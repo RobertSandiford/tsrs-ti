@@ -206,8 +206,9 @@ with a recorder (`runner.patch` + `tsrs_dump.go`) and writes every scenario as J
 ops of every edit, both in the incremental run and replayed from scratch for the non-incremental comparison. The
 harness (`crates/tsrs_execute/src/tsctests`, a `#[cfg(test)]` module of the driver crate because it drives
 `execute::command_line_with_testing`) replays them with a fake clock, the FS differ, the readable buildinfo and the
-output sanitizer of `tsctests/sys.go`. Watch scenarios are skipped; content-mapper scenarios use the in-process
-test mappers of `tsrs_contentmappertest`.
+output sanitizer of `tsctests/sys.go`. Watch scenarios (`tscWatch/`, `tsbuildWatch/`) drive the watcher through
+Go's mock watch backend (`tsctests/mockwatch.rs`); content-mapper scenarios use the in-process test mappers of
+`tsrs_contentmappertest`.
 
 ## Validation
 
@@ -220,7 +221,7 @@ Build the CLI and conformance runner as described in [CONTRIBUTING.md](../CONTRI
 
 The emit harness mirrors Go's pre- and post-emit programs, output ordering, declaration recompilation and
 `noCheck` repeat. Its `baseline.DiffText` uses the `similar` crate's patience algorithm and unified format.
-Go's own nondeterministic emit-test skip list is preserved. Watch scenarios are skipped.
+Go's own nondeterministic emit-test skip list is preserved.
 
 ### Emit oracle
 
@@ -251,8 +252,7 @@ two-package fixture.
 
 ## Known limitations
 
-CLI build mode retains finished programs and can use more memory than tsgo on large graphs. Watch mode is
-not ported. Content-mapper conformance cases that need `runExternalCode` are not run yet.
+CLI build mode retains finished programs and can use more memory than tsgo on large graphs. Content-mapper conformance cases that need `runExternalCode` are not run yet.
 
 The const-enum inliner checks property accesses during emit, so emit can change where a diagnostic is first
 reported, as in tsgo. A `--noEmit` run does not take that path. Match the pinned TypeScript source, compiler

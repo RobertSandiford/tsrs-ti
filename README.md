@@ -22,7 +22,7 @@ We aim to release a stable version against TypeScript 7.1 with 100% conformance.
 
 We take conformance really seriously and are fixing the remaining 0.01% of issues we discover in existing projects.
 
-`--watch`, `--init` and `--showConfig` are not supported. See [compatibility and evidence](https://github.com/maschwenk/tsrs/blob/main/docs/COMPATIBILITY.md)
+`--init` and `--showConfig` are not supported. See [compatibility and evidence](https://github.com/maschwenk/tsrs/blob/main/docs/COMPATIBILITY.md)
 for supported features and known gaps.
 
 [![Performance](https://raw.githubusercontent.com/maschwenk/tsrs/main/bench/large-projects.svg)](https://github.com/maschwenk/tsrs/blob/main/bench/RESULTS.md)
