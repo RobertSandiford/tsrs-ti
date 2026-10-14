@@ -90,6 +90,8 @@ fn setup_with(files: &[(&str, &str)], vs: bool) -> (LanguageService, Context) {
     caps.text_document.hover.content_format = vec![lsproto::MarkupKind::Markdown];
     caps.text_document.definition.link_support = true;
     caps.text_document.type_definition.link_support = true;
+    caps.text_document.semantic_tokens.token_types = ["namespace", "class", "enum", "interface", "struct", "typeParameter", "type", "parameter", "variable", "property", "enumMember", "decorator", "event", "function", "method", "macro", "label", "comment", "string", "keyword", "number", "regexp", "operator"].map(String::from).to_vec();
+    caps.text_document.semantic_tokens.token_modifiers = ["declaration", "definition", "readonly", "static", "deprecated", "abstract", "async", "modification", "documentation", "defaultLibrary"].map(String::from).to_vec();
     caps.vs_supports_visual_studio_extensions = vs;
     let ctx = lsproto::with_client_capabilities(&Context::background(), Arc::new(caps));
     (ls, ctx)
@@ -208,4 +210,59 @@ fn hover_visual_studio_raw_content() {
     let uri = lsconv::file_name_to_document_uri("/index.ts");
     assert_eq!(json(&ls.provide_hover(&ctx, &lsproto::HoverParams { text_document: lsproto::TextDocumentIdentifier { uri: uri.clone() }, position: position_of(INDEX, "add(p.x"), ..Default::default() }).unwrap()), r#"{"contents":{"kind":"markdown","value":"```typescript\nfunction add(a: number, b: number): number;\n```\nAdds two numbers.\n\n*@param* `a` — the first\n\n*@returns* — the sum"},"range":{"start":{"line":8,"character":14},"end":{"line":8,"character":17}},"_vs_rawContent":{"Style":1,"Elements":[{"Style":0,"Elements":[{"ImageId":{"Guid":"ae27a6b0-e345-4288-96df-5eaf394ee369","Id":1880,"_vs_type":"ImageId"},"_vs_type":"ImageElement"},{"Runs":[{"ClassificationTypeName":"keyword","Text":"function ","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"method name","Text":"add","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":"(","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"parameter name","Text":"a","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":":","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"whitespace","Text":" ","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"keyword","Text":"number","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":",","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"whitespace","Text":" ","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"parameter name","Text":"b","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":":","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"whitespace","Text":" ","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"keyword","Text":"number","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":")","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":":","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"whitespace","Text":" ","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"keyword","Text":"number","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":";","_vs_type":"ClassifiedTextRun"}],"_vs_type":"ClassifiedTextElement"}],"_vs_type":"ContainerElement"},{"Runs":[{"ClassificationTypeName":"text","Text":"Adds two numbers.","_vs_type":"ClassifiedTextRun"}],"_vs_type":"ClassifiedTextElement"}],"_vs_type":"ContainerElement"}}"#, "{}", "add(p.x");
     assert_eq!(json(&ls.provide_hover(&ctx, &lsproto::HoverParams { text_document: lsproto::TextDocumentIdentifier { uri }, position: position_of(INDEX, "x: 1"), ..Default::default() }).unwrap()), r#"{"contents":{"kind":"markdown","value":"```typescript\n(property) Point.x: number\n```\n"},"range":{"start":{"line":7,"character":19},"end":{"line":7,"character":20}},"_vs_rawContent":{"Style":0,"Elements":[{"ImageId":{"Guid":"ae27a6b0-e345-4288-96df-5eaf394ee369","Id":2436,"_vs_type":"ImageId"},"_vs_type":"ImageElement"},{"Runs":[{"ClassificationTypeName":"punctuation","Text":"(","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"text","Text":"property","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":") ","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"property name","Text":"Point.x","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"punctuation","Text":": ","_vs_type":"ClassifiedTextRun"},{"ClassificationTypeName":"keyword","Text":"number","_vs_type":"ClassifiedTextRun"}],"_vs_type":"ClassifiedTextElement"}],"_vs_type":"ContainerElement"}}"#, "{}", "x: 1");
+}
+
+// A JSDoc `@this` tag adds a `this` parameter whose name has no source position. Building the name table of such
+// a file (any search for a global name) panicked. The highlights were recorded from tsgo-ref; the definition of
+// `this` deliberately points at the tag name where tsgo-ref returns the start of the file (docs/LSP.md, "Deviations
+// from Go").
+#[test]
+fn jsdoc_this_parameter() {
+    const A: &str = "const m = 1;\nm;\n/** @this {string} */\nfunction f() { return this.length; }\n";
+    let files = [("/tsconfig.json", r#"{"compilerOptions":{"allowJs":true,"checkJs":true,"noEmit":true},"files":["a.js"]}"#), ("/a.js", A)];
+    let (ls, ctx) = setup(&files);
+    let uri = lsconv::file_name_to_document_uri("/a.js");
+    assert_eq!(
+        json(&ls.provide_document_highlights(&ctx, &uri, position_of(A, "m;")).unwrap()),
+        r#"[{"range":{"start":{"line":0,"character":6},"end":{"line":0,"character":7}},"kind":3},{"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":1}},"kind":2}]"#
+    );
+    let this_definition = r#"[{"originSelectionRange":{"start":{"line":3,"character":22},"end":{"line":3,"character":26}},"targetUri":"file:///a.js","targetRange":{"start":{"line":2,"character":5},"end":{"line":2,"character":9}},"targetSelectionRange":{"start":{"line":2,"character":5},"end":{"line":2,"character":9}}}]"#;
+    assert_eq!(json(&ls.provide_definition(&ctx, &uri, position_of(A, "this.length")).unwrap()), this_definition);
+    assert_eq!(json(&ls.provide_source_definition(&ctx, &uri, position_of(A, "this.length")).unwrap()), this_definition);
+}
+
+// U+2028 / U+2029 end an ECMAScript line. Slicing up to "next line start - 1" (Go's arithmetic) cut through their
+// three-byte encoding and panicked; the line now ends before the whole line break, so a region's collapsed text and
+// end do not include part of it (tsgo-ref returns `foo` plus two U+FFFD and an end two characters later; docs/LSP.md,
+// "Deviations from Go"). The JSDoc template after `/**` matches tsgo-ref's for the same text with `\n`.
+#[test]
+fn ecma_line_separators() {
+    const A: &str = "// #region foo\u{2028}let a = 1;\n// #endregion\u{2028}let b = 2;\n/**\u{2029}function f(x) {}\n";
+    let files = [("/tsconfig.json", r#"{"files":["a.ts"]}"#), ("/a.ts", A)];
+    let (ls, _) = setup(&files);
+    let mut caps = lsproto::ResolvedClientCapabilities::default();
+    caps.text_document.folding_range.folding_range.collapsed_text = true;
+    let ctx = lsproto::with_client_capabilities(&Context::background(), Arc::new(caps));
+    let uri = lsconv::file_name_to_document_uri("/a.ts");
+    assert_eq!(
+        json(&ls.provide_folding_range(&ctx, &uri).unwrap()),
+        r#"[{"startLine":0,"startCharacter":0,"endLine":1,"endCharacter":13,"kind":"region","collapsedText":"foo"},{"startLine":2,"startCharacter":0,"endLine":3,"endCharacter":0,"kind":"comment"}]"#
+    );
+    let completion = json(&ls.provide_completion(&ctx, &uri, position_of(A, "\u{2029}function"), None).unwrap());
+    assert!(completion.contains(r#""label":"/** */""#), "{completion}");
+}
+
+// `not` is a property whose type has call signatures and properties: Go classifies it as a property. With lazy member
+// tables the instantiated interface's resolved property list is empty, which used to make it a method. Expected
+// tokens recorded from `tsgo-ref --lsp -stdio`.
+#[test]
+fn semantic_tokens_property_of_lazily_resolved_interface() {
+    let text = "interface A<T> { (x: string): A<T>; not: A<T>; foo(): void }\ndeclare function expect<T>(x: T): A<T>;\nexpect(1).not.foo();\n";
+    let files = [("/tsconfig.json", r#"{"compilerOptions":{"strict":true},"files":["index.ts"]}"#), ("/index.ts", text)];
+    let (ls, ctx) = setup(&files);
+    let uri = lsconv::file_name_to_document_uri("/index.ts");
+    assert_eq!(
+        json(&ls.provide_semantic_tokens(&ctx, &uri).unwrap()),
+        r#"{"data":[0,10,1,3,1,0,2,1,5,1,0,6,1,7,1,0,12,1,3,0,0,2,1,5,0,0,4,3,9,1,0,5,1,3,0,0,2,1,5,0,0,4,3,14,1,1,17,6,13,1,0,7,1,5,1,0,3,1,7,1,0,3,1,5,0,0,4,1,3,0,0,2,1,5,0,1,0,6,13,0,0,10,3,9,0,0,4,3,14,0]}"#
+    );
 }

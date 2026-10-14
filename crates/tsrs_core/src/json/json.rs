@@ -229,13 +229,17 @@ fn write_string(out: &mut String, s: &str) {
 pub fn unmarshal(input: &str) -> Result<Value, String> {
     let mut p = JsonParser { s: input.as_bytes(), pos: 0 };
     p.skip_ws();
-    let v = p.parse_value()?;
+    let v = p.parse_value(0)?;
     p.skip_ws();
     if p.pos != p.s.len() {
         return Err(format!("jsontext: invalid character after top-level value at offset {}", p.pos));
     }
     Ok(v)
 }
+
+// jsontext's maxNestingDepth: opening a container deeper than this is an error (state.go `errMaxDepth`). The
+// limit also bounds the parser's recursion, so a deeply nested input cannot overflow the stack.
+const MAX_NESTING_DEPTH: usize = 10000;
 
 struct JsonParser<'a> {
     s: &'a [u8],
@@ -251,7 +255,11 @@ impl JsonParser<'_> {
         Err(format!("jsontext: {msg} at offset {}", self.pos))
     }
 
-    fn parse_value(&mut self) -> Result<Value, String> {
+    // `depth` counts the containers enclosing the value.
+    fn parse_value(&mut self, depth: usize) -> Result<Value, String> {
+        if depth == MAX_NESTING_DEPTH && matches!(self.s.get(self.pos), Some(b'[' | b'{')) {
+            return self.err("exceeded max depth");
+        }
         match self.s.get(self.pos) {
             None => self.err("unexpected EOF"),
             Some(b'n') => self.literal("null", Value::Null),
@@ -268,7 +276,7 @@ impl JsonParser<'_> {
                 }
                 loop {
                     self.skip_ws();
-                    items.push(self.parse_value()?);
+                    items.push(self.parse_value(depth + 1)?);
                     self.skip_ws();
                     match self.s.get(self.pos) {
                         Some(b',') => self.pos += 1,
@@ -300,7 +308,7 @@ impl JsonParser<'_> {
                     }
                     self.pos += 1;
                     self.skip_ws();
-                    let value = self.parse_value()?;
+                    let value = self.parse_value(depth + 1)?;
                     match members.entry(key) {
                         Entry::Occupied(entry) => {
                             return self.err(&format!("duplicate object member name {}", marshal_string(entry.key())));
@@ -382,8 +390,14 @@ impl JsonParser<'_> {
         if self.pos + 4 > self.s.len() {
             return self.err("invalid escape sequence");
         }
-        let text = std::str::from_utf8(&self.s[self.pos..self.pos + 4]).map_err(|e| e.to_string())?;
-        let v = u32::from_str_radix(text, 16).or_else(|_| self.err("invalid escape sequence"))?;
+        // jsonwire.parseHexUint16: exactly four hex digits (`u32::from_str_radix` would take a leading '+').
+        let mut v = 0;
+        for &c in &self.s[self.pos..self.pos + 4] {
+            let Some(digit) = (c as char).to_digit(16) else {
+                return self.err("invalid escape sequence");
+            };
+            v = v * 16 + digit;
+        }
         self.pos += 4;
         Ok(v)
     }
@@ -476,5 +490,35 @@ mod tests {
             let expected: f64 = text.parse().unwrap();
             assert_eq!(n.to_bits(), expected.to_bits(), "{text}");
         }
+    }
+
+    #[test]
+    fn unicode_escape_needs_four_hex_digits() {
+        assert_eq!(unmarshal(r#""\u0041\u00e9\u00C9""#).unwrap(), Value::String("AéÉ".to_string()));
+        for text in [r#""\u+041""#, r#""\u-041""#, r#""\u 041""#, r#""\u004""#, r#""\ud83d\u+e00""#] {
+            assert!(unmarshal(text).unwrap_err().starts_with("jsontext: invalid escape sequence"), "{text}");
+        }
+    }
+
+    #[test]
+    fn max_nesting_depth() {
+        // Recursion to the limit needs more than the default test thread stack in an unoptimized build.
+        std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(|| {
+                let nested = |open: &str, close: &str, depth: usize| format!("{}{}", open.repeat(depth), close.repeat(depth));
+                assert!(unmarshal(&nested("[", "]", MAX_NESTING_DEPTH)).is_ok());
+                assert!(unmarshal(&format!("{{\"a\":{}}}", nested("[", "]", MAX_NESTING_DEPTH - 1))).is_ok());
+                assert_eq!(unmarshal(&nested("[", "]", MAX_NESTING_DEPTH + 1)).unwrap_err(), "jsontext: exceeded max depth at offset 10000");
+                let deep_object = format!("{{\"a\":{}", nested("[", "]", MAX_NESTING_DEPTH));
+                assert_eq!(unmarshal(&deep_object).unwrap_err(), "jsontext: exceeded max depth at offset 10004");
+                // Far deeper than the stack could recurse.
+                assert!(unmarshal(&nested("[", "]", 2_000_000)).is_err());
+                // Scalars at the limit are fine.
+                assert!(unmarshal(&format!("{}1{}", "[".repeat(MAX_NESTING_DEPTH), "]".repeat(MAX_NESTING_DEPTH))).is_ok());
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 }

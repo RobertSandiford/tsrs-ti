@@ -151,7 +151,7 @@ for server data; see [the memory design](../notes/lsp-mem.md) and
 | object | Go lifetime | tsrs lifetime |
 | --- | --- | --- |
 | a parsed file version (text, AST, symbols, flow nodes, and its lazily filled data) | until neither the parse cache nor a live program refers to it | **file region**: the parse cache's parse function runs parse + bind in a fresh region; the cache entry owns it until its final `Deref`, and so does every program owner whose program contains the file |
-| types, signatures, links, transient symbols, synthetic nodes of a program's checkers | until the program's pool is unreachable | **checker region** per pooled checker: the holder's allocation target while it is created and while it is held; freed with the pool when the program is freed (a disposed checker is parked until then, see below) |
+| types, signatures, links, transient symbols, synthetic nodes of a program's checkers | until nothing refers to the checker or its data | **checker region** per pooled checker: the holder's allocation target while it is created and while it is held; a disposed checker (idle timeout, cancellation) is freed once the requests that held it are done, or with the pool when its data may outlive them (see below) |
 | `Program` (file lists, maps, resolution data; cloned per edit by `ReuseProgram`) | GC | **program owner** (`tsrs_project` memregions.rs), held by every `Project` value that refers to the program; what `CreateProgram` allocates is in the version's region, the full build's region is shared by its clones (they share its processed-file data); dropping the owner frees the checkers, the `Program` (`tsrs_compiler::free_program`) and the regions |
 | auto-import registry update scratch (module and alias resolvers, extraction checkers, resolution caches) | GC | **scratch region** per `Registry::clone_registry`, freed before it returns; files the update acquired are released at the end of the snapshot clone as in Go (and freed when nothing else holds them) |
 | auto-import registry versions (buckets, indexes, entrypoints: heap; directories' package.json entries: arena) | GC | heap values by Rust ownership; the package.json entries an update reads for `directories` go to a **package.json region** of that update, held by every registry version whose directories still refer into it (`Registry::regions`) |
@@ -178,9 +178,16 @@ Two ownership constraints matter when changing this code:
   language service from an older snapshot holds no snapshot reference in Go either and relies on the GC. The owner
   is therefore tied to Rust ownership of the `Project` values (snapshots and language services hold them), and file
   regions are owned by program owners as well as by the cache entry.
-- Checker regions are not freed when a checker is disposed (idle timeout, cancellation): its data can be referenced
-  from pool- and program-lifetime structures (global diagnostics, the declaration diagnostics cache). Disposed
-  checkers are parked with their regions until the pool is freed; holding a checker keeps the program owner alive.
+- A disposed checker (idle timeout, cancellation) is freed with its region once no request that held it can still
+  use its data: Go's language service keeps using results after releasing the checker (diagnostics are converted
+  after `GetSemanticDiagnostics` returned), so the dispatch loop gives every message a lease
+  (`tsrs_project::checkerDataLease`, in the request context and, while the handler runs, the thread's), each
+  acquisition registers it with the checker, and the free waits for the checker's last lease to end. A checker held
+  without a lease (outside the server's dispatch loop; the API checker, whose handles outlive requests) is pinned,
+  and a checker whose data was stored in a pool- or program-lifetime structure is marked escaped
+  (`arena::note_escape`: the pool's accumulated global diagnostics, the program's declaration diagnostics cache, the
+  include processor's diagnostics); both are parked until the pool is freed. Holding a checker keeps the program
+  owner alive.
 
 The census build is the gate (notes/mem-recycle.md; at server exit with `TSRS_CENSUS=1`, roots = server, session,
 snapshot): a freed region is recorded as would-free and kept, and nothing reachable may point into it. Kept `None`
@@ -280,3 +287,20 @@ Checked in the code on 2026-10-10; collected from the porting waves' notes.
 - Cross-project orchestration (`handle_cross_project`, references / rename across projects) searches projects
   sequentially; Go fans out to goroutines. Results are merged in the same order, so responses are identical; only
   latency differs on multi-project workspaces.
+- The `this` parameter that a JSDoc `@this` tag adds has a name without a source position (Go position -1). Go's name
+  table stores -1 for it, which reads as "appears more than once"; tsrs stores the same. Go to definition and source
+  definition on `this` point at the tag name (`definition.rs`, `get_file_and_start_pos_from_declaration`) where Go
+  converts -1 to the start of the file.
+- A line that ends in U+2028 / U+2029 ends before the line break (`get_line_end_of_position`, completions_2.rs). Go
+  subtracts one byte, which ends the line inside the break's three-byte encoding: a `#region` / `#endregion` line's
+  folding range then ends two characters later and its collapsed text ends in two U+FFFD, and a `/**` followed by
+  the break gets JSDoc tag completions instead of the JSDoc template that `\n` gets.
+- With the UTF-8 position encoding, a character offset inside a multi-byte character snaps back to the start of that
+  character (`line_and_character_to_position`), as a UTF-16 offset inside a surrogate pair does. Go keeps the byte
+  offset: an edit there splits the character and leaves invalid UTF-8 in the overlay, which Rust text cannot hold.
+- Signature help in JSX attributes: Go builds the attributes' argument span with the length as its end
+  (`core.NewTextRange(attributeSpanStart, attributeSpanEnd-attributeSpanStart)`, ls/signaturehelp.go:1002), so the
+  span rarely contains the position and Go walks on to an enclosing call. tsrs computes the real span
+  (signaturehelp.rs `get_immediately_containing_argument_info`). Inside a JSX element that is itself in a call's
+  argument (`wrap(() => <Comp href={…} />)`), tsrs shows the element's signature (none for an intrinsic element)
+  where Go shows the enclosing call's; outside a call both show the element's signature.
