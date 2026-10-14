@@ -102,9 +102,11 @@ structure with OS threads:
 - read thread: `Server::read_loop` (frames, `initialize`, responses to server->client requests, `$/cancelRequest`);
 - dispatch thread: `Server::dispatch_loop`, runs `handle_request_or_notification`;
 - write thread: `Server::write_loop`;
-- async request work runs on a **fixed pool of worker threads** with 512 MB stacks (the checker recurses as deeply
-  as in the CLI). Not a thread per request: every thread owns a leak arena that is never returned (`tsrs_core::ptr`
-  `ARENA`), so a thread per request would leak at least one arena chunk per request.
+- async request work runs on worker threads with 512 MB stacks (the checker recurses as deeply as in the CLI). As
+  with Go's goroutine per request, a job never waits for a thread: when every worker is busy (often blocked on a
+  checker), another one starts. `max(4, available_parallelism)` workers stay and wait for jobs; one beyond that
+  exits when it finds no job, handing back its thread arena and slab (`tsrs_core::ptr` `ReleaseAtExit`), so the
+  thread count follows the requests in flight (notes/lsp-server.md has the numbers).
 - session-level background work (Go's `background.Queue`, scheduled diagnostics refreshes, snapshot updates on
   timers) runs on a separate fixed pool of 6 background threads with 512 MB stacks (`tsrs_project::background`);
   Go's `time.AfterFunc` -> one timer thread with a deadline heap that dispatches the callbacks onto those workers.
@@ -156,6 +158,7 @@ for server data; see [the memory design](../notes/lsp-mem.md) and
 | auto-import registry update scratch (module and alias resolvers, extraction checkers, resolution caches) | GC | **scratch region** per `Registry::clone_registry`, freed before it returns; files the update acquired are released at the end of the snapshot clone as in Go (and freed when nothing else holds them) |
 | auto-import registry versions (buckets, indexes, entrypoints: heap; directories' package.json entries: arena) | GC | heap values by Rust ownership; the package.json entries an update reads for `directories` go to a **package.json region** of that update, held by every registry version whose directories still refer into it (`Registry::regions`) |
 | package.json cache entries of a program's resolution data (copied to its clones) | GC | the original cache's region when added while that region is the allocation target (the full build); otherwise the thread arena (`arena::enter_table_owner`) |
+| symlinked directories and files the project-reference dts-faking host learns (the host is shared by every version cloned from a full build) | GC | the thread arena (`arena::enter_table_owner`; the host's table is on the heap): a module specifier lookup can add one while a checker or a later version's region is the target |
 | request-scoped results (lsproto values, strings) | GC | ordinary Rust ownership |
 
 Mechanism (`tsrs_core::arena`): `Region::enter` makes a region the thread's allocation target until the returned
@@ -164,13 +167,14 @@ own, so its free lists and checkpoints are its own (a recycling site frees into 
 debug builds assert it). It keeps a drop list of the values allocated in it whose type needs drop, and freeing it
 runs those drops, so heap memory owned by links and tables goes too. Lazily filled data of a shared object is routed
 to the object's own region (`arena::enter_owner(addr)`: `SourceFile`'s JSDoc cache, line and position maps, name
-table, identifier set, token cache, declaration map; the program's symlink cache goes to the full build's region);
-process-wide statics allocate in the thread arena (`arena::enter_thread_arena`). Entries of a table that later
-versions copy and any thread may fill (the resolution data's package.json cache) use `arena::enter_table_owner`:
-the current target if the table lives in it, else the thread arena, without waiting for a region another thread has
-entered (parse workers fill the cache while the building thread holds the full build's region). Regions bump upwards and their
-chunks are carved from per-thread slabs, and a file region is trimmed after binding: tens of thousands of file
-regions would otherwise each cost a partly used page.
+table, identifier set, token cache, declaration map; a command line's rootDir errors; the program's symlink cache
+goes to the full build's region); process-wide statics allocate in the thread arena (`arena::enter_thread_arena`).
+Entries of a table that later versions share or copy and any thread may fill (the resolution data's package.json
+cache, the dts-faking host's symlinks) use `arena::enter_table_owner`: the current target if the table lives in it,
+else the thread arena, without waiting for a region another thread has entered (parse workers fill the cache while
+the building thread holds the full build's region). Regions bump upwards and their chunks are carved from per-thread
+slabs, and a file region is trimmed after binding: tens of thousands of file regions would otherwise each cost a
+partly used page.
 
 Two ownership constraints matter when changing this code:
 
@@ -298,9 +302,23 @@ Checked in the code on 2026-10-10; collected from the porting waves' notes.
 - With the UTF-8 position encoding, a character offset inside a multi-byte character snaps back to the start of that
   character (`line_and_character_to_position`), as a UTF-16 offset inside a surrogate pair does. Go keeps the byte
   offset: an edit there splits the character and leaves invalid UTF-8 in the overlay, which Rust text cannot hold.
+  Byte offsets that skip the converter snap the same way (`lsconv::snap_to_char_boundary`): `data.position` in
+  `completionItem/resolve`, and the API's `getCompletionsAtPosition`, whose UTF-16 offset between the halves of a
+  surrogate pair maps inside the character. Go slices its strings at those bytes; Rust panicked there.
 - Signature help in JSX attributes: Go builds the attributes' argument span with the length as its end
   (`core.NewTextRange(attributeSpanStart, attributeSpanEnd-attributeSpanStart)`, ls/signaturehelp.go:1002), so the
   span rarely contains the position and Go walks on to an enclosing call. tsrs computes the real span
   (signaturehelp.rs `get_immediately_containing_argument_info`). Inside a JSX element that is itself in a call's
   argument (`wrap(() => <Comp href={…} />)`), tsrs shows the element's signature (none for an intrinsic element)
   where Go shows the enclosing call's; outside a call both show the element's signature.
+- A `file:` URI whose percent-escapes decode to invalid UTF-8 (`latin%FF1.ts`) names a file with U+FFFD in place of
+  each bad sequence (`DocumentUri::file_name`, lsp.rs `unescape`); Go keeps the raw bytes. Responses for such an open
+  document (definition, references, rename) then name `latin%EF%BF%BD1.ts`, a document the client never opened,
+  where Go answers with `latin%FF1.ts`; and two open URIs that differ only in such bytes (`%FF` and `%FE`) share one
+  overlay. Rust file names cannot hold the bytes; keeping the escape text would collide with a real file named
+  `latin%FF1.ts` (URI `latin%25FF1.ts`), and mapping the bytes to other characters with a file that contains those
+  characters, so only remembering each open document's URI would fix it. Go's handling is not lossless
+  either: the file name in completion item data reaches the client with U+FFFD (JSON encoding), so its
+  `completionItem/resolve` on that document fails with "no project found". On disk neither reads such a file: Go's
+  and tsrs's directory reads both yield the U+FFFD name, and a file matched by `include` is reported as not found
+  (TS6053).
