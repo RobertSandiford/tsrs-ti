@@ -119,6 +119,7 @@ pub static ErrUnavailable: Sentinel = Sentinel("fswatch: watcher not available o
 pub static ErrFilesystemUnsupported: Sentinel = Sentinel("fswatch: watcher backend unsupported on this filesystem");
 
 // `fmt.Errorf("%w: watched directory removed", ErrWatchTerminated)`.
+#[cfg(unix)]
 pub(crate) fn err_watched_directory_removed() -> Error {
     Error::wrap(format!("{}: watched directory removed", ErrWatchTerminated.0), &ErrWatchTerminated.into())
 }
@@ -996,6 +997,7 @@ impl dirWatch {
     // watcher.go:866
     // displayPath maps a physical event path back under the caller-visible
     // watch root.
+    #[cfg(unix)]
     pub(crate) fn display_path(&self, watch_path: &str) -> String {
         rebase_path(watch_path, &self.physical_dir, &self.dir)
     }
@@ -1042,6 +1044,7 @@ impl dirWatch {
     }
 
     // watcher.go:926
+    #[cfg(unix)]
     pub(crate) fn notify(&self) {
         let st = self.mu.lock().unwrap();
         let has_pending_cbs = st.callbacks.iter().any(|cb| !cb.delivered);

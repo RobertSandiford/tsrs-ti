@@ -67,6 +67,7 @@ impl eventList {
     // create records a new-file event for path. Both create and update
     // produce EventUpdate externally; sequence state tracks coalescing
     // (create+delete within a batch cancels out).
+    #[cfg(any(unix, test))]
     pub(crate) fn create(&self, path: &str) {
         let mut el = self.mu.lock().unwrap();
         let seq = el.next_seq_locked();
@@ -75,6 +76,7 @@ impl eventList {
 
     // event.go:79
     // update records an update event for path.
+    #[cfg(any(unix, test))]
     pub(crate) fn update(&self, path: &str) {
         let mut el = self.mu.lock().unwrap();
         let seq = el.next_seq_locked();
@@ -100,6 +102,7 @@ impl eventList {
 
     // event.go:106
     // remove records a delete event for path.
+    #[cfg(any(unix, test))]
     pub(crate) fn remove(&self, path: &str) {
         let mut el = self.mu.lock().unwrap();
         let seq = el.next_seq_locked();
@@ -183,6 +186,7 @@ impl eventList {
 
     // event.go:201
     // setError stores the first error encountered (later errors are ignored).
+    #[cfg(any(unix, test))]
     pub(crate) fn set_error(&self, err: Error) {
         let mut el = self.mu.lock().unwrap();
         if el.err.is_none() {
@@ -211,6 +215,7 @@ impl eventList {
 
 impl eventListState {
     // event.go:65
+    #[cfg(any(unix, test))]
     fn create_locked(&mut self, path: &str, seq: u64) {
         let entry = self.get_or_create(path);
         if entry.is_deleted() {
@@ -226,6 +231,7 @@ impl eventListState {
     }
 
     // event.go:101
+    #[cfg(any(unix, test))]
     fn update_locked(&mut self, path: &str, seq: u64) {
         self.get_or_create(path).updated_seq = seq;
     }
@@ -281,6 +287,7 @@ impl eventListState {
 
 impl eventEntry {
     // event.go:252
+    #[cfg(any(unix, test))]
     fn is_deleted(&self) -> bool {
         self.deleted_seq > self.created_seq && self.deleted_seq > self.updated_seq
     }
