@@ -275,3 +275,235 @@ fn completion_resolve_snaps_client_data_position() {
     }
     let _ = close_client.close();
 }
+
+// Not a Go test (Go panics on each, ending the session). A client's bad input gets an error, and the server keeps
+// answering: URIs `file_name` cannot use (in document requests and notifications, file renames, watched file events
+// and call hierarchy items), a change after the close of the same document, a completion item without a rooted file
+// name and a code lens without data.
+#[test]
+fn bad_client_input_does_not_end_the_session() {
+    use crate::lsptestutil::{acknowledge_registrations, new_lsp_client, test_server_options};
+
+    let files = [("/home/projects/tsconfig.json", "{}"), ("/home/projects/index.ts", "export const abc = 1;\n")];
+    let (client, close_client) = new_lsp_client(test_server_options("/home/projects", &files), Some(acknowledge_registrations()));
+    let (init_msg, _) = client.send_request(lsproto::INITIALIZE_INFO, lsproto::InitializeParams::default());
+    assert!(init_msg.error.is_none(), "Initialize failed");
+    client.send_notification(lsproto::INITIALIZED_INFO, lsproto::InitializedParams::default());
+    client.server.init_complete().wait();
+    let good = lsproto::DocumentUri::from("file:///home/projects/index.ts");
+    let hover = |uri: &lsproto::DocumentUri| {
+        client.send_request(
+            lsproto::TEXT_DOCUMENT_HOVER_INFO,
+            lsproto::HoverParams { text_document: lsproto::TextDocumentIdentifier { uri: uri.clone() }, position: lsproto::Position { line: 0, character: 14 }, ..Default::default() },
+        )
+    };
+    let open = |uri: &lsproto::DocumentUri| {
+        client.send_notification(
+            lsproto::TEXT_DOCUMENT_DID_OPEN_INFO,
+            lsproto::DidOpenTextDocumentParams {
+                text_document: lsproto::TextDocumentItem { uri: uri.clone(), language_id: lsproto::LanguageKind::TypeScript, text: "export const abc = 1;\n".to_string(), ..Default::default() },
+            },
+        );
+    };
+    let is_invalid_params = |msg: &lsproto::ResponseMessage| msg.error.as_ref().is_some_and(|e| e.code == lsproto::ErrorCode::InvalidParams.0);
+    open(&good);
+
+    for bad in ["", "not a uri", "relative/path.ts", "file://", "foo://host"] {
+        let uri = lsproto::DocumentUri::from(bad);
+        let (msg, _) = hover(&uri);
+        assert!(is_invalid_params(&msg), "hover {bad:?}: {:?}", msg.error);
+        open(&uri);
+        client.send_notification(lsproto::TEXT_DOCUMENT_DID_CLOSE_INFO, lsproto::DidCloseTextDocumentParams { text_document: lsproto::TextDocumentIdentifier { uri: uri.clone() } });
+        client.send_notification(
+            lsproto::WORKSPACE_DID_CHANGE_WATCHED_FILES_INFO,
+            lsproto::DidChangeWatchedFilesParams { changes: vec![lsproto::FileEvent { uri: uri.clone(), type_: lsproto::FileChangeType(2) }] },
+        );
+        let (msg, _) = client.send_request(
+            lsproto::WORKSPACE_WILL_RENAME_FILES_INFO,
+            lsproto::RenameFilesParams { files: vec![lsproto::FileRename { old_uri: uri.clone(), new_uri: good.clone() }] },
+        );
+        assert!(is_invalid_params(&msg), "willRenameFiles {bad:?}: {:?}", msg.error);
+        let item = lsproto::CallHierarchyItem { name: "abc".to_string(), uri: uri.clone(), ..Default::default() };
+        let (msg, _) = client.send_request(lsproto::CALL_HIERARCHY_OUTGOING_CALLS_INFO, lsproto::CallHierarchyOutgoingCallsParams { item, ..Default::default() });
+        assert!(is_invalid_params(&msg), "outgoingCalls {bad:?}: {:?}", msg.error);
+    }
+
+    // A change right after the close of the same document.
+    let other = lsproto::DocumentUri::from("file:///home/projects/other.ts");
+    open(&other);
+    client.send_notification(lsproto::TEXT_DOCUMENT_DID_CLOSE_INFO, lsproto::DidCloseTextDocumentParams { text_document: lsproto::TextDocumentIdentifier { uri: other.clone() } });
+    client.send_notification(
+        lsproto::TEXT_DOCUMENT_DID_CHANGE_INFO,
+        lsproto::DidChangeTextDocumentParams {
+            text_document: lsproto::VersionedTextDocumentIdentifier { uri: other.clone(), version: 2 },
+            content_changes: vec![lsproto::TextDocumentContentChangePartialOrWholeDocument {
+                whole_document: Some(lsproto::TextDocumentContentChangeWholeDocument { text: "x".to_string() }),
+                ..Default::default()
+            }],
+        },
+    );
+
+    for file_name in ["", "tsconfig.json", "untitled:Untitled-1", "file:///home/projects/index.ts"] {
+        let item = lsproto::CompletionItem {
+            label: "abc".to_string(),
+            data: Some(lsproto::CompletionItemData { file_name: file_name.to_string(), ..Default::default() }),
+            ..Default::default()
+        };
+        let (msg, _) = client.send_request(lsproto::COMPLETION_ITEM_RESOLVE_INFO, item);
+        assert!(is_invalid_params(&msg), "resolve {file_name:?}: {:?}", msg.error);
+    }
+    let (msg, _) = client.send_request(lsproto::CODE_LENS_RESOLVE_INFO, lsproto::CodeLens::default());
+    assert!(is_invalid_params(&msg), "code lens without data: {:?}", msg.error);
+
+    let (msg, resp) = hover(&good);
+    assert!(msg.error.is_none() && resp.is_some(), "the session still answers: {:?}", msg.error);
+    let _ = close_client.close();
+}
+
+// Not a Go test (Go dereferences the missing session and panics). A document request between `initialize` and
+// `initialized` gets ServerNotInitialized.
+#[test]
+fn document_requests_before_initialized_get_an_error() {
+    use crate::lsptestutil::{acknowledge_registrations, new_lsp_client, test_server_options};
+
+    let (client, close_client) = new_lsp_client(test_server_options("/home/projects", &[]), Some(acknowledge_registrations()));
+    let (init_msg, _) = client.send_request(lsproto::INITIALIZE_INFO, lsproto::InitializeParams::default());
+    assert!(init_msg.error.is_none(), "Initialize failed");
+    let uri = lsproto::DocumentUri::from("file:///home/projects/index.ts");
+    let (msg, _) = client.send_request(
+        lsproto::TEXT_DOCUMENT_HOVER_INFO,
+        lsproto::HoverParams { text_document: lsproto::TextDocumentIdentifier { uri }, ..Default::default() },
+    );
+    assert_eq!(msg.error.map(|e| e.code), Some(lsproto::ErrorCode::ServerNotInitialized.0));
+    let _ = close_client.close();
+}
+
+// Not a Go test (Go panics in `FileName` when the session starts). A rootUri the server cannot use falls back to the
+// server's directory.
+#[test]
+fn a_bad_root_uri_falls_back_to_the_server_directory() {
+    use crate::lsptestutil::{acknowledge_registrations, new_lsp_client, test_server_options};
+
+    let files = [("/home/projects/tsconfig.json", "{}"), ("/home/projects/index.ts", "export const abc = 1;\n")];
+    let (client, close_client) = new_lsp_client(test_server_options("/home/projects", &files), Some(acknowledge_registrations()));
+    let params = lsproto::InitializeParams { root_uri: lsproto::DocumentUriOrNull { document_uri: Some(lsproto::DocumentUri::from("not a uri")) }, ..Default::default() };
+    let (init_msg, _) = client.send_request(lsproto::INITIALIZE_INFO, params);
+    assert!(init_msg.error.is_none(), "Initialize failed");
+    client.send_notification(lsproto::INITIALIZED_INFO, lsproto::InitializedParams::default());
+    client.server.init_complete().wait();
+    let uri = lsproto::DocumentUri::from("file:///home/projects/index.ts");
+    client.send_notification(
+        lsproto::TEXT_DOCUMENT_DID_OPEN_INFO,
+        lsproto::DidOpenTextDocumentParams {
+            text_document: lsproto::TextDocumentItem { uri: uri.clone(), language_id: lsproto::LanguageKind::TypeScript, text: "export const abc = 1;\n".to_string(), ..Default::default() },
+        },
+    );
+    let (msg, resp) = client.send_request(
+        lsproto::TEXT_DOCUMENT_HOVER_INFO,
+        lsproto::HoverParams { text_document: lsproto::TextDocumentIdentifier { uri }, position: lsproto::Position { line: 0, character: 14 }, ..Default::default() },
+    );
+    assert!(msg.error.is_none() && resp.is_some(), "{:?}", msg.error);
+    let _ = close_client.close();
+}
+
+// Not a Go test. `workspace/willRenameFiles` sends a `documentChanges` workspace edit with one entry per changed file or
+// renamed companion file; returns (uri, edit text) for each text edit and (old uri, new uri) for each file rename.
+fn will_rename_files(files: &[(&str, &str)], renames: &[(&str, &str)]) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    use crate::lsptestutil::{acknowledge_registrations, new_lsp_client, test_server_options};
+
+    let (client, close_client) = new_lsp_client(test_server_options("/home/projects", files), Some(acknowledge_registrations()));
+    let capabilities = lsproto::ClientCapabilities {
+        workspace: Some(lsproto::WorkspaceClientCapabilities {
+            workspace_edit: Some(lsproto::WorkspaceEditClientCapabilities { document_changes: Some(true), ..Default::default() }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let (init_msg, _) = client.send_request(lsproto::INITIALIZE_INFO, lsproto::InitializeParams { capabilities, ..Default::default() });
+    assert!(init_msg.error.is_none(), "Initialize failed");
+    client.send_notification(lsproto::INITIALIZED_INFO, lsproto::InitializedParams::default());
+    client.server.init_complete().wait();
+    let (file_name, text) = files.iter().find(|(name, _)| name.ends_with(".ts")).unwrap();
+    client.send_notification(
+        lsproto::TEXT_DOCUMENT_DID_OPEN_INFO,
+        lsproto::DidOpenTextDocumentParams {
+            text_document: lsproto::TextDocumentItem {
+                uri: lsproto::DocumentUri::from(format!("file://{file_name}")),
+                language_id: lsproto::LanguageKind::TypeScript,
+                text: text.to_string(),
+                ..Default::default()
+            },
+        },
+    );
+    let params = lsproto::RenameFilesParams {
+        files: renames
+            .iter()
+            .map(|(old, new)| lsproto::FileRename { old_uri: lsproto::DocumentUri::from(format!("file://{old}")), new_uri: lsproto::DocumentUri::from(format!("file://{new}")) })
+            .collect(),
+    };
+    let (msg, resp) = client.send_request(lsproto::WORKSPACE_WILL_RENAME_FILES_INFO, params);
+    assert!(msg.error.is_none(), "{:?}", msg.error);
+    let _ = close_client.close();
+    let mut edits = Vec::new();
+    let mut file_renames = Vec::new();
+    for change in resp.and_then(|r| r.workspace_edit).and_then(|e| e.document_changes).unwrap_or_default() {
+        if let Some(rename) = change.rename_file {
+            file_renames.push((rename.old_uri.to_string(), rename.new_uri.to_string()));
+        }
+        if let Some(text_document_edit) = change.text_document_edit {
+            let uri = text_document_edit.text_document.uri.to_string();
+            edits.extend(text_document_edit.edits.into_iter().map(|edit| (uri.clone(), edit.text_edit.expect("a plain text edit").new_text)));
+        }
+    }
+    (edits, file_renames)
+}
+
+// Not a Go test (Go rewrites every unresolved relative import, here `../../../x` to `../../x`, since the path climbs
+// past the root). A file whose unresolved imports point at nothing renamed gets no edit.
+#[test]
+fn will_rename_files_leaves_unrelated_unresolved_imports_alone() {
+    let files = [
+        ("/home/projects/tsconfig.json", "{}"),
+        ("/home/projects/a.ts", "export const a = 1;\n"),
+        ("/home/projects/b.ts", "import { a } from \"./a\";\nimport { x } from \"../../../x\";\nimport { y } from \"./missing\";\n"),
+        ("/home/projects/c.ts", "/// <reference path=\"../../../y.d.ts\" />\nimport { x } from \"../../../x\";\n"),
+    ];
+    let (edits, _) = will_rename_files(&files, &[("/home/projects/a.ts", "/home/projects/a2.ts")]);
+    assert_eq!(edits, vec![("file:///home/projects/b.ts".to_string(), "./a2".to_string())]);
+}
+
+// Not a Go test (Go computes each rename on its own, so `./b` in a.ts got both `../src/b` and `../lib/b` here). The
+// renames of a file and a file it imports are computed together.
+#[test]
+fn will_rename_files_computes_several_renames_together() {
+    let files = [
+        ("/home/projects/tsconfig.json", "{}"),
+        ("/home/projects/src/a.ts", "import { b } from \"./b\";\nimport { c } from \"./c\";\n"),
+        ("/home/projects/src/b.ts", "export const b = 1;\n"),
+        ("/home/projects/src/c.ts", "export const c = 1;\n"),
+        ("/home/projects/main.ts", "import { b } from \"./src/b\";\nimport { a } from \"./src/a\";\n"),
+    ];
+    let (mut edits, _) = will_rename_files(
+        &files,
+        &[("/home/projects/src/a.ts", "/home/projects/lib/a.ts"), ("/home/projects/src/b.ts", "/home/projects/lib/b.ts")],
+    );
+    edits.sort();
+    let edit = |file: &str, text: &str| (format!("file:///home/projects/{file}"), text.to_string());
+    assert_eq!(edits, vec![edit("main.ts", "./lib/a"), edit("main.ts", "./lib/b"), edit("src/a.ts", "../src/c")]);
+}
+
+// Not a Go test (Go took the new declaration file's extension from the old name, so `foo.css` was renamed to
+// `bar.css` here though bar.d.ts is not a declaration for a .css file).
+#[test]
+fn will_rename_files_renames_the_companion_only_for_a_matching_declaration() {
+    let files = [
+        ("/home/projects/tsconfig.json", "{}"),
+        ("/home/projects/index.ts", "export {};\n"),
+        ("/home/projects/foo.d.css.ts", "export {};\n"),
+        ("/home/projects/foo.css", ""),
+    ];
+    let (_, renames) = will_rename_files(&files, &[("/home/projects/foo.d.css.ts", "/home/projects/bar.d.ts")]);
+    assert_eq!(renames, Vec::<(String, String)>::new());
+    let (_, renames) = will_rename_files(&files, &[("/home/projects/foo.d.css.ts", "/home/projects/bar.d.css.ts")]);
+    assert_eq!(renames, vec![("file:///home/projects/foo.css".to_string(), "file:///home/projects/bar.css".to_string())]);
+}

@@ -1950,12 +1950,9 @@ pub(crate) fn get_possible_symbol_reference_nodes(source_file: P<SourceFile>, sy
         .collect()
 }
 
-// Go `strings.Index(text[start:], needle)`: `start` need not be a char boundary. A match never starts at a UTF-8
-// continuation byte (the needle is valid UTF-8), so searching from the next char boundary finds the same index.
+// Go `strings.Index(text[start:], needle)`.
 fn index_from(text: &str, start: usize, needle: &str) -> Option<usize> {
-    let mut boundary = start;
-    boundary += (boundary..text.len()).take_while(|&index| !text.is_char_boundary(index)).count();
-    text[boundary..].find(needle).map(|i| i + boundary - start)
+    tsrs_core::index_bytes(&text.as_bytes()[start..], needle.as_bytes())
 }
 
 // findallreferences.go:1646
