@@ -69,21 +69,43 @@ tsrs_api_codec = { path = "crates/tsrs_api_codec" }
 tsrs_ipc = { path = "crates/tsrs_ipc" }
 tsrs_contentmapper = { path = "crates/tsrs_contentmapper" }
 tsrs_contentmappertest = { path = "crates/tsrs_contentmappertest" }
+tsrs_fourslash_harness = { path = "crates/tsrs_fourslash_harness" }
 
 [profile.dev]
-opt-level = 1
-# Disabling debug info speeds up local and CI builds,
-# and we don't rely on it for debugging that much.
-debug = false
-# `lto = false` still runs ThinLTO across a crate's codegen units when opt-level > 0; "off" skips it. That pass was
-# most of an incremental rebuild of tsrs_checker (notes/dev-loop-build.md). `test` inherits this.
+# The edit-build-test loop (docs/DEBUGGING.md): release optimization without any LTO, incrementally. A checker edit
+# rebuilds tsrs and tsrs-test in about 5 s instead of about 3 minutes, and the conformance suite gives the same
+# results in the same time (notes/dev-loop-build.md). Not for performance measurements: use `release`.
+opt-level = 3
 lto = "off"
-
-[profile.test]
-# Disabling debug info speeds up local and CI builds,
-# and we don't rely on it for debugging that much.
+codegen-units = 256
+incremental = true
+strip = "symbols"
 debug = false
+panic = "unwind"
 
+# Generated fourslash test bodies are glue around the real language-server crates. Optimizing all 4,546 bodies
+# dominates their build but does not make the server under test faster; the hand-written harness is a separate crate.
+[profile.dev.package.tsrs_fourslash]
+opt-level = 0
+codegen-units = 256
+
+# Correctness gates and the native reference of the WebAssembly gate in CI (tools/wasm/gate.sh): release code without
+# LTO, which builds in about a third of the release build's time; these gates compare outputs, which LTO does not change.
+[profile.ci]
+inherits = "release"
+lto = "off"
+codegen-units = 16
+
+# Correctness CI does not need to optimize the generated glue. Override both inherited release package settings;
+# the separate harness and language-server crates remain optimized.
+[profile.ci.package.tsrs_fourslash]
+opt-level = 0
+codegen-units = 256
+
+# Release binaries (.github/workflows/release.yml) build with this profile twice, for PGO: -Cprofile-generate,
+# training run, -Cprofile-use (notes/perf-pgo.md), then BOLT on Linux. Instrumented builds override rustc's LTO to
+# thin, keeping the Cargo profile identical for PGO symbol matching. tools/wasm/build.sh applies its target-specific
+# size and panic settings to this profile through scoped environment overrides.
 [profile.release]
 opt-level = 3
 lto = "fat"
@@ -92,63 +114,11 @@ strip = "symbols" # set to `false` for debug information
 debug = false # set to `true` for debug information
 panic = "unwind"
 
-# The fourslash harness and its ~750k lines of generated tests need no -O3: at opt-level 3 in one codegen unit they
-# took 79 s to compile and the tsrs-fourslash link 106 s, the longest serial path of CI's release build (212 s on
-# 14 cores, against 137 s with this). The language server it runs comes from the other crates, still at opt-level 3
-# and through the same fat LTO, so the suite's results and run time (4.2 s) are unchanged. opt-level 0 also slows the
-# server's code in the binary (the suite took 6.7 s) and saves no wall time.
+# Preserve release's measured compromise for the generated test bodies. The hand-written harness and language-server
+# crates are separate and still use release's opt-level 3 and fat LTO.
 [profile.release.package.tsrs_fourslash]
 opt-level = 1
 codegen-units = 16
-
-# Release binaries (.github/workflows/release.yml) build with this profile twice, for PGO: -Cprofile-generate,
-# training run, -Cprofile-use (notes/perf-pgo.md). `release` has the same LTO and codegen units; the release
-# workflow's `dist` builds add only the PGO profile (and, on Linux, BOLT through .github/scripts/bolt.sh).
-# Instrumented builds override rustc's LTO to thin, keeping this Cargo profile identical for PGO symbol matching.
-[profile.dist]
-inherits = "release"
-lto = "fat"
-codegen-units = 1
-
-# The native reference of the WebAssembly gate in CI (tools/wasm/gate.sh): release code without LTO, which builds in
-# about a third of the release build's time; the gate compares outputs, which LTO does not change.
-[profile.ci-native]
-inherits = "release"
-lto = false
-codegen-units = 16
-
-# Undoes `profile.release.package.tsrs_fourslash`, which only pays under fat LTO: there the crate stops at bitcode, and
-# opt-level 1 saves its optimization. Without LTO the crate goes through code generation, where opt-level 1 took
-# 60-65 s against 35 s at opt-level 3.
-[profile.ci-native.package.tsrs_fourslash]
-opt-level = 3
-codegen-units = 16
-
-# The edit-build-test loop (CONTRIBUTING.md, docs/DEBUGGING.md): release optimization without any LTO, incrementally.
-# A checker edit rebuilds tsrs and tsrs-test in about 5 s instead of about 3 minutes, and the conformance suite gives
-# the same results in the same time (notes/dev-loop-build.md). Not for performance measurements: use `release`.
-[profile.fast]
-inherits = "release"
-lto = "off"
-codegen-units = 256
-incremental = true
-
-# As for ci-native: no LTO, so the release override for tsrs_fourslash only slows its build (an edit rebuilt it in
-# 5 s against 3 s).
-[profile.fast.package.tsrs_fourslash]
-opt-level = 3
-codegen-units = 256
-
-# The WebAssembly module (crates/tsrs_wasm, tools/wasm/build.sh; notes/wasm-build.md has the opt-level measurements).
-# panic = "abort": wasm cannot unwind (a panic prints and exits with status 5, as a panicked native driver thread).
-[profile.wasm]
-inherits = "release"
-opt-level = "s"
-lto = "fat"
-codegen-units = 1
-panic = "abort"
-debug = false
-strip = "debuginfo"
 
 [workspace.lints.rust]
 non_upper_case_globals = "allow"
