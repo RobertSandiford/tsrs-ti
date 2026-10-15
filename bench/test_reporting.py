@@ -52,8 +52,12 @@ class ReportingTests(unittest.TestCase):
 
     def test_merge_keeps_fixed_and_wide_machine_provenance(self):
         resized = self.resized()
+        vscode = resized['projects']['vscode']
+        vscode['wide-checkers4'] = copy.deepcopy(vscode['checkers16'])
+        vscode['wide-checkers8'] = copy.deepcopy(vscode['checkers16'])
         partials = []
-        for modes in (['default', 'single', 'checkers8'], ['wide', 'checkers16']):
+        # The wide partial measures more cells than the fixed-spec one; the fixed-spec machine is still the run's.
+        for modes in (['default', 'single', 'checkers8'], ['wide', 'wide-checkers4', 'wide-checkers8', 'checkers16']):
             part = copy.deepcopy(resized)
             part['modes'] = modes
             part['projects'] = {'vscode': {mode: copy.deepcopy(resized['projects']['vscode'][mode]) for mode in modes}}
@@ -70,6 +74,8 @@ class ReportingTests(unittest.TestCase):
             merged = run.merge_results({'projects': [{'name': 'vscode'}]}, paths)
         self.assertEqual(8, merged['machine']['cpus'])
         self.assertEqual(16, merged['projects']['vscode']['wide']['machine']['cpus'])
+        self.assertEqual(16, merged['projects']['vscode']['wide-checkers4']['machine']['cpus'])
+        self.assertNotIn('machine', merged['projects']['vscode']['single'])
         self.assertIn('Default settings on 16 vCPUs', run.markdown(merged, ['wide']))
 
     def test_merge_adds_the_watch_table_to_reports_but_not_the_chart(self):
@@ -83,7 +89,7 @@ class ReportingTests(unittest.TestCase):
                            'tsgo': stats(1), 'tsrs': stats(0.25), 'sessions': {}}}
         with tempfile.TemporaryDirectory() as directory:
             paths = [Path(directory) / 'all.json', Path(directory) / 'watch.json']
-            paths[0].write_text(json.dumps(self.historical))
+            paths[0].write_text(json.dumps(self.resized()))
             paths[1].write_text(json.dumps(watch))
             merged = run.merge_results({'projects': [{'name': name} for name in self.historical['projects']]}, paths)
             other = dict(watch, tsrs=dict(watch['tsrs'], commit='0' * 40))
@@ -163,8 +169,10 @@ class PublishTests(unittest.TestCase):
         report = report.decode()
         self.assertIn(f'tsrs commit: `{commit[:12]}`', report)
         self.assertIn('### Default settings on 16 vCPUs', report)
+        self.assertIn('### `--checkers 16`', report)
+        self.assertNotIn('### `--checkers 4`', report)
+        self.assertNotIn('### `--checkers 8`', report)
         self.assertNotIn('### `--singleThreaded`', report)
-        self.assertNotIn('### `--checkers', report)
         self.assertNotIn('### Scaling', report)
         self.assertTrue(report.startswith('# Benchmark results\n\n<!-- bench:start -->\n'))
         self.assertIn('Method: [benchmark methodology](https://github.com/maschwenk/tsrs/blob/main/bench/README.md)', report)
@@ -175,6 +183,57 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(self.repo / 'bench/large-projects-dark.svg', publish.dark_image(self.image))
         self.assertIn(chart.THEMES['light']['background'].encode(), svg)
         self.assertIn(chart.THEMES['dark']['background'].encode(), dark_svg)
+
+    def with_wide_points(self, result):
+        """The fixture with the 16-vCPU machine's 4- and 8-checker cells, scaled from its 16-checker ones."""
+        result['modes'] += ['wide-checkers4', 'wide-checkers8']
+        result['mode_reps'].update({mode: result['mode_reps']['checkers16'] for mode in ('wide-checkers4', 'wide-checkers8')})
+        for project in result['projects'].values():
+            for mode, tsgo_scale, tsrs_scale in (('wide-checkers4', 1.6, 1.1), ('wide-checkers8', 1.2, 1.05)):
+                cell = project[mode] = copy.deepcopy(project['checkers16'])
+                cell['tsgo']['wall_s'] *= tsgo_scale
+                cell['tsrs']['wall_s'] *= tsrs_scale
+                cell['tsgo']['peak_rss_bytes'] /= tsgo_scale
+        return result
+
+    def test_chart_draws_one_line_per_project_through_its_thread_counts(self):
+        result = self.with_wide_points(self.result(self.commits[0]))
+        self.assertTrue(self.publish(result))
+        _, svg, dark_svg = self.latest()
+        ns = '{http://www.w3.org/2000/svg}'
+        for image in (svg, dark_svg):
+            root = ET.fromstring(image)
+            self.assertIn('Both compilers at the same number of checker threads (4, 8 and 16) on 16 vCPUs',
+                          [element.text for element in root.iter(f'{ns}text')])
+            vscode = root.find(f".//{ns}g[@data-project='vscode']")
+            self.assertEqual(['4', '8', '16'], [c.get('data-checkers') for c in vscode.iter(f'{ns}circle')])
+            self.assertEqual(3, len(vscode.find(f'{ns}polyline').get('points').split()))
+            metadata = root.find(f'{ns}metadata').text
+            self.assertIn('modes: wide-checkers4, wide-checkers8, checkers16', metadata)
+            cell = result['projects']['vscode']['checkers16']
+            description = root.find(f'{ns}desc').text
+            self.assertIn(f"tsrs {chart.format_value('wall_s', cell['tsrs']['wall_s'])}", description)
+
+    def test_chart_draws_the_points_a_result_has(self):
+        self.assertTrue(self.publish(self.result(self.commits[0])))
+        _, svg, _ = self.latest()
+        root = ET.fromstring(svg)
+        ns = '{http://www.w3.org/2000/svg}'
+        self.assertIn('Both compilers at 16 checker threads on 16 vCPUs', [element.text for element in root.iter(f'{ns}text')])
+        vscode = root.find(f".//{ns}g[@data-project='vscode']")
+        self.assertEqual(['16'], [c.get('data-checkers') for c in vscode.iter(f'{ns}circle')])
+        self.assertIsNone(vscode.find(f'{ns}polyline'))
+
+    def test_publishes_sixteen_vcpu_tables_at_four_eight_and_sixteen_checkers(self):
+        self.assertTrue(self.publish(self.with_wide_points(self.result(self.commits[0]))))
+        report = self.report.read_text()
+        positions = [report.index(title) for title in (
+            '### Default settings on 16 vCPUs', '### `--checkers 4`', '### `--checkers 8`', '### `--checkers 16`')]
+        self.assertEqual(sorted(positions), positions)
+        self.assertEqual(1, report.count('### `--checkers 8`'))
+        self.assertIn("4 checker threads each (tsgo's default)", report)
+        self.assertIn("16 checker threads each (tsrs's default on 16 vCPUs)", report)
+        self.assertNotIn(', on Depot CI', report)
 
     def test_publishing_preserves_handwritten_sections_around_tables(self):
         before = '# Benchmark results\n\nPinned projects and methodology.\n\n'
@@ -202,6 +261,7 @@ class PublishTests(unittest.TestCase):
         old_report, old_svg, old_dark_svg = self.latest()
         result['date'] = '2026-10-11 12:00 UTC'
         result['projects']['vscode']['wide']['tsrs']['wall_s'] *= 2
+        result['projects']['vscode']['checkers16']['tsrs']['wall_s'] *= 2
         self.assertTrue(self.publish(result))
         report, svg, dark_svg = self.latest()
         self.assertNotEqual(old_report, report)
@@ -209,18 +269,19 @@ class PublishTests(unittest.TestCase):
         self.assertNotEqual(old_dark_svg, dark_svg)
         self.assertIn(result['date'].encode(), report)
 
-    def test_results_without_wide_measurements_preserve_latest(self):
+    def test_results_without_sixteen_vcpu_measurements_preserve_latest(self):
         self.assertTrue(self.publish(self.result(self.commits[0])))
         latest = self.latest()
-        for missing in ('mode', 'cells'):
-            with self.subTest(missing=missing):
-                result = self.result(self.commits[2])
-                if missing == 'mode':
-                    result['modes'].remove('wide')
-                else:
-                    del result['projects']['vscode']['wide']
-                self.assertFalse(self.publish(result))
-                self.assertEqual(latest, self.latest())
+        for mode in ('wide', 'checkers16'):
+            for missing in ('mode', 'cells'):
+                with self.subTest(mode=mode, missing=missing):
+                    result = self.result(self.commits[2])
+                    if missing == 'mode':
+                        result['modes'].remove(mode)
+                    else:
+                        del result['projects']['vscode'][mode]
+                    self.assertFalse(self.publish(result))
+                    self.assertEqual(latest, self.latest())
 
 
 if __name__ == '__main__':
