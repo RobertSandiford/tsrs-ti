@@ -480,9 +480,11 @@ fn get_spelling_suggestion_worker<T, S: AsRef<str>>(
     mut compare: impl FnMut(&T, &T) -> Ordering,
     max_candidates: usize,
 ) -> Option<T> {
-    let rune_name = to_runes(name);
-    let maximum_length_difference = 2usize.max((rune_name.len() as f64 * 0.34) as usize);
-    let mut best_distance = (rune_name.len() as f64 * 0.4).floor() + 0.9; // If the best result is worse than this, don't bother.
+    let target_is_ascii = name.is_ascii();
+    let mut target_runes = (!target_is_ascii).then(|| to_runes(name));
+    let target_rune_len = target_runes.as_ref().map_or(name.len(), Vec::len);
+    let maximum_length_difference = 2usize.max((target_rune_len as f64 * 0.34) as usize);
+    let mut best_distance = (target_rune_len as f64 * 0.4).floor() + 0.9; // If the best result is worse than this, don't bother.
     let mut buffers = LevenshteinBuffers::default();
     let mut best_candidate: Option<T> = None;
     let mut checked_candidates = 0;
@@ -494,8 +496,8 @@ fn get_spelling_suggestion_worker<T, S: AsRef<str>>(
         let candidate_name_s = get_name(&candidate);
         let candidate_name = candidate_name_s.as_ref();
         // Go compares the candidate's byte length with the name's rune count here.
-        let max_len = candidate_name.len().max(rune_name.len());
-        let min_len = candidate_name.len().min(rune_name.len());
+        let max_len = candidate_name.len().max(target_rune_len);
+        let min_len = candidate_name.len().min(target_rune_len);
         if !candidate_name.is_empty() && max_len - min_len <= maximum_length_difference {
             if candidate_name == name {
                 continue;
@@ -505,12 +507,25 @@ fn get_spelling_suggestion_worker<T, S: AsRef<str>>(
             if candidate_name.len() < 3 && !stringutil::equal_fold(candidate_name, name) {
                 continue;
             }
-            let Some(distance) = levenshtein_with_max(
-                &mut buffers,
-                &rune_name,
-                &to_runes(candidate_name),
-                best_distance,
-            ) else {
+            let distance = if target_is_ascii && candidate_name.is_ascii() {
+                levenshtein_with_max(
+                    &mut buffers,
+                    name.as_bytes(),
+                    candidate_name.as_bytes(),
+                    best_distance,
+                    |c| c.to_ascii_lowercase(),
+                )
+            } else {
+                let target_runes = target_runes.get_or_insert_with(|| to_runes(name));
+                levenshtein_with_max(
+                    &mut buffers,
+                    target_runes,
+                    &to_runes(candidate_name),
+                    best_distance,
+                    stringutil::unicode_to_lower,
+                )
+            };
+            let Some(distance) = distance else {
                 continue;
             };
             assert!(distance <= best_distance); // Else `levenshteinWithMax` should return undefined
@@ -538,11 +553,12 @@ struct LevenshteinBuffers {
     current: Vec<f64>,
 }
 
-fn levenshtein_with_max(
+fn levenshtein_with_max<T: Copy + Eq>(
     buffers: &mut LevenshteinBuffers,
-    s1: &[stringutil::Rune],
-    s2: &[stringutil::Rune],
+    s1: &[T],
+    s2: &[T],
     max_value: f64,
+    to_lowercase: impl Fn(T) -> T,
 ) -> Option<f64> {
     let buffer_size = s2.len() + 1;
     buffers.previous.clear();
@@ -565,7 +581,7 @@ fn levenshtein_with_max(
         current[0] = col_min;
         current.iter_mut().take(min_j.min(buffer_size)).skip(1).for_each(|value| *value = big);
         for j in min_j..=max_j {
-            let substitution_distance = if stringutil::unicode_to_lower(s1[i - 1]) == stringutil::unicode_to_lower(s2[j - 1]) {
+            let substitution_distance = if to_lowercase(s1[i - 1]) == to_lowercase(s2[j - 1]) {
                 previous[j - 1] + 0.1
             } else {
                 previous[j - 1] + 2.0
@@ -860,5 +876,7 @@ mod tests {
         assert_eq!(get_spelling_suggestion_for_strings("lenght", names.iter().copied()), Some("length"));
         assert_eq!(get_spelling_suggestion_for_strings("xyzzy", names.iter().copied()), None);
         assert_eq!(get_spelling_suggestion_for_strings("Foo", names.iter().copied()), Some("foo"));
+        assert_eq!(get_spelling_suggestion_for_strings("École", ["école"]), Some("école"));
+        assert_eq!(get_spelling_suggestion_for_strings("Ecole", ["école"]), Some("école"));
     }
 }
