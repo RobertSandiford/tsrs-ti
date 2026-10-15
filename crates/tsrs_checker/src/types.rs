@@ -2141,6 +2141,14 @@ impl LiteralType {
     pub fn value(&self) -> Option<LiteralValue> {
         self.value.get()
     }
+    /// Compare stored values without materializing the whole literal enum for numeric pairs.
+    #[inline]
+    pub(crate) fn value_equals(&self, other: &LiteralType) -> bool {
+        match self.value() {
+            Some(LiteralValue::Number(left)) => matches!(other.value(), Some(LiteralValue::Number(right)) if left == right),
+            value => value == other.value(),
+        }
+    }
     #[inline]
     pub fn fresh_type(&self) -> Option<P<Type>> {
         self.fresh_type.get()
