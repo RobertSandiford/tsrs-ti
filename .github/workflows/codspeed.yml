@@ -1,7 +1,7 @@
 # CodSpeed (https://codspeed.io): bench/codspeed.yml type-checks a few bench projects single-threaded under CodSpeed's
 # CPU simulation, which counts instructions and simulated cache misses in one run, so the result does not depend on the
 # machine. Runs on GitHub-hosted runners (free for public repositories); CodSpeed comments on pull requests with the
-# change against main. The wall-time benchmark stays on Depot (.depot/workflows/bench.yml).
+# change against main. The wall-time benchmark runs separately in .github/workflows/bench.yml.
 # Security: read-only GITHUB_TOKEN plus an OIDC token for the CodSpeed upload, no secrets.
 
 name: CodSpeed
@@ -38,6 +38,8 @@ jobs:
       - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
 
       - uses: oxc-project/setup-node@f46a72f95efdc55273fcd042d61c84e723b2892c # v1.4.1
+        with:
+          registry-url: "" # Public benchmark installs use Yarn 1, which rejects an unset NODE_AUTH_TOKEN.
 
       - name: Cache key for the bench projects
         id: keys
