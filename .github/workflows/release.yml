@@ -5,7 +5,7 @@
 # (tools/wasm/gate.sh) runs only in ci.yml.
 #
 # Setup before the first release:
-#   - npm trusted publishers for `tsrs`, `@ts-rs/wasm` and every platform package: GitHub Actions,
+#   - npm trusted publishers for `tsrs`, `@tsrs/wasm` and every platform package: GitHub Actions,
 #     repository maschwenk/tsrs, workflow release.yml, no environment, with direct publishing allowed.
 #   - tag pushes `v<workspace version>` or `v<npm version>` (node npm/build.mjs --print-version), e.g. v0.1.0.
 # Provenance (`pnpm publish --provenance`) is only possible from a public repository; it is enabled automatically
@@ -258,7 +258,7 @@ jobs:
           path: out/
           if-no-files-found: error
 
-  # `@ts-rs/wasm` (npm/tsrs-wasm, notes/wasm-build.md): the module as ci.yml's wasm job builds it, the
+  # `@tsrs/wasm` (npm/tsrs-wasm, notes/wasm-build.md): the module as ci.yml's wasm job builds it, the
   # package's tests (they compare against a native release build), the package packed by npm/build.mjs, and that
   # tarball installed and run before it is handed to the publish job.
   wasm:
@@ -351,7 +351,7 @@ jobs:
         with:
           name: npm-packages
           path: npm/dist/*.tgz
-      - name: Publish (@ts-rs platform packages, tsrs, then @ts-rs/wasm)
+      - name: Publish (@tsrs platform packages, tsrs, then @tsrs/wasm)
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
           VERSION: ${{ needs.version.outputs.version }}
