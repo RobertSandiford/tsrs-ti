@@ -7,8 +7,6 @@ use super::embed_generated::EMBEDDED_CONTENTS;
 use super::libs_generated::LIB_NAMES;
 use crate::{Entries, FileInfo, FileMode, FS};
 
-pub(crate) const EMBEDDED: bool = true;
-
 const SCHEME: &str = "bundled:///";
 
 static EMBEDDED_CONTENTS_MAP: LazyLock<FxHashMap<&'static str, &'static str>> = LazyLock::new(|| EMBEDDED_CONTENTS.iter().copied().collect());
@@ -21,7 +19,7 @@ fn split_path(path: &str) -> Option<&str> {
     path.strip_prefix(SCHEME)
 }
 
-pub(crate) fn lib_path() -> String {
+pub fn lib_path() -> String {
     format!("{SCHEME}libs")
 }
 
@@ -37,7 +35,7 @@ pub struct WrappedFS<T: FS> {
     fs: T,
 }
 
-pub(crate) fn wrap_fs<T: FS>(fs: T) -> WrappedFS<T> {
+pub fn wrap_fs<T: FS>(fs: T) -> WrappedFS<T> {
     WrappedFS { fs }
 }
 
@@ -53,7 +51,9 @@ impl<T: FS> WrappedFS<T> {
 }
 
 /// The embedded text of a `bundled:///` path (the lib files `include_str!` put in the binary), without a copy; `None`
-/// for any other path. tsrs-only: the compiler host parses this text in place instead of reading a heap copy through
+/// for any other path.
+///
+/// tsrs-only: the compiler host parses this text in place instead of reading a heap copy through
 /// `FS::read_file` and leaking it (lib.dom.d.ts alone is 2.3 MB).
 pub fn embedded_file(path: &str) -> Option<&'static str> {
     split_path(path).and_then(embedded_contents)
