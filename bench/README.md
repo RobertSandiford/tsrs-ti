@@ -4,11 +4,11 @@
 ([microsoft/typescript-benchmarking](https://github.com/microsoft/typescript-benchmarking), `cases/`) and eleven
 open-source applications and libraries (see "Application projects") with tsrs, with tsgo 7.0.2 (npm `typescript@7.0.2`) and, where a
 Bun binary is given, with `bun check`, and reports wall time, peak memory and the error count of each.
-Wall-time benchmark automation is disabled; its workflow is preserved as
-[`.github/workflows/bench.yml.bak`](../.github/workflows/bench.yml.bak). The local commands below remain available.
+Wall-time reports are published by [`.github/workflows/update-benchmarks.yml`](../.github/workflows/update-benchmarks.yml)
+on changes to the project list or workflow, and on manual dispatch. The local commands below remain available.
 The outdated `bench/results/` archive has been removed from the working tree; historical runs remain in
 [Git history](https://github.com/oxc-project/tsrs/tree/94e7305f0f067e9f68570798c0498e03c7e423eb/bench/results).
-The saved workflow measures every project on GitHub-hosted `ubuntu-24.04` runners in four modes and in four more
+The former benchmark workflow measured every project on GitHub-hosted `ubuntu-24.04` runners in four modes and in four more
 with bun check; `bench/results/<date>-<commit>.md` has every table. [The latest recorded results](RESULTS.md) show the
 Bun comparison tables, with tsgo, tsrs and bun check side by side: the default mode (each compiler at its own
 thread count) and both compilers at `--checkers` 4 (tsgo's default), 8 and 16.
@@ -248,9 +248,10 @@ the small projects move by a few hundred KiB), so peak memory is flagged when it
 
 ## CI
 
-CodSpeed runs on pushes to main, pull requests, and manual dispatch. The other benchmark workflows are disabled,
-including manual dispatch. Their definitions are preserved under `.github/workflows/`
-as `bench.yml.bak`, `bench-compare.yml.bak`, `pr-verify.yml.bak` and `perf-probe.yml.bak`.
+CodSpeed runs on pushes to main, pull requests, and manual dispatch. `update-benchmarks.yml` publishes wall-time reports
+on changes to `bench/projects.json` or the workflow itself, and on manual dispatch. The comparison and probe workflows
+are disabled, including manual dispatch. Their definitions are preserved under `.github/workflows/`
+as `bench-compare.yml.bak`, `pr-verify.yml.bak` and `perf-probe.yml.bak`. The former `bench.yml` is available in Git history.
 The completed build-layout experiment's workflow and build script were removed; `tools/perf/layout-measure.py`
 still compares supplied binaries. Local measurement tools remain available; recorded runs are archived in Git history.
 
@@ -294,9 +295,10 @@ Outside CodSpeed's Linux instrumentation, the last command exercises capture, wa
 verification without reporting performance measurements. Use `--profile dev` when building for local correctness
 checks. The workflow uses the release profile without PGO, with debug symbols retained by cargo-codspeed.
 
-### Published benchmarks
+### Historical benchmark workflow
 
-The saved benchmark workflow is built for unattended runs: one run per measured commit (the concurrency group is the commit, so a dispatch for another commit
+This section describes the removed `bench.yml` workflow; its dispatch commands require restoring it from Git history.
+The workflow was built for unattended runs: one run per measured commit (the concurrency group is the commit, so a dispatch for another commit
 starts its own run on its own machines and only a re-dispatch of the same commit replaces a queued twin; until
 2026-10-07 one shared group let a later push replace the queued bench, and bursts of merges left most commits without
 a results file), never cancelled, network steps retried, and the results commit re-created on top of the latest
@@ -304,8 +306,8 @@ a results file), never cancelled, network steps retried, and the results commit 
 the newest commit's results: a run whose commit is an ancestor of the one the table came from (its last line names
 it) adds its results file and leaves the tables and chart alone. The regression flag compares a run with the nearest
 earlier benchmarked ancestor of its commit, not with the newest file by date. A pull request that changes code must
-not carry a CI-skip marker in its title, body or commit subjects (the disabled `ci.yml.bak` contains the
-`skip-marker` check, `tools/ci/skip_marker.py`): `gh pr merge --squash` copies them into the commit message, and such a
+not carry a CI-skip marker in its title, body or commit subjects (the local check is
+`tools/ci/skip_marker.py`): `gh pr merge --squash` copies them into the commit message, and such a
 commit lands without CI and without a results file; notes-only pull requests carry the marker on purpose. A commit
 whose bench was skipped or cancelled (before 2026-10-07, most commits of a burst of merges) is backfilled with `gh workflow run bench.yml --ref main -f commit=<sha>`: the build and measuring jobs check out that commit, the merge job runs the current scripts, the results
 file is committed, and the tables and chart update only when no newer commit's report is there.
@@ -373,14 +375,12 @@ cache for the suite checkout plus the pnpm-installed compilers (`typescript@7.0.
 per cloned project (checkout + `node_modules`) keyed on its pinned commit and install command
 (`bench/run.py --print-cache-keys`), so changing one pin re-installs only that project. Each measuring job restores
 the shared cache and its own project's; the build job restores the two training projects (xstate-main, webpack) and
-saves the shared cache; `ci.yml.bak`'s `check-and-test` job restores the shared cache and four projects (xstate-main, webpack,
-nuxt, drizzle-orm) for the determinism gate, `tools/ci/determinism.sh` (notes/perf-order-independence.md "Gate"). The
-build job, and `ci.yml.bak`'s `check-and-test` and `arena-safety` jobs, restore the TypeScript
+saves the shared cache. The build job restores the TypeScript
 testdata (`ts-ref/tsc/testdata`, 22 MB compressed) from a cache keyed on the TypeScript commit; on a miss they run the
 sparse checkout and save it. That saves about 4 s per job (2026-10-07: checkout 4.9-5.7 s, restore 1.4 s).
 
-These cache details describe the disabled benchmark workflows and `ci.yml.bak`. The simplified active CI does not
-run benchmark project workloads or restore their caches; it checks out only the pinned TypeScript conformance fixtures.
+These cache details describe the disabled benchmark workflows. The active CI does not run benchmark project
+workloads or restore their caches; it checks out the pinned TypeScript source and fixtures for conformance and Fourslash.
 
 Historical job duration split, 2026-10-01 (before this migration):
 
