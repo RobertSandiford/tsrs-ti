@@ -1415,23 +1415,53 @@ pub(crate) static OPTIONS_FOR_COMPILER: LazyLock<Vec<&'static CommandLineOption>
     });
 // END GENERATED
 
-fn options_have_changes(
+#[derive(Clone, Copy, Default, Eq, PartialEq)]
+struct CompilerOptionChanges(u8);
+
+impl CompilerOptionChanges {
+    const SEMANTIC_DIAGNOSTICS: Self = Self(1 << 0);
+    const DECLARATION_PATH: Self = Self(1 << 1);
+    const EMIT: Self = Self(1 << 2);
+    const ALL: Self = Self(Self::SEMANTIC_DIAGNOSTICS.0 | Self::DECLARATION_PATH.0 | Self::EMIT.0);
+
+    fn from_declaration(option: &CommandLineOption) -> Self {
+        Self(
+            (option.affects_semantic_diagnostics as u8)
+                | ((option.affects_declaration_path as u8) << 1)
+                | ((option.affects_emit as u8) << 2),
+        )
+    }
+
+    fn insert(&mut self, other: Self) {
+        self.0 |= other.0;
+    }
+
+    fn contains(self, other: Self) -> bool {
+        self.0 & other.0 != 0
+    }
+}
+
+#[inline(never)]
+fn compiler_option_changes(
     old_options: Option<&CompilerOptions>,
     new_options: Option<&CompilerOptions>,
-    decl_filter: impl Fn(&CommandLineOption) -> bool,
-) -> bool {
+) -> CompilerOptionChanges {
     let (old_options, new_options) = match (old_options, new_options) {
-        (None, None) => return false,
-        (Some(old), Some(new)) if std::ptr::eq(old, new) => return false,
+        (None, None) => return CompilerOptionChanges::default(),
+        (Some(old), Some(new)) if std::ptr::eq(old, new) => {
+            return CompilerOptionChanges::default();
+        }
         (Some(old), Some(new)) => (old, new),
-        _ => return true,
+        _ => return CompilerOptionChanges::ALL,
     };
+    let mut changes = CompilerOptionChanges::default();
     // Go ForEachCompilerOptionValue walks the struct fields by reflection and looks each one up by name.
     macro_rules! compare_fields {
         ($($field:ident: $json:literal,)*) => {
             $(
                 if let Some(option_declaration) = COMMAND_LINE_COMPILER_OPTIONS_MAP.get($json) {
-                    if decl_filter(option_declaration) {
+                    let affected = CompilerOptionChanges::from_declaration(option_declaration);
+                    if affected != CompilerOptionChanges::default() {
                         let changed = if option_declaration.strict_flag {
                             compare_strict(old_options, new_options, &old_options.$field, &new_options.$field)
                         } else if option_declaration.allow_js_flag {
@@ -1440,7 +1470,10 @@ fn options_have_changes(
                             old_options.$field != new_options.$field
                         };
                         if changed {
-                            return true;
+                            changes.insert(affected);
+                            if changes == CompilerOptionChanges::ALL {
+                                return changes;
+                            }
                         }
                     }
                 }
@@ -1448,7 +1481,7 @@ fn options_have_changes(
         };
     }
     for_each_compiler_options_field!(compare_fields);
-    false
+    changes
 }
 
 fn compare_strict<T: std::any::Any>(
@@ -1466,19 +1499,21 @@ pub fn compiler_options_affect_semantic_diagnostics(
     old_options: Option<&CompilerOptions>,
     new_options: Option<&CompilerOptions>,
 ) -> bool {
-    options_have_changes(old_options, new_options, |option| option.affects_semantic_diagnostics)
+    compiler_option_changes(old_options, new_options)
+        .contains(CompilerOptionChanges::SEMANTIC_DIAGNOSTICS)
 }
 
 pub fn compiler_options_affect_declaration_path(
     old_options: Option<&CompilerOptions>,
     new_options: Option<&CompilerOptions>,
 ) -> bool {
-    options_have_changes(old_options, new_options, |option| option.affects_declaration_path)
+    compiler_option_changes(old_options, new_options)
+        .contains(CompilerOptionChanges::DECLARATION_PATH)
 }
 
 pub fn compiler_options_affect_emit(
     old_options: Option<&CompilerOptions>,
     new_options: Option<&CompilerOptions>,
 ) -> bool {
-    options_have_changes(old_options, new_options, |option| option.affects_emit)
+    compiler_option_changes(old_options, new_options).contains(CompilerOptionChanges::EMIT)
 }
