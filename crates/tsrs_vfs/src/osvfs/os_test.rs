@@ -34,6 +34,27 @@ pub(super) fn mklink(target: &str, link: &str, is_dir: bool) {
 }
 
 #[test]
+fn test_get_global_typings_cache_location() {
+    let subdir = if cfg!(windows) { "Microsoft/TypeScript" } else { "typescript" };
+    let version = tsrs_core::version_major_minor();
+
+    assert_eq!(global_typings_cache_location(None), "");
+    assert_eq!(global_typings_cache_location(Some("relative-cache")), "");
+    assert_eq!(global_typings_cache_location(Some("relative-home/.cache")), "");
+    assert_eq!(global_typings_cache_location(Some("file:///cache?query")), "");
+    assert_eq!(
+        global_typings_cache_location(Some("/home/user/../cache")),
+        format!("/home/cache/{subdir}/{version}")
+    );
+    if cfg!(windows) {
+        assert_eq!(
+            global_typings_cache_location(Some(r"C:\Users\me\AppData\Local")),
+            format!("C:/Users/me/AppData/Local/{subdir}/{version}")
+        );
+    }
+}
+
+#[test]
 fn test_os_read_file() {
     let fs = fs();
 

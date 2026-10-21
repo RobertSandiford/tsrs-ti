@@ -4983,3 +4983,70 @@ evidence that network-path checks cause a speedup. The deterministic Linux
 `bench/count.py` counter was unavailable on this macOS host. Raw runs,
 matching output hashes, and the JavaScript collector are retained under
 `target/port-623/0104-ce30dd50a5/perf/`.
+
+## 105. `bb9afd2bbf` — Disable ATA when no user cache is available
+
+Upstream `bb9afd2bbf9f35481c6b755259f7103baa73b3a4` makes the global
+typings-cache location empty when the user cache cannot be found or is not an
+absolute path, instead of falling back to the temporary directory. The Rust
+lookup now lives with the OS VFS, normalizes a valid absolute path, rejects
+URL query/fragment suffixes, and preserves an empty location through the LSP
+entry point. The empty location already prevents a typings watcher from being
+created. Rust still does not install typings automatically, so the new Go ATA
+test has no installer counterpart; the compatibility table continues to mark
+ATA unported. Deterministic Rust unit cases cover valid, missing, relative,
+and URL-suffixed cache paths without mutating process environment.
+
+The draft PR's native Windows API transport test exposed an unrelated SDDL
+presentation difference from source 101: a named-pipe handle can report
+`FA` (file all access) where the generated descriptor uses `GA` (generic
+all access). The test now canonicalizes those equivalent ACE rights before
+comparing the protected, single-entry current-user DACL. The Windows test
+target compiles under `x86_64-pc-windows-msvc`; it could not be executed on
+this macOS host. Cross-target Clippy still reports preexisting raw-pointer and
+unsafe-comment lints in the Windows transport module; the required
+host all-target Clippy run passes.
+
+The exact-source Go OS VFS and ATA packages pass, including the newly added
+cache and no-install tests; the changed Go LSP and CLI test packages compile.
+The Rust cache unit test, dev CLI/testrunner build, full workspace,
+40 regression cases, WebAssembly target check, exact-source Fourslash
+(4,091 exercised groups passing, 470 skipped, none failing), warnings-denied
+host Clippy, source lint, and formatting pass. The Fourslash and workspace
+tests needed local Unix-socket access after sandbox binding denials. Generated
+code is unchanged. The ignored `ts-ref` checkout advances to source 105;
+the published TypeScript pin stays at the base revision until the full
+migration.
+
+All 18 Go-history, 18 canonical, and 36 emit compiler named outcome lists
+are byte-identical to source 104. Go-history and canonical each retain 13,581
+diagnostic passes and 12,884 and 12,883 type/symbol passes, respectively.
+Emit retains 13,585 diagnostic, 12,884 type/symbol, 13,511
+JavaScript/declaration, 149 JavaScript-map, and 156 source-map passes.
+There is no lost pass or new failure, crash, or timeout. The exact results,
+comparison script, Fourslash results, and release measurements are under
+`target/port-623/0105-bb9afd2bbf/`.
+
+Five alternating release-binary pairs per public project and checker mode
+compared frozen source 104 and source 105 binaries. Every exit status and
+output hash matched. macOS `/usr/bin/time -l` provided retired instructions
+and peak RSS; wall time includes process launch:
+
+| Project | Mode | Instructions, billions before → after | Peak RSS MiB before → after | Wall seconds before → after |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions | single | 3.22043 → 3.22038 | 59.09 → 59.14 | 0.225 → 0.224 |
+| Compiler-Unions | default | 3.91523 → 3.91152 | 82.17 → 82.05 | 0.106 → 0.107 |
+| webpack | single | 11.01242 → 11.02980 | 306.44 → 306.50 | 0.911 → 0.921 |
+| webpack | default | 15.20569 → 15.38212 | 497.41 → 500.22 | 0.189 → 0.195 |
+| VS Code | single | 81.40750 → 81.41118 | 1586.66 → 1586.69 | 7.701 → 7.710 |
+| VS Code | default | 93.70866 → 93.71087 | 2087.08 → 2075.31 | 1.129 → 1.139 |
+
+The five-pair webpack/default cell initially rose 1.160% in instructions,
+3.391% in wall time, and 0.565% in RSS. A reversed ten-pair confirmation
+measured +0.698%, +2.879%, and +0.906%; a second ten-pair confirmation
+measured +0.070%, −0.864%, and +0.236%. The signal did not hold across
+confirmations, and no material regression was confirmed. Source 105 changes
+only LSP startup behavior plus the Windows-only test, not compiler work.
+The Linux deterministic `bench/count.py` counter was unavailable on this
+macOS host. All raw paired measurements and output hashes are retained in
+`perf/`, `perf-confirmation/`, and `perf-confirmation-2/`.

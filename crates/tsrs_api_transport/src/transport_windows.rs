@@ -309,7 +309,13 @@ mod tests {
         };
         let expected_descriptor = private_security_descriptor().expect("current-user DACL");
         let expected = dacl_sddl(expected_descriptor.0);
-        assert_eq!(actual, expected);
+        // Windows can expand generic-all access to file-all access on a named-pipe handle.
+        let normalize_access = |sddl: &str| sddl.replace(";;FA;;;", ";;GA;;;");
+        assert_eq!(
+            normalize_access(&actual),
+            normalize_access(&expected),
+            "pipe DACL: {actual}; generated DACL: {expected}"
+        );
         assert!(actual.starts_with("D:P("), "DACL must be protected: {actual}");
         assert_eq!(actual.matches('(').count(), 1, "expected one access-control entry: {actual}");
 

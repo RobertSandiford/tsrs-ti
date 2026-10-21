@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tsrs_core::context::{CancelFunc, Context};
-use tsrs_core::tspath;
 use tsrs_vfs::{FS, bundled, osvfs};
 
 // lsp.go:20
@@ -36,7 +35,7 @@ pub fn run_lsp(args: &[String]) -> i32 {
 
     let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(osvfs::fs()));
     let default_library_path = bundled::default_lib_path();
-    let typings_location = get_global_typings_cache_location();
+    let typings_location = osvfs::get_global_typings_cache_location();
 
     // signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM); main started catching the signals.
     let (ctx, stop) = Context::background().with_cancel();
@@ -164,34 +163,6 @@ const PROCESS_ALIVE_SUPPORTED: bool = false;
 #[cfg(not(unix))]
 fn is_process_alive(_pid: i64) -> bool {
     false
-}
-
-// vfs/osvfs/os.go:193
-fn get_global_typings_cache_location() -> String {
-    let cache_dir = user_cache_dir().unwrap_or_else(|| {
-        std::env::temp_dir().to_string_lossy().trim_end_matches('/').to_string()
-    });
-
-    let subdir = if cfg!(windows) { "Microsoft/TypeScript" } else { "typescript" };
-    tspath::combine_paths(&cache_dir, &[subdir, tsrs_core::version_major_minor()])
-}
-
-// Go os.UserCacheDir.
-fn user_cache_dir() -> Option<String> {
-    let non_empty = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
-    if cfg!(windows) {
-        return non_empty("LocalAppData");
-    }
-    if cfg!(target_os = "macos") {
-        return non_empty("HOME").map(|home| home + "/Library/Caches");
-    }
-    if let Some(dir) = non_empty("XDG_CACHE_HOME") {
-        if !dir.starts_with('/') {
-            return None;
-        }
-        return Some(dir);
-    }
-    non_empty("HOME").map(|home| home + "/.cache")
 }
 
 // The subset of Go's `flag` package (FlagSet with ContinueOnError) that runLSP uses.

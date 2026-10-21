@@ -147,6 +147,41 @@ impl FS for OsFS {
     }
 }
 
+// osvfs/os.go:231
+pub fn get_global_typings_cache_location() -> String {
+    global_typings_cache_location(user_cache_dir().as_deref())
+}
+
+fn global_typings_cache_location(cache_dir: Option<&str>) -> String {
+    let Some(cache_dir) = cache_dir.filter(|cache_dir| {
+        tspath::path_is_absolute(cache_dir)
+            && !(tspath::is_url(cache_dir) && cache_dir.contains(['?', '#']))
+    }) else {
+        return String::new();
+    };
+    let cache_path = tspath::get_normalized_absolute_path(cache_dir, "");
+    let subdir = if cfg!(windows) { "Microsoft/TypeScript" } else { "typescript" };
+    tspath::combine_paths(&cache_path, &[subdir, tsrs_core::version_major_minor()])
+}
+
+// Go os.UserCacheDir.
+fn user_cache_dir() -> Option<String> {
+    let non_empty = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+    if cfg!(windows) {
+        return non_empty("LocalAppData");
+    }
+    if cfg!(target_os = "macos") {
+        return non_empty("HOME").map(|home| home + "/Library/Caches");
+    }
+    if let Some(dir) = non_empty("XDG_CACHE_HOME") {
+        if !dir.starts_with('/') {
+            return None;
+        }
+        return Some(dir);
+    }
+    non_empty("HOME").map(|home| home + "/.cache")
+}
+
 fn os_fs_realpath(path: &str) -> String {
     let _ = internal::root_length(path); // Assert path is rooted
 
