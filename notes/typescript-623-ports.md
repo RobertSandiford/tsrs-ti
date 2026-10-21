@@ -5141,3 +5141,77 @@ are unaffected by this evidence-only port; source 106's paired measurements
 remain the before-and-after evidence. The full outcome lists, comparison
 script, build/check logs, and release hash are under
 `target/port-623/0107-abcbb2e69d/`.
+
+## 108. `0a27badde0` — Rebuild incremental diagnostics after global deletion
+
+Upstream `0a27badde07113faba9f735c21071d461a37634a` fixes incremental
+snapshot reuse when a program loses files. The Rust port copies old changed
+and pending-emit paths only when the new program still contains them, marks
+build info pending when it discards stale paths, and visits every removed
+file-info entry. A removed global file invalidates every retained non-default
+source file and evicts cached diagnostics from default libraries that will be
+checked again; skipped libraries retain their cache. A file that stops
+affecting the global scope uses the same invalidation. The tsrs-only
+`has_deleted_files` guard remains, so the normal no-deletion path does not
+scan old file-info entries. The Go scenario dumper also accepts upstream's
+typed rooted paths, allowing the exact-source scenarios to be replayed.
+The ignored `ts-ref` checkout advances to source 108; the published pin
+remains at the migration base.
+
+The exact-source Go incremental package passes all unit tests. Eleven Rust
+snapshot tests pass, including four new checks for mixed deletion order,
+stale pending paths, refreshed default-library diagnostics, and retained
+skipped-library caches. All 14 new exact-source incremental history
+scenarios pass byte-for-byte in the Rust tsc harness across the default,
+single-threaded, and one-checker modes and the `noCheck`/`noEmit` composite
+variants. All 18 Go-history, 18 canonical, and 36 emit compiler named
+outcome lists match source 107 exactly: Go-history and canonical each retain
+13,581 diagnostic passes and 12,884 and 12,883 type/symbol passes;
+emit retains 13,585 diagnostic, 12,884 type/symbol, 13,511 JavaScript/
+declaration, 149 JavaScript-map, and 156 source-map passes. The first emit
+run timed out on the unrelated long-running
+`intersectionConstructorReductionCrash` fixture at its default 20-second
+limit; it passed in 36.5 seconds with a 90-second limit, restoring all 36
+identical named lists. No pass was lost, and no failure or crash was added.
+
+The dev CLI and testrunner build, full workspace suite, 40 CLI regression
+cases, WebAssembly target check, warnings-denied Clippy, source lint,
+formatting, and generator freshness check pass. The exact-source Go
+Fourslash gate exercises 4,092 groups successfully, skips 470, and fails
+none. The workspace and Fourslash checks used local Unix-socket access for
+the API transport and Go subprocess bridge. Generator freshness was checked
+by comparing the complete `crates/` diff before and after regeneration,
+since this port itself edits the incremental crate.
+
+Five alternating release-binary pairs per public project and mode compared
+sources 107 and 108. The warm case repeats an unchanged VS Code incremental
+check; the synthetic deletion case removes a global declaration before the
+second check. Every pair had matching exit status and output hash, including
+the expected missing-name diagnostic after deletion. macOS `/usr/bin/time -l`
+supplied retired instructions and peak RSS; wall time includes process launch:
+
+| Case | Mode | Instructions, billions before → after | Peak RSS MiB before → after | Wall seconds before → after |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions cold | single | 3.22113 → 3.22130 | 59.11 → 59.13 | 0.227 → 0.233 |
+| Compiler-Unions cold | default | 3.90985 → 3.90988 | 82.20 → 82.02 | 0.138 → 0.140 |
+| webpack cold | single | 10.80129 → 10.80132 | 306.48 → 306.47 | 0.926 → 0.910 |
+| webpack cold | default | 15.19216 → 15.20851 | 495.45 → 495.98 | 0.353 → 0.360 |
+| VS Code cold | single | 81.25697 → 81.26878 | 1586.67 → 1586.67 | 7.928 → 7.924 |
+| VS Code cold | default | 93.81632 → 93.69340 | 2086.33 → 2081.72 | 1.686 → 1.703 |
+| VS Code warm | single | 23.49115 → 23.48907 | 1243.20 → 1243.20 | 1.890 → 1.879 |
+| VS Code warm | default | 24.13033 → 24.11300 | 1321.58 → 1320.94 | 0.480 → 0.474 |
+| Global deletion | single | 0.79243 → 0.79244 | 42.80 → 42.81 | 0.062 → 0.062 |
+| Global deletion | default | 0.88271 → 0.88420 | 51.25 → 51.17 | 0.064 → 0.063 |
+
+Initial Compiler-Unions/single and webpack/default cold wall increases were
+2.508% and 2.136%. Reversed ten-pair confirmations measured −0.971% and
++1.544%, respectively; their instruction deltas were +0.001% and −0.607%.
+No regression persisted at the repository's performance threshold. The
+largest initial instruction increase was 0.168% in the tiny deletion case,
+and the largest peak-RSS increase was 0.107% in webpack/default. The retained
+no-deletion guard keeps ordinary warm incremental checks clear of the
+diagnostic-cache refresh previously rejected in `notes/perf-round2-followups.md`.
+The deterministic Linux `bench/count.py` counter was unavailable on this
+macOS host; the macOS instruction count includes kernel work. Frozen binary
+hashes, raw runs, output hashes, and confirmations are under
+`target/port-623/0108-0a27badde0/perf/`.
