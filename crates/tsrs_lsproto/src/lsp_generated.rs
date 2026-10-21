@@ -20706,7 +20706,7 @@ impl Json for ProfileResult {
 // Parameters for the initializeAPISession request.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct InitializeAPISessionParams {
-    // Optional path to use for the named pipe or Unix domain socket. If not provided, a unique path will be generated.
+    // Optional named pipe path on Windows. On Unix, the path must not exist and will be created as a private directory containing a socket named 'socket'. If not provided, a unique path will be generated.
     pub pipe: Option<String>,
 }
 

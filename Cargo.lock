@@ -976,6 +976,7 @@ dependencies = [
  "serde_json",
  "tsrs_core",
  "tsrs_vfs",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

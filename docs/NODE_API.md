@@ -151,6 +151,12 @@ The transport does not depend on `tsrs_api`. It defines its own handler/conn tra
 - deterministic shutdown: EOF on input ends `run` with `Ok`, malformed frames end it with an error
   without writing non-protocol bytes to stdout.
 
+Source 101 makes `--api --pipe <path>` create a new private directory on Unix, with a socket at
+`<path>/socket` (`0700` directory, `0600` socket); an existing path is an error. On Windows,
+`<path>` is a named pipe restricted to the current user. The spawned sync client gives its
+Windows pipe a random 128-bit suffix. LSP `custom/initializeAPISession` is still unported, so
+the LSP-provided API-pipe lifecycle is unavailable.
+
 ### Codec (`tsrs_api_codec`)
 
 - `encode_source_file(&'static SourceFile) -> Result<(Vec<u8>, NodeIndexTable), EncodeError>` (Go

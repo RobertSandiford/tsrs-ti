@@ -32,7 +32,10 @@ pub(crate) struct ApiFlags {
 pub(crate) fn parse_api_flags(args: &[String]) -> Result<ApiFlags, ()> {
     let mut flags = flagSet::new("api");
     flags.string("cwd", "current working directory");
-    flags.string("pipe", "use named pipe or Unix domain socket for communication instead of stdio");
+    flags.string(
+        "pipe",
+        "use a named pipe (Windows) or create a private Unix socket at <path>/socket, where <path> must not exist",
+    );
     flags.string("callbacks", "comma-separated list of FS callbacks and defaults to enable");
     flags.bool("useCaseSensitiveFileNames", "treat filesystem paths as case-sensitive");
     flags.bool("async", "use JSON-RPC protocol instead of MessagePack (for async API)");

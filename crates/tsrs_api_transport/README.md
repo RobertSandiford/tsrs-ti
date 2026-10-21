@@ -134,7 +134,9 @@ request params before serde so duplicates are rejected like Go's `unmarshalPaylo
   and `async` clients (from `ts-ref`, `node --conditions=@typescript/source`) against
   `examples/transport_test_server.rs`, including fs callbacks with every serverFS sentinel, callback
   re-entry, astral text, lone surrogates (rejected like Go), 5 MiB payloads, timing, server exit, and
-  `--pipe` sockets. Mandatory: it fails with install instructions when node or ts-ref is missing.
+  `--pipe` sockets. On Unix `--pipe` creates a private directory containing a `socket` file; on Windows it
+  creates a named pipe restricted to the current user. Mandatory: it fails with install instructions when node
+  or ts-ref is missing.
   Rust-only: `cargo test -p tsrs_api_transport --lib --test conn --test go_frames --test strictjson_oracle --test reentrancy`.
 - `tests/strictjson_oracle.rs`: 38 inputs decoded by a Go binary built at the pinned commit
   (duplicate names at any depth, lone/unpaired surrogates, invalid UTF-8, valid astral pairs): same
@@ -152,8 +154,6 @@ request params before serde so duplicates are rejected like Go's `unmarshalPaylo
 
 ## Not supported
 
-- Windows named pipes (`--pipe` on Windows returns an `Unsupported` error). The pinned sync Node client
-  always uses `--pipe` on Windows, so the sync client is unsupported there.
 - `$/cancelRequest` and other notifications are ignored, exactly as the pinned session does.
 - External content-mapper spawning (`--runExternalCode`) is not part of this crate.
 

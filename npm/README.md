@@ -151,8 +151,9 @@ package hangs those requests and crashes on the unhandled rejection).
 Wire contract the server has to speak (from the pinned `tsc/cmd/tsc/api.go`, `tsc/internal/ipc`, `src/api/options.ts`):
 
 - argv: `--api [--async] --cwd <dir> --useCaseSensitiveFileNames=<bool> [--callbacks=<names>] [--timing]
-  [--runExternalCode] [--pipe <path>]` (`--pipe` only on Windows for the sync client). stdout carries only protocol
-  bytes; stderr is inherited.
+  [--runExternalCode] [--pipe <path>]` (`--pipe` only on Windows for the spawned sync client). On Unix, the optional
+  `--pipe` argument names a new private directory and the client connects to `<path>/socket`; on Windows it names a
+  current-user-only named pipe. stdout carries only protocol bytes; stderr is inherited.
 - sync: every message is a MessagePack 3-array `[uint8 type, bin method, bin payload]`; types 1 request, 2 callback
   response, 3 callback error (client to server), 4 response, 5 error, 6 callback call (server to client). Payloads are
   JSON text, except binary responses (`getSourceFile` and friends: the AST encoding, protocol version 9 in the top

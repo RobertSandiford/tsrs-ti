@@ -4761,3 +4761,68 @@ Thus source 99's public paired instructions-retired, peak-RSS, and wall-time
 measurements apply to source 100 on identical inputs; this port introduces
 no Rust performance regression. Logs and the binary comparison are under
 `target/port-623/0100-76c4f5078b/`.
+
+## 101. `257e87406c` — Private API pipe creation
+
+Upstream `257e87406c6a8be277cb8cd5ef8d7b458a650390` changes Unix
+`--api --pipe <path>` from an ordinary socket at `<path>` to a newly created,
+private directory containing `<path>/socket`, with directory mode `0700` and
+socket mode `0600`. Existing paths now fail rather than being removed. The
+Rust listener follows that contract, exposes an unpredictable private-path
+constructor, and cleans up only the directory and
+socket it created, preserving replacements. The Windows listener now creates
+a current-user-only named pipe with a protected DACL and rejects an existing
+pipe instance. The Node sync channel uses a random 128-bit suffix in its
+Windows pipe name. The CLI help, generated LSP wire comment, SDK manifest,
+and API documentation reflect the new path contract. Rust's LSP
+`custom/initializeAPISession` handler remains an earlier unported stub, so
+that LSP-provided API-pipe lifecycle is not available yet. The published
+TypeScript pin remains at the base until the full migration finishes.
+
+Exact-source Go IPC tests pass. Native Unix transport tests cover modes,
+existing-path failure, cleanup, replacement preservation, and the pinned
+Node client round trip. The Windows transport and its native security and
+ping-pong test compile for `x86_64-pc-windows-msvc`; CI now runs that test on
+Windows. Native Windows execution was unavailable on this host. The dev CLI
+and testrunner build, workspace and regression suites, 956 SDK API source
+tests, package/consumer smoke tests, WebAssembly target check, warnings-denied
+Clippy, source lint, formatting, and generated-code freshness checks pass.
+
+All 18 Go-history, 18 canonical, and 36 emit named outcome lists are
+byte-identical to source 100, with no lost pass, new failure, crash, or
+timeout. Go-history checking retains 13,580 diagnostic and 12,884
+type/symbol passes; canonical retains 13,580 and 12,883. Emit retains
+13,584 diagnostic, 12,884 type/symbol, 13,510 JavaScript/declaration, 149
+JavaScript-map, and 156 source-map passes. The exact-source Fourslash gate
+has 4,091 exercised groups passing, 470 skipped, and none failing.
+
+Public paired performance measurements compare frozen source-100 and
+source-101 release binaries on Compiler-Unions, webpack, and VS Code in
+single-threaded and default modes. Every output hash matches between the
+two binaries. The initial five alternating pairs per cell give these
+instruction, wall-time, and peak-RSS medians:
+
+| Project | Mode | Instructions, billions before → after | Wall seconds before → after | Peak RSS MiB before → after |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions | single | 3.27050 → 3.27011 | 0.250 → 0.244 | 59.25 → 59.14 |
+| Compiler-Unions | default | 3.95910 → 3.96317 | 0.108 → 0.110 | 82.03 → 82.02 |
+| webpack | single | 10.80813 → 10.80823 | 0.894 → 0.938 | 306.69 → 306.45 |
+| webpack | default | 15.19337 → 15.20910 | 0.165 → 0.169 | 497.67 → 498.31 |
+| VS Code | single | 81.26311 → 82.29728 | 7.867 → 7.846 | 1586.80 → 1586.63 |
+| VS Code | default | 93.54570 → 93.70511 | 0.995 → 0.995 | 2089.28 → 2081.83 |
+
+The initial VS Code single instruction median crossed a bimodal boundary:
+both binaries recorded samples near 81.2 and 82.3 billion instructions. A
+separate reversed ten-pair confirmation gives 81.43219 → 81.49411 billion
+instructions (+0.076%), 7.721 → 7.735 seconds (+0.181%), and 1586.80 →
+1586.63 MiB peak RSS. This disconfirms the initial 1.273% instruction
+increase as a stable source-101 effect. Raw measurements and the JavaScript
+collector are under `target/port-623/0101-257e87406c/perf/`.
+
+Reversed ten-pair webpack confirmations likewise reverse the initial
+wall-time increases: single-threaded is 0.895 → 0.889 seconds (−0.725%),
+and default is 0.162 → 0.161 seconds (−0.648%). Their instruction changes
+are +0.0006% and −0.305%, and their peak-RSS changes are −0.076% and
+−0.208%. No material source-101 performance regression is detected on this
+public cohort. The Linux deterministic `bench/count.py` instruction counter
+was unavailable on this macOS host.
