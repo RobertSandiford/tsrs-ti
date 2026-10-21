@@ -28,13 +28,115 @@ pub trait Closer: Send + Sync {
 }
 
 // Go net.Pipe, as the ipc tests and contentmappertest/spawner.go use it: two connected in-memory streams, each the
-// other's peer. It is a Unix socket pair. `close` shuts its end down in both directions: a read blocked on either
-// end returns EOF (Go's own end reports io.ErrClosedPipe instead) and later writes on this end fail. A write on the
-// peer fails too on Linux; on macOS it is accepted and dropped until every handle on this end is dropped.
+// other's peer. It is a Unix socket pair (two in-memory byte queues on Windows, whose sockets cannot wake a read
+// blocked on another handle). `close` shuts its end down in both directions: a read blocked on either end returns
+// EOF (Go's own end reports io.ErrClosedPipe instead) and later writes on this end fail. A write on the peer fails
+// too on Linux and Windows; on macOS it is accepted and dropped until every handle on this end is dropped.
 #[cfg(unix)]
 pub fn pipe() -> std::io::Result<(ReadWriteCloser, ReadWriteCloser)> {
     let (a, b) = std::os::unix::net::UnixStream::pair()?;
     Ok((socket_read_write_closer(a)?, socket_read_write_closer(b)?))
+}
+
+#[cfg(windows)]
+#[expect(clippy::unnecessary_wraps, reason = "the signature of the Unix pipe(), whose socket pair can fail")]
+pub fn pipe() -> std::io::Result<(ReadWriteCloser, ReadWriteCloser)> {
+    let a_to_b = Arc::new(queue::default());
+    let b_to_a = Arc::new(queue::default());
+    Ok((
+        queue_read_write_closer(Arc::clone(&b_to_a), Arc::clone(&a_to_b)),
+        queue_read_write_closer(a_to_b, b_to_a),
+    ))
+}
+
+// The bytes one direction of a Windows `pipe()` carries. `closed` ends it: reads drain what is queued and then see
+// EOF, writes fail.
+#[cfg(windows)]
+#[derive(Default)]
+struct queue {
+    state: std::sync::Mutex<queueState>,
+    readable: std::sync::Condvar,
+}
+
+#[cfg(windows)]
+#[derive(Default)]
+struct queueState {
+    bytes: std::collections::VecDeque<u8>,
+    closed: bool,
+}
+
+#[cfg(windows)]
+impl queue {
+    fn state(&self) -> std::sync::MutexGuard<'_, queueState> {
+        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn close(&self) {
+        self.state().closed = true;
+        self.readable.notify_all();
+    }
+}
+
+#[cfg(windows)]
+struct queueReader(Arc<queue>);
+
+#[cfg(windows)]
+impl Read for queueReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut state = self.0.state();
+        while state.bytes.is_empty() && !state.closed {
+            state = self.0.readable.wait(state).unwrap_or_else(std::sync::PoisonError::into_inner);
+        }
+        let n = buf.len().min(state.bytes.len());
+        for (slot, byte) in buf.iter_mut().zip(state.bytes.drain(..n)) {
+            *slot = byte;
+        }
+        Ok(n)
+    }
+}
+
+#[cfg(windows)]
+struct queueWriter(Arc<queue>);
+
+#[cfg(windows)]
+impl Write for queueWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut state = self.0.state();
+        if state.closed {
+            return Err(std::io::ErrorKind::BrokenPipe.into());
+        }
+        state.bytes.extend(buf);
+        self.0.readable.notify_all();
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+struct queueCloser {
+    reads: Arc<queue>,
+    writes: Arc<queue>,
+}
+
+#[cfg(windows)]
+impl Closer for queueCloser {
+    fn close(&self) -> std::io::Result<()> {
+        self.reads.close();
+        self.writes.close();
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+fn queue_read_write_closer(reads: Arc<queue>, writes: Arc<queue>) -> ReadWriteCloser {
+    ReadWriteCloser {
+        reader: Box::new(queueReader(Arc::clone(&reads))),
+        writer: Box::new(queueWriter(Arc::clone(&writes))),
+        closer: Arc::new(queueCloser { reads, writes }),
+    }
 }
 
 #[cfg(unix)]

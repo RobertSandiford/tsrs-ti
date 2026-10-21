@@ -67,8 +67,8 @@ The tsrs-only flags are described in [Performance options](USAGE.md#performance-
 | setting | tsgo | tsrs |
 | --- | --- | --- |
 | Linux backend | fanotify when the kernel and filesystem support it, otherwise inotify | inotify (fanotify isn't ported) |
-| Windows | Native backend | Not ported: `--watch` exits with "not supported" |
-| When a change starts a rebuild | First event after a quiet period | CLI watch waits for the writer to close the file (inotify), or while the file is empty (FSEvents/kqueue), for up to 1000 ms without writes or 2000 ms after the first write |
+| Windows | ReadDirectoryChangesW | The same API, one thread per watched directory. A read that completes with no bytes, which is the kernel dropping changes, is an overflow (a full rebuild); tsgo reads it as no changes. Event paths are converted to `/` before the watch logic sees them |
+| When a change starts a rebuild | First event after a quiet period | CLI watch waits for the writer to close the file (inotify), or while the file is empty (FSEvents, kqueue, Windows), for up to 1000 ms without writes or 2000 ms after the first write |
 | FSEvents batch touching several files | Fires at once | Waits for 50 ms of quiet |
 | FSEvents streams | A stream can watch multiple roots | Gives up to 256 roots their own streams; additional roots share streams. Uses a `USER_INITIATED` dispatch queue |
 | When to watch a parent recursively | At least 10 watches under the parent | At least 10 distinct children of the parent with watches |

@@ -6,6 +6,8 @@ use std::sync::{Arc, Condvar, LazyLock, Mutex};
 use crate::canonicalize::canonicalize_path;
 use crate::debounce::debounce;
 use crate::event::{Event, EventKind, eventList};
+use crate::filepath::HOST;
+use crate::nativepath;
 use crate::pathcompare::{comparisonCache, comparisonPath, pathComparer};
 
 // ----- errors -----------------------------------------------------------------
@@ -134,7 +136,7 @@ pub static ErrFilesystemUnsupported: Sentinel =
     Sentinel("fswatch: watcher backend unsupported on this filesystem");
 
 // `fmt.Errorf("%w: watched directory removed", ErrWatchTerminated)`.
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 pub(crate) fn err_watched_directory_removed() -> Error {
     Error::wrap(
         format!("{}: watched directory removed", ErrWatchTerminated.0),
@@ -294,8 +296,12 @@ pub(crate) static kqueueWatcher: LazyLock<watcher> = LazyLock::new(|| {
     let w = crate::kqueue::init(w);
     w
 });
-// windows.go (ReadDirectoryChangesW) is not ported: Windows builds get an unavailable watcher.
-pub(crate) static windowsWatcher: LazyLock<watcher> = LazyLock::new(|| watcher::new("windows"));
+pub(crate) static windowsWatcher: LazyLock<watcher> = LazyLock::new(|| {
+    let w = watcher::new("windows");
+    #[cfg(windows)]
+    let w = crate::windows::init(w);
+    w
+});
 // fanotify_linux.go is not ported: fanotify().Available() is false, so Linux uses inotify (Go's Default() falls
 // back to inotify the same way on kernels without fanotify).
 pub(crate) static fanotifyWatcher: LazyLock<watcher> = LazyLock::new(|| watcher::new("fanotify"));
@@ -362,7 +368,7 @@ pub fn set_write_settling(on: bool) {
     WRITE_SETTLING.store(on, std::sync::atomic::Ordering::Relaxed);
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub(crate) fn write_settling() -> bool {
     // Relaxed: set before the first watch is made; the backend threads that read it took the locks that publish
     // that watch, which order the store before this load.
@@ -598,9 +604,9 @@ impl watcher {
             return String::new();
         }
         let mut dir = dir.to_string();
-        let mut parent = filepath_dir(&dir);
+        let mut parent = HOST.dir(&dir);
         while parent != dir && parent != "." {
-            if filepath_dir(&parent) == parent {
+            if HOST.dir(&parent) == parent {
                 break;
             }
             let physical_parent = physical_dir_for(&parent);
@@ -631,7 +637,7 @@ impl watcher {
             if enough {
                 return parent;
             }
-            let next = filepath_dir(&parent);
+            let next = HOST.dir(&parent);
             if next == parent {
                 break;
             }
@@ -772,8 +778,8 @@ impl Watcher for watcher {
                 rollback(&prepared);
                 return Err(errNilCallback.into());
             };
-            let dir = filepath_clean(&request.dir);
-            if !dir.starts_with('/') {
+            let dir = HOST.clean(&request.dir);
+            if !HOST.is_abs(&dir) {
                 rollback(&prepared);
                 return Err(errNotAbsolute.into());
             }
@@ -850,12 +856,12 @@ impl Watcher for watcher {
         if !self.available() {
             return Err(ErrUnavailable.into());
         }
-        let path = filepath_clean(path);
-        if !path.starts_with('/') {
+        let path = HOST.clean(path);
+        if !HOST.is_abs(&path) {
             return Err(errNotAbsolute.into());
         }
         let path = canonicalize_path(&path);
-        let dir = filepath_dir(&path);
+        let dir = HOST.dir(&path);
         if dir == path {
             return Err(errRootPath.into());
         }
@@ -1050,9 +1056,9 @@ pub(crate) fn watch_remove(impl_: &Arc<dyn watcherImpl>, w: &Arc<dirWatch>) {
 }
 
 // watcher.go:775
-#[expect(
-    dead_code,
-    reason = "its only Go caller, windows.go (windowsSubscription.fatal), is not ported"
+#[cfg_attr(
+    not(windows),
+    expect(dead_code, reason = "its only Go caller, windows.go (windowsSubscription.fatal), is Windows-only")
 )]
 pub(crate) fn handle_watcher_error(impl_: &Arc<dyn watcherImpl>, werr: &dirWatchError) {
     watch_remove(impl_, &werr.dir_watch);
@@ -1080,7 +1086,7 @@ pub(crate) struct callback {
     terminal: Option<Error>,
     delivered: bool,
     comparer: pathComparer,
-    #[cfg(target_os = "macos")] // read only by terminate_callbacks_for_deleted_root
+    #[cfg(any(target_os = "macos", windows))] // read only by terminate_callbacks_for_deleted_root
     dir_comparison: comparisonPath<'static>,
     physical_comparison: comparisonPath<'static>,
     file_comparison: comparisonPath<'static>,
@@ -1089,9 +1095,9 @@ pub(crate) struct callback {
 // dirWatchError associates an error with a specific directory watch.
 pub(crate) struct dirWatchError {
     pub(crate) err: Error,
-    #[expect(
-        dead_code,
-        reason = "read only by handle_watcher_error, whose Go caller (windows.go) is not ported"
+    #[cfg_attr(
+        not(windows),
+        expect(dead_code, reason = "read only by handle_watcher_error, whose Go caller (windows.go) is Windows-only")
     )]
     pub(crate) dir_watch: Arc<dirWatch>,
 }
@@ -1182,7 +1188,7 @@ impl dirWatch {
     // watcher.go:866
     // displayPath maps a physical event path back under the caller-visible
     // watch root.
-    #[cfg(unix)]
+    #[cfg(unix)] // the Windows backend names event paths from `dir` itself
     pub(crate) fn display_path(&self, watch_path: &str) -> String {
         rebase_path(watch_path, &self.physical_dir, &self.dir)
     }
@@ -1202,7 +1208,7 @@ impl dirWatch {
         }
     }
 
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     // tsrs-only (`set_write_settling`): see `debounce::write_started` / `write_finished`.
     pub(crate) fn write_started(&self, path: &str) {
         let db = self.mu.lock().unwrap().debounce.clone();
@@ -1211,7 +1217,7 @@ impl dirWatch {
         }
     }
 
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     pub(crate) fn write_finished(&self, path: &str) {
         let db = self.mu.lock().unwrap().debounce.clone();
         if let Some(db) = db {
@@ -1229,7 +1235,7 @@ impl dirWatch {
     }
 
     // watcher.go:926
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     pub(crate) fn notify(&self) {
         let st = self.mu.lock().unwrap();
         let has_pending_cbs = st.callbacks.iter().any(|cb| !cb.delivered);
@@ -1363,7 +1369,7 @@ impl dirWatch {
     }
 
     // watcher.go:1066
-    #[cfg(target_os = "macos")] // only the FSEvents backend calls it
+    #[cfg(any(target_os = "macos", windows))] // only the FSEvents and Windows backends call it
     pub(crate) fn terminate_callbacks_for_deleted_root(
         &self,
         path: &str,
@@ -1446,7 +1452,7 @@ impl dirWatch {
             terminal: None,
             delivered: false,
             comparer: self.comparer,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             dir_comparison: self.comparer.prepare(dir),
             physical_comparison: self.comparer.prepare(physical_dir),
             file_comparison: self.comparer.prepare(file),
@@ -1563,7 +1569,7 @@ impl eventIndex {
                 continue;
             };
             for key in [display, physical] {
-                let parent = filepath_dir(&key);
+                let parent = HOST.dir(&key);
                 let list = index.by_parent.entry(parent).or_default();
                 if list.last() != Some(&i) {
                     list.push(i);
@@ -1610,14 +1616,21 @@ impl eventIndex {
 // ancestor of dir, is a symlink or reparse point, events are subscribed on its
 // realpath while callbacks still use dir.
 pub(crate) fn physical_dir_for(dir: &str) -> String {
-    let Ok(realpath) = std::fs::canonicalize(dir) else {
+    let Ok(realpath) = nativepath::realpath(dir) else {
         return dir.to_string();
     };
-    let realpath = realpath.to_string_lossy().into_owned();
     if realpath == dir {
         return dir.to_string();
     }
-    canonicalize_path(&filepath_clean(&realpath))
+    canonicalize_path(&HOST.clean(&realpath))
+}
+
+fn starts_with_separator(s: &str) -> bool {
+    s.as_bytes().first().is_some_and(|&c| HOST.is_path_separator(c))
+}
+
+fn ends_with_separator(s: &str) -> bool {
+    s.as_bytes().last().is_some_and(|&c| HOST.is_path_separator(c))
 }
 
 // watcher.go:878
@@ -1635,10 +1648,10 @@ pub(crate) fn rebase_path(path: &str, from: &str, to: &str) -> String {
         return path.to_string();
     }
     let suffix = &path[from.len()..];
-    if from.ends_with('/') {
+    if ends_with_separator(from) {
         return join_path_suffix(to, suffix);
     }
-    if !suffix.starts_with('/') {
+    if !starts_with_separator(suffix) {
         return path.to_string();
     }
     join_path_suffix(to, suffix)
@@ -1649,16 +1662,16 @@ pub(crate) fn join_path_suffix(root: &str, suffix: &str) -> String {
     if suffix.is_empty() {
         return root.to_string();
     }
-    if let Some(rest) = suffix.strip_prefix('/') {
-        if root.ends_with('/') {
-            return format!("{root}{rest}");
+    if starts_with_separator(suffix) {
+        if ends_with_separator(root) {
+            return format!("{root}{}", &suffix[1..]);
         }
         return format!("{root}{suffix}");
     }
-    if root.ends_with('/') {
+    if ends_with_separator(root) {
         return format!("{root}{suffix}");
     }
-    format!("{root}/{suffix}")
+    format!("{root}{}{suffix}", char::from(HOST.separator()))
 }
 
 // watcher.go:1087
@@ -1676,17 +1689,17 @@ pub(crate) fn is_in_directory_or_self(dir: &str, path: &str) -> bool {
     if rest.is_empty() {
         return false;
     }
-    if dir.ends_with('/') {
+    if ends_with_separator(dir) {
         return true;
     }
-    rest.starts_with('/')
+    starts_with_separator(rest)
 }
 
 // tsrs-only (`find_consolidation_dir_locked`): the child of `dir` that `path`, a path strictly inside `dir`, is in
 // or is.
 fn child_on_path<'p>(dir: &str, path: &'p str) -> &'p str {
-    let start = if dir.ends_with('/') { dir.len() } else { dir.len() + 1 };
-    path[start..].find('/').map_or(path, |i| &path[..start + i])
+    let start = if ends_with_separator(dir) { dir.len() } else { dir.len() + 1 };
+    path[start..].bytes().position(|c| HOST.is_path_separator(c)).map_or(path, |i| &path[..start + i])
 }
 
 // watcher.go:1108
@@ -1700,47 +1713,11 @@ pub(crate) fn is_direct_child(dir: &str, path: &str) -> bool {
     if rest.is_empty() {
         return false;
     }
-    if !rest.starts_with('/') {
+    if !starts_with_separator(rest) {
         return false;
     }
     let rest = &rest[1..];
-    !rest.is_empty() && !rest.contains('/')
-}
-
-// Go `filepath.Clean` (Unix).
-pub(crate) fn filepath_clean(path: &str) -> String {
-    if path.is_empty() {
-        return ".".to_string();
-    }
-    let rooted = path.starts_with('/');
-    let mut out: Vec<&str> = Vec::new();
-    for part in path.split('/') {
-        match part {
-            "" | "." => {}
-            ".." => {
-                if out.last().is_some_and(|p| *p != "..") {
-                    out.pop();
-                } else if !rooted {
-                    out.push("..");
-                }
-            }
-            p => out.push(p),
-        }
-    }
-    let joined = out.join("/");
-    if rooted {
-        format!("/{joined}")
-    } else if joined.is_empty() {
-        ".".to_string()
-    } else {
-        joined
-    }
-}
-
-// Go `filepath.Dir` (Unix).
-pub(crate) fn filepath_dir(path: &str) -> String {
-    let i = path.rfind('/').map_or(0, |i| i + 1);
-    filepath_clean(&path[..i])
+    !rest.is_empty() && !rest.bytes().any(|c| HOST.is_path_separator(c))
 }
 
 #[cfg(all(test, target_os = "macos"))]

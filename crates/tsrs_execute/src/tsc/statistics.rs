@@ -119,8 +119,7 @@ fn memory_used_bytes() -> u64 {
         .ok()
         .and_then(|o| tsrs_core::utf8::into_string(o.stdout).ok())
         .and_then(|s| s.trim().parse::<u64>().ok())
-        .map(|kb| kb * 1024)
-        .unwrap_or(0)
+        .map_or(0, |kb| kb * 1024)
 }
 
 pub fn statistics_from_program(input: &EmitInput, times: &CompileTimes) -> Statistics {

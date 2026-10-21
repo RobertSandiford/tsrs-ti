@@ -90,7 +90,7 @@ impl debounce {
 
     // debounce.go:65
     // trigger wakes the debounce loop.
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     pub(crate) fn trigger(&self) {
         let mut l = self.latch_mu.lock().unwrap();
         if !l.notified {
@@ -100,7 +100,7 @@ impl debounce {
         self.latch_cv.notify_all();
     }
 
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     // tsrs-only: a writer wrote to `path` (or created it) and has not closed it yet.
     pub(crate) fn write_started(&self, path: &str) {
         let now = Instant::now();
@@ -116,7 +116,7 @@ impl debounce {
         }
     }
 
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     // tsrs-only: the writer of `path` closed it; the callbacks fire once no file is being written.
     pub(crate) fn write_finished(&self, path: &str) {
         let mut writes = self.writes.lock().unwrap();

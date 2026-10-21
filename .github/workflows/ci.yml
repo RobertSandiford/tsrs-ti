@@ -113,6 +113,29 @@ jobs:
             target/test-results-default/*.txt
           if-no-files-found: ignore
 
+  # Watch mode on Windows: the file-watching backend (ReadDirectoryChangesW) and the Windows-only path handling around
+  # it compile and run only here.
+  test-windows-watch:
+    name: Test Windows watch
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
+
+      - uses: oxc-project/setup-rust@3d6fb132fbe7cdcb66bf8ec193911c2945369d12 # v1.0.17
+        with:
+          save-cache: ${{ github.ref_name == 'main' }}
+          cache-key: warm-windows-watch
+
+      - name: Clippy
+        run: cargo clippy --locked -p tsrs_fswatch -p tsrs_ipc -p tsrs_execute --all-targets --config 'build.warnings="deny"'
+
+      - name: Watcher, IPC and execute tests
+        run: cargo test --locked -p tsrs_fswatch -p tsrs_ipc -p tsrs_execute
+
   fourslash:
     name: Fourslash
     runs-on: ubuntu-latest

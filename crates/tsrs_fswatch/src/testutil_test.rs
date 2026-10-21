@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::event::{Event, EventKind};
+use crate::event::{Event, EventKind, eventList};
+use crate::filepath::HOST;
 use crate::watcher::{
     Error, Watch, WatchCallback, WatchOption, Watcher, all_watchers, fsevents, kqueue,
 };
@@ -116,7 +117,17 @@ pub(crate) fn watcher_event_timeout(t: &TestT, w: &dyn Watcher) -> Duration {
 // it matches what backends report, and registers cleanup.
 pub(crate) fn new_tmp_dir(t: &mut TestT) -> String {
     let d = t.temp_dir();
-    std::fs::canonicalize(&d).unwrap().to_string_lossy().into_owned()
+    crate::nativepath::realpath(&d).unwrap()
+}
+
+// Go's tests join paths with filepath.Join under the temp dir's volume; these let a table write `/root/a` instead.
+pub(crate) fn host_separators(path: &str) -> String {
+    path.replace('/', &char::from(HOST.separator()).to_string())
+}
+
+pub(crate) fn native(rooted_path: &str) -> String {
+    let volume = HOST.volume_name(&std::env::temp_dir().to_string_lossy());
+    format!("{volume}{}", host_separators(rooted_path))
 }
 
 static nameCounter: AtomicU64 = AtomicU64::new(0);
@@ -126,7 +137,12 @@ pub(crate) fn sub_path(dir: &str) -> String {
     let n = nameCounter.fetch_add(1, Ordering::Relaxed);
     let nanos =
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos();
-    format!("{dir}/test{n}{nanos}")
+    join(dir, &format!("test{n}{nanos}"))
+}
+
+// Go `filepath.Join` of two elements.
+pub(crate) fn join(dir: &str, name: &str) -> String {
+    format!("{dir}{}{name}", char::from(HOST.separator()))
 }
 
 // watcher_test.go:167
@@ -241,6 +257,23 @@ impl recordingWatcher {
         let st = self.mu.lock().unwrap();
         let (mut st, _) = self.cond.wait_timeout_while(st, d, |st| st.buf.is_empty()).unwrap();
         std::mem::take(&mut st.buf)
+    }
+
+    // watcher_test.go:325
+    // gatherUntilQuiet waits up to initial_wait for a first batch, then keeps collecting until a batch takes longer
+    // than `quiet` to arrive.
+    pub(crate) fn gather_until_quiet(&self, initial_wait: Duration, quiet: Duration) -> Vec<Event> {
+        let mut all = self.next(initial_wait);
+        if all.is_empty() {
+            return all;
+        }
+        loop {
+            let more = self.next(quiet);
+            if more.is_empty() {
+                return all;
+            }
+            all.extend(more);
+        }
     }
 
     // watcher_test.go:293
@@ -394,6 +427,21 @@ fn filter_to_wanted_paths(got: &[Event], want: &[wantEvent]) -> Vec<Event> {
 // watcher_test.go:569
 pub(crate) fn contains_event(got: &[Event], typ: EventKind, path: &str) -> bool {
     got.iter().any(|e| e.kind == typ && e.path == path)
+}
+
+// watcher_test.go:838
+// replayEventList re-applies a sequence of events through a fresh eventList and returns the coalesced result: what the
+// directory watch would have produced had every event landed in the same debounce batch.
+pub(crate) fn replay_event_list(events: &[Event]) -> Vec<Event> {
+    let el = eventList::default();
+    for e in events {
+        match e.kind {
+            EventKind::Update => el.update(&e.path),
+            EventKind::Delete => el.remove(&e.path),
+            _ => {}
+        }
+    }
+    el.get_events()
 }
 
 // watcher_test.go:820

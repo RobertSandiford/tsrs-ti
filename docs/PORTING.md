@@ -214,7 +214,7 @@ callback, even when the closure does not need it.
 
 ## What not to port
 
-`--init`/`--showConfig`, tracing, pprof, message localization, the fanotify and Windows file-watching backends, and
+`--init`/`--showConfig`, tracing, pprof, message localization, the fanotify file-watching backend, and
 the language server's automatic type acquisition and performance/project telemetry are not ported
 ([capability table](COMPATIBILITY.md#what-it-does-and-doesnt-do)). If a function only serves one of those, leave it
 out; if a needed function has a branch that only serves one, keep the branch structure and mark only the truly

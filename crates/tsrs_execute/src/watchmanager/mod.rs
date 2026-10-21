@@ -61,6 +61,13 @@ impl WatchBackend for FsWatchBackend {
     }
 }
 
+// tsrs-only: fswatch spells paths the way the operating system does (`C:\proj\a.ts` on Windows); the watch logic matches
+// them against globs, watched directories and program files, all of which use `/`. A backslash is part of a file name
+// elsewhere, so only Windows converts.
+fn slash_path(path: &str) -> String {
+    if cfg!(windows) { tspath::normalize_slashes(path) } else { path.to_string() }
+}
+
 struct watchedDir {
     closer: Option<Box<dyn tsrs_fswatch::Watch>>,
     recursive: bool,
@@ -222,7 +229,7 @@ impl WatchManager {
                 FxHashMap::with_capacity_and_hasher(events.len(), rustc_hash::FxBuildHasher)
             });
             for e in events {
-                paths.insert(e.path.clone(), e.kind);
+                paths.insert(slash_path(&e.path), e.kind);
             }
         }
         self.signal_do_cycle();
@@ -565,4 +572,34 @@ pub fn perceived_os_root_length_for_watching(components: &[String]) -> usize {
         return index_after_os_root + 1;
     }
     index_after_os_root + 2
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    // fswatch reports paths the way the operating system spells them (`C:\proj\a.ts`); the watch logic, like the rest of
+    // the compiler, works on `/` paths.
+    #[test]
+    fn events_are_recorded_with_forward_slashes() {
+        let wm = WatchManager::new(Arc::new(|_: &str| {}), Box::new(|_: &str| true));
+        wm.on_watch_events(
+            &[
+                Event::new(EventKind::Update, r"C:\proj\src\c.ts"),
+                Event::new(EventKind::Delete, "C:/proj\\src/d.ts"),
+            ],
+            None,
+        );
+        let (paths, overflow) = wm.drain_events();
+        assert!(!overflow);
+        let mut got: Vec<_> = paths.into_iter().collect();
+        got.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(
+            got,
+            vec![
+                ("C:/proj/src/c.ts".to_string(), EventKind::Update),
+                ("C:/proj/src/d.ts".to_string(), EventKind::Delete),
+            ]
+        );
+    }
 }
