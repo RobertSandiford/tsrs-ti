@@ -4879,3 +4879,45 @@ measures. The raw pairs and JavaScript collectors are under
 Linux `bench/count.py` compiler-project measurement, and no two-publish
 wall-time claim follows from it. No material performance regression was
 detected in this SDK cohort, and the Rust compiler runtime is unchanged.
+
+## 103. `0ee02846fb` — Keep version substitutions aligned in tsc test baselines
+
+Upstream `0ee02846fb1e4f7710c396ff42e4289f81f1a6ba` fixes the Go
+`tsctests` output sanitizer: replacing the compiler version with
+`FakeTSVersion` must preserve the width of a space-padded `--help` header,
+including the 75-column and 115-column logo forms. It adds six sanitizer
+cases for English and Czech and corrects one Go help-output baseline. We
+ported the substitution to `tsrs_execute`'s test-only English sanitizer and
+added the six matching English cases, including repeated versions and both
+logo widths. Czech message localization and the full `tsc --help` output
+remain outside tsrs's documented scope; the CLI still prints its short usage.
+The source commit also adjusts four Microsoft Azure release-branch workflows
+to run token cleanup after a failure and requests issue-write permission for
+their app. tsrs has no corresponding Azure release-branch jobs, so this port
+does not add unrelated workflow conditions or permissions. The ignored
+`ts-ref` checkout advances to the exact upstream commit; the published
+TypeScript pin remains at the base until the migration finishes.
+
+The exact-source Go `tsctests` package and focused sanitizer test pass. The
+Rust sanitizer's six-case test passes, as do all 14 `tsrs_execute` unit tests,
+the dev CLI/testrunner build, warnings-denied Clippy, source lint, and
+formatting. The Rust tsc-scenario replay has no generated dump in this
+checkout; it was not counted as baseline coverage. Full compiler runs against
+source 103 pass with no new loss: the 18 Go-history, 18 canonical, and 36 emit
+named outcome lists are byte-identical to source 101 (source 102 changed no
+compiler input). Go-history and canonical checking each retain 13,580
+diagnostic passes, with 12,884 and 12,883 type/symbol passes respectively.
+Emit retains 13,584 diagnostic, 12,884 type/symbol, 13,510
+JavaScript/declaration, 149 JavaScript-map, and 156 source-map passes.
+Source 101's exact-source Fourslash result (4,091 pass, 470 skip, no failure)
+also applies because sources 102 and 103 change no Fourslash input or Rust
+language-service code.
+
+The Rust edit is confined to `tsctests`, a module behind `#[cfg(test)]`.
+`cargo build --release --locked -p tsrs_cli` succeeds, and the release CLI's
+SHA-256 is identical before and after rebuilding
+(`30025581b2d146d92b50b42d91e9d4c3e4b86e693994a062fdf92ee0b3893938`).
+The checker instruction count, wall time, and peak RSS therefore cannot
+change from this port; source 101's public compiler performance evidence
+carries through without a new runtime measurement. Outcome lists and the
+JavaScript comparison script are under `target/port-623/0103-0ee02846fb/`.
