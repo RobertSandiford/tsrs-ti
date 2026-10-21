@@ -5302,3 +5302,46 @@ was 93.69340 billion instructions and 2081.72 MiB. The deterministic Linux
 `bench/count.py` counter was unavailable on this macOS host. The exact-source
 Go/Rust logs, 72 named-list comparison, Fourslash result, and release hash are
 under `target/port-623/0110-9de8b7a3b8/`.
+
+## 111. `2e9fb00f5f` — Cover previously untested repository failures
+
+Upstream `2e9fb00f5f5c9186d09aabd78cced5ce2497456d` adds 112 compiler
+cases, two conformance cases, their 323 reference baselines, and seven `tsc`
+command-line scenarios for `alwaysStrict` and `baseUrl` config values. It
+changes no compiler runtime code. Rust already matches all new cases: the
+114 exact-source diagnostic and JavaScript-emit checks pass, all 113
+applicable `.types` and `.symbols` baselines pass. None of the new cases has a
+source-map baseline, so those checks are skipped. The exact-source Go
+scenario dumper records 550 scenarios; Rust replay passes all seven new
+`in-configuration` scenarios with no mismatch. The ignored `ts-ref` checkout
+advances to this commit, while the published TypeScript pin remains at the
+base until the complete migration.
+
+All 18 Go-history, 18 canonical, and 36 emit named outcome lists preserve
+every source-110 result. The new cases add exactly 114 diagnostic passes,
+113 type/symbol passes and one type/symbol skip, and 114 JavaScript passes;
+there are no new failures or crashes. Go-history checking now passes 13,695
+diagnostic and 12,997 type/symbol baselines; canonical has 13,695 and 12,996.
+The complete emit run passes 13,699 diagnostics, 12,997 type/symbol, 13,625
+JavaScript/declaration, 149 JavaScript-map, and 156 source-map baselines.
+An initial 14-worker emit run timed out on the pre-existing
+`intersectionConstructorReductionCrash` case at the harness's 20-second
+limit. The complete ten-worker rerun with a 60-second limit passes it and
+all other cases. The reference fixtures and the release CLI hash for that
+case are unchanged from source 110.
+
+The exact-source Go Fourslash gate passes 4,092 exercised groups, skips 470,
+and fails none. The first attempt was blocked by the sandbox denying a local
+Unix socket bind; the unsandboxed rerun passed. The dev CLI, test runner,
+and Fourslash server build; warnings-denied Clippy, source lint, and
+generated-code freshness all pass. No Rust source changed in this port.
+
+The release CLI is byte-identical to source 110 (SHA-256
+`bf49874f30b6ffe935b89fbce36b504a42ccc25d076e3ed99a6d379b44a2a3c9`),
+so its public instructions-retired, wall-time and peak-RSS behavior on
+identical inputs is unchanged. The previous VS Code cold single-thread
+reference was 81.26878 billion instructions and 1586.67 MiB peak RSS;
+default was 93.69340 billion instructions and 2081.72 MiB. The deterministic
+Linux `bench/count.py` counter was unavailable on this macOS host. Exact
+scenario, compiler, Fourslash, and repository-check evidence is under
+`target/port-623/0111-2e9fb00f5f/`.
