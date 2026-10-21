@@ -24,6 +24,73 @@ fn jsdoc_parameter_tag_has_type_annotation_node() {
 }
 
 #[test]
+fn test_jsdoc_augments_heritage() {
+    for (name, expression, tag_name, augments) in [
+        ("identifier", "A", "A", true),
+        ("dotted name", "ns.A", "ns.A", true),
+        ("call", "A.extend()", "A", true),
+        ("mixin", "mixin(A)", "A", true),
+        ("element access", "ns[\"A\"]", "A", true),
+        ("conditional", "(cond ? A : A)", "A", true),
+        ("parenthesized name", "(A)", "A", true),
+        ("null", "null", "A", false),
+        ("mismatched identifier", "A", "Other", false),
+        ("mismatched dotted name", "ns.A", "ns.Other", false),
+    ] {
+        let source =
+            format!("/** @extends {{{tag_name}<string>}} */\nclass B extends {expression} {{}}");
+        let file = parse_source_file(
+            SourceFileParseOptions { file_name: "/index.js".to_string(), ..Default::default() },
+            &source,
+            ScriptKind::JS,
+        );
+        assert!(file.diagnostics().is_empty(), "{name}: {:?}", file.diagnostics());
+        let statements = file.statements().nodes();
+        assert_eq!(statements.len(), 1, "{name}");
+        let class = statements[0];
+        assert_eq!(class.kind(), Kind::ClassDeclaration, "{name}");
+
+        let base_type = tsrs_ast::get_class_extends_heritage_element(class).unwrap();
+        let base = base_type.as_expression_with_type_arguments();
+        assert_eq!(tsrs_scanner::get_text_of_node(base.expression), expression, "{name}");
+
+        let jsdocs = class.jsdoc(Some(file.get()));
+        assert_eq!(jsdocs.len(), 1, "{name}");
+        let tags = jsdocs[0].as_jsdoc().tags().unwrap();
+        assert_eq!(tags.nodes().len(), 1, "{name}");
+        let tag = tags.nodes()[0];
+        assert_eq!(tag.kind(), Kind::JSDocAugmentsTag, "{name}");
+        let source_type_arguments =
+            tag.class_name().as_expression_with_type_arguments().type_arguments.get().unwrap();
+        assert_eq!(source_type_arguments.nodes().len(), 1, "{name}");
+        let source_argument = source_type_arguments.nodes()[0];
+
+        let type_arguments = base.type_arguments.get();
+        if augments {
+            let type_arguments = type_arguments.unwrap();
+            assert_eq!(type_arguments.nodes().len(), 1, "{name}");
+            let argument = type_arguments.nodes()[0];
+            assert_eq!(argument.kind(), Kind::StringKeyword, "{name}");
+            assert!(argument.flags().contains(NodeFlags::Reparsed), "{name}");
+            assert_eq!(argument.parent(), Some(base_type), "{name}");
+            assert_eq!(tsrs_scanner::get_text_of_node(argument), "string", "{name}");
+            assert_eq!(
+                tsrs_ast::get_reparsed_node_for_node(source_argument),
+                Some(argument),
+                "{name}"
+            );
+        } else {
+            assert!(type_arguments.is_none(), "{name}");
+            assert_eq!(
+                tsrs_ast::get_reparsed_node_for_node(source_argument),
+                Some(source_argument),
+                "{name}",
+            );
+        }
+    }
+}
+
+#[test]
 fn test_parse_static_source_phase_import() {
     for (source, phase, binding) in [
         ("import source a from './a.wasm';", Kind::SourceKeyword, "a"),

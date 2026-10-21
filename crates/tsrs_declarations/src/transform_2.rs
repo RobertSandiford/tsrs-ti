@@ -913,7 +913,7 @@ impl DeclarationTransformer {
 
             let members = self.build_class_members(input, &extra_members);
 
-            let extends_clause = get_effective_base_type_node(input);
+            let extends_clause = ast::get_class_extends_heritage_element(input);
 
             if let Some(extends_clause) = extends_clause {
                 let extends_expression =

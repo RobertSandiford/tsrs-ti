@@ -4614,3 +4614,62 @@ Thus source 96's paired public instructions-retired, peak-RSS, and wall-time
 measurements above apply unchanged to the same inputs: source 97 introduces
 no Rust performance regression. Focused test logs, validation logs, and
 the binary comparison are under `target/port-623/0097-6c976dad5d/`.
+
+## 98. `f5cdce998e` — Reparse JSDoc generic heritage on expressions
+
+Upstream `f5cdce998e1b35ec1e226101e65b6b05d6993e74` fixes JavaScript
+classes such as `/** @extends {A<string>} */ class B extends A.extend() {}`.
+The parser now clones `@extends` type arguments onto a single heritage element
+when its expression is a call, mixin, element access, conditional expression,
+or parenthesized name. Named heritage still requires a matching JSDoc name,
+and `extends null` remains unaugmented. The Rust parser follows the Go
+predicate and preserves the cloned nodes' `Reparsed` flags, parents, source
+text, and JSDoc-to-reparse mapping. The checker now obtains the base
+constructor before checking the tag, compares type identity for named bases
+and assignability from the actual base to the JSDoc type for expression
+bases, and reports the full expression in TS8023. Declaration emit uses the
+actual heritage element directly; its removed `getEffectiveBaseTypeNode`
+wrapper had no remaining JSDoc behavior. No algorithmic deviation from Go
+was needed.
+
+Exact-source Go `TestJSDocAugmentsHeritage` and the matching ten-case Rust
+parser test pass. All 15 focused `extendsTag` compiler variants match error,
+type, symbol, and JavaScript baselines, including eight new upstream fixtures
+(`extendsTag7`–`extendsTag14`). The ignored `ts-ref` checkout advances to this
+source commit; the published TypeScript pin stays at the base revision until
+the complete upgrade. The capability table records the behavior and updated
+counts. The root and npm READMEs have no conflicting numerical summary.
+
+All 18 Go-history, 18 canonical, and 36 emit outcome lists were compared to
+source 97's unchanged source-96 runtime. Their only new names are the eight
+passing `extendsTag` fixtures; no pass is lost, and no new failure, crash, or
+timeout appears. Go-history checking now has 13,580 diagnostic and 12,884
+type/symbol passes; canonical has 13,580 and 12,883. Emit has 13,584
+diagnostic, 12,884 type/symbol, 13,510 JavaScript, 149 JavaScript-map, and
+156 source-map passes. Exact-source Fourslash passes 4,091 exercised groups,
+skips 470, and fails none. The dev CLI and testrunner build, full Rust
+workspace, CLI regressions, `wasm32-wasip1` check, warnings-denied Clippy,
+source lint, and formatting pass. Fourslash needed local Unix-socket access
+after the sandbox denied the first subprocess test's bind.
+
+Five alternating paired macOS release runs per public cell compared source
+97's frozen binary with source 98. Every pair retained the same exit status
+and diagnostic hash. Instructions below are billions retired from
+`/usr/bin/time -l`, including kernel work; RSS is peak MiB, and wall is the
+paired process duration:
+
+| Public case | Checkers | Instructions, before → after | Peak RSS, before → after | Wall change |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions | one | 3.26942 → 3.26919 (−0.007%) | 59.23 → 59.27 (+0.053%) | −0.03% |
+| Compiler-Unions | default | 3.95571 → 3.95810 (+0.060%) | 82.06 → 82.06 (0%) | −0.09% |
+| webpack | one | 10.80919 → 10.80932 (+0.001%) | 306.67 → 306.69 (+0.005%) | −0.43% |
+| webpack | default | 15.20385 → 15.18598 (−0.118%) | 497.92 → 497.55 (−0.075%) | +0.98% |
+| VS Code | one | 81.47641 → 81.48135 (+0.006%) | 1586.80 → 1586.80 (0%) | +0.25% |
+| VS Code | default | 93.55789 → 93.51093 (−0.050%) | 2074.91 → 2084.98 (+0.486%) | −0.05% |
+
+The largest instruction increase is 0.060%, and the largest peak-RSS
+increase is 0.486%; no material performance regression was detected. The
+Linux deterministic `bench/count.py` counter was unavailable on this macOS
+host. Frozen release binaries, every paired sample and output hash, exact
+Go and Rust results, and the JavaScript measurement collector are under
+`target/port-623/0098-f5cdce998e/`.

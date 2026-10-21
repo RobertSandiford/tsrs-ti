@@ -41,8 +41,8 @@ impl Checker {
             let base_types = self.get_base_types(class_type);
             if !base_types.is_empty() {
                 let base_type = base_types[0];
-                self.check_jsdoc_augments_tag_matches_extends(node, base_type_node, base_type);
                 let base_constructor_type = self.get_base_constructor_type_of_class(class_type);
+                self.check_jsdoc_augments_tag_matches_extends(node, base_type_node, base_type);
                 let static_base_type = self.get_apparent_type(base_constructor_type);
                 self.check_base_type_accessibility(static_base_type, base_type_node);
                 self.check_source_element(base_type_node.expression());
@@ -170,47 +170,6 @@ impl Checker {
         self.check_index_constraints(static_type, symbol, true /*isStaticIndex*/);
         self.check_class_or_interface_for_duplicate_index_signatures(node);
         self.check_property_initialization(node);
-    }
-
-    // checker.go:4424
-    pub(crate) fn check_jsdoc_augments_tag_matches_extends(
-        &mut self,
-        node: P<Node>,
-        base_type_node: P<Node>,
-        base_type: P<Type>,
-    ) {
-        if !is_in_js_file(node) {
-            return;
-        }
-        let file = get_source_file_of_node(node);
-        for &j in node.eager_jsdoc(file.map(tsrs_core::P::get)) {
-            let Some(tags) = j.as_jsdoc().tags else {
-                continue;
-            };
-            for &tag in tags.nodes() {
-                if tag.kind() != Kind::JSDocAugmentsTag {
-                    continue;
-                }
-                let source_type_node = tag.class_name();
-                let source_type = self.get_type_from_type_node(source_type_node);
-                if self.is_type_identical_to(source_type, base_type) {
-                    continue;
-                }
-                let target_name = get_identifier_from_entity_name_expression(
-                    base_type_node.expression().unwrap(),
-                );
-                let source_name = get_identifier_from_entity_name_expression(
-                    source_type_node.expression().unwrap(),
-                );
-                if let (Some(target_name), Some(source_name)) = (target_name, source_name) {
-                    self.error(
-                        Some(source_name),
-                        &diagnostics::JSDoc_0_1_does_not_match_the_extends_2_clause,
-                        &[&tag.tag_name().text(), &source_name.text(), &target_name.text()],
-                    );
-                }
-            }
-        }
     }
 
     // checker.go:4450

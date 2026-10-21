@@ -170,25 +170,11 @@ pub(crate) fn should_emit_function_properties(input: P<Node>) -> bool {
 }
 
 // util.go:164
-pub(crate) fn get_effective_base_type_node(node: P<Node>) -> Option<P<Node>> {
-    let base_type = ast::get_class_extends_heritage_element(node);
-    // !!! TODO: JSDoc support
-    // if (baseType && isInJSFile(node)) {
-    //     // Prefer an @augments tag because it may have type parameters.
-    //     const tag = getJSDocAugmentsTag(node);
-    //     if (tag) {
-    //         return tag.class;
-    //     }
-    // }
-    base_type
-}
-
-// util.go:177
 pub(crate) fn is_scope_marker(node: P<Node>) -> bool {
     ast::is_export_assignment(node) || ast::is_export_declaration(node)
 }
 
-// util.go:181
+// util.go:168
 pub(crate) fn has_scope_marker(statements: Option<P<NodeList>>) -> bool {
     let Some(statements) = statements else {
         return false;
