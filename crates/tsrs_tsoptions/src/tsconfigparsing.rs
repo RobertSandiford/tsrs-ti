@@ -629,6 +629,12 @@ fn normalize_non_list_option_value(
     value
 }
 
+// Match the path that the file system will receive after resolving it against
+// the config's base directory; normalization can add or remove an /??/ prefix.
+pub(crate) fn is_network_path_value(value: &str, base_path: &str) -> bool {
+    tspath::is_network_path(&tspath::get_normalized_absolute_path(value, base_path))
+}
+
 pub(crate) fn convert_json_option(
     opt: &'static CommandLineOption,
     value: CompilerOptionsValue,
@@ -709,6 +715,19 @@ pub(crate) fn convert_json_option(
             validate_json_option_value(opt, value, value_expression, source_file);
         if !errors.is_empty() || validated_value.is_null() {
             (validated_value, errors)
+        } else if let CompilerOptionsValue::String(path) = &validated_value
+            && opt.is_file_path
+            && is_network_path_value(path, base_path)
+        {
+            (
+                CompilerOptionsValue::Null,
+                vec![create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
+                    source_file,
+                    value_expression,
+                    &diagnostics::Network_path_0_is_not_supported,
+                    &[path],
+                )],
+            )
         } else {
             (normalize_non_list_option_value(opt, base_path, validated_value), errors)
         }
@@ -815,6 +834,15 @@ fn get_extends_config_path(
     let extended_config = tspath::normalize_slashes(extended_config);
     let mut errors: Vec<P<Diagnostic>> = Vec::new();
     let error_file = source_file;
+    if is_network_path_value(&extended_config, base_path) {
+        errors.push(create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
+            error_file,
+            value_expression,
+            &diagnostics::Network_path_0_is_not_supported,
+            &[&extended_config],
+        ));
+        return (String::new(), errors);
+    }
     if tspath::is_rooted_disk_path(&extended_config)
         || extended_config.starts_with("./")
         || extended_config.starts_with("../")
@@ -2022,6 +2050,7 @@ fn parse_json_config_file_content_worker(
         (validated_include_specs_before_substitution, err) = validate_specs(
             include_specs,
             true, /*disallowTrailingRecursion*/
+            &base_path_for_file_names,
             tsconfig_to_source_file(source_file),
             "include",
         );
@@ -2039,6 +2068,7 @@ fn parse_json_config_file_content_worker(
         (validated_exclude_specs, err) = validate_specs(
             exclude_specs,
             false, /*disallowTrailingRecursion*/
+            &base_path_for_file_names,
             tsconfig_to_source_file(source_file),
             "exclude",
         );
@@ -2053,15 +2083,21 @@ fn parse_json_config_file_content_worker(
         }
     }
     if let Some(file_specs) = &file_specs.slice_value {
-        validated_files_spec_before_substitution.extend(
-            file_specs.iter().filter(|v| is_string_value(v)).filter_map(|spec| {
-                if let CompilerOptionsValue::String(spec) = spec {
-                    Some(spec.clone())
-                } else {
-                    None
-                }
-            }),
-        );
+        for value in file_specs {
+            let CompilerOptionsValue::String(spec) = value else {
+                continue;
+            };
+            if is_network_path_value(spec, &base_path_for_file_names) {
+                errors.push(create_diagnostic_for_spec(
+                    tsconfig_to_source_file(source_file),
+                    "files",
+                    &diagnostics::Network_path_0_is_not_supported,
+                    spec,
+                ));
+                continue;
+            }
+            validated_files_spec_before_substitution.push(spec.clone());
+        }
         validated_files_spec = match get_substituted_string_array_with_config_dir_template(
             &validated_files_spec_before_substitution,
             &base_path_for_file_names,
@@ -2362,6 +2398,16 @@ fn parse_json_config_file_content_worker(
                     ));
                     continue;
                 }
+                if is_network_path_value(&ref_.reference.path, base_path) {
+                    errors.push(create_diagnostic_at_project_reference_property(
+                        source_file,
+                        index,
+                        "path",
+                        &diagnostics::Network_path_0_is_not_supported,
+                        &[&ref_.reference.path],
+                    ));
+                    continue;
+                }
                 if ref_.has_circular && !ref_.circular_valid {
                     errors.push(create_diagnostic_at_project_reference_property(
                         source_file,
@@ -2430,27 +2476,19 @@ fn should_report_no_input_files(
 fn validate_specs(
     specs: &[CompilerOptionsValue],
     disallow_trailing_recursion: bool,
+    base_path: &str,
     json_source_file: Option<P<SourceFile>>,
     spec_key: &str,
 ) -> (Vec<String>, Vec<P<Diagnostic>>) {
-    let create_diagnostic = |message: &'static Message, spec: &str| -> P<Diagnostic> {
-        let element = get_ts_config_prop_array_element_value(json_source_file, spec_key, spec);
-        create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
-            json_source_file,
-            element,
-            message,
-            &[&spec],
-        )
-    };
     let mut errors: Vec<P<Diagnostic>> = Vec::new();
     let mut final_specs: Vec<String> = Vec::new();
     for value in specs {
         let CompilerOptionsValue::String(spec) = value else {
             continue;
         };
-        let diag = spec_to_diagnostic(spec, disallow_trailing_recursion);
+        let diag = spec_to_diagnostic(spec, disallow_trailing_recursion, base_path);
         if let Some(diag) = diag {
-            errors.push(create_diagnostic(diag, spec));
+            errors.push(create_diagnostic_for_spec(json_source_file, spec_key, diag, spec));
         } else {
             final_specs.push(spec.clone());
         }
@@ -2458,10 +2496,31 @@ fn validate_specs(
     (final_specs, errors)
 }
 
+fn create_diagnostic_for_spec(
+    json_source_file: Option<P<SourceFile>>,
+    spec_key: &str,
+    message: &'static Message,
+    spec: &str,
+) -> P<Diagnostic> {
+    let element = get_ts_config_prop_array_element_value(json_source_file, spec_key, spec);
+    create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
+        json_source_file,
+        element,
+        message,
+        &[&spec],
+    )
+}
+
 pub(crate) fn spec_to_diagnostic(
     spec: &str,
     disallow_trailing_recursion: bool,
+    base_path: &str,
 ) -> Option<&'static Message> {
+    // A '?' in a file spec is a wildcard, so an /??/ spec can match local
+    // directories. Only a normalized UNC/device root is unambiguously remote.
+    if tspath::get_normalized_absolute_path(spec, base_path).starts_with("//") {
+        return Some(&diagnostics::Network_path_0_is_not_supported);
+    }
     if disallow_trailing_recursion && invalid_trailing_recursion(spec) {
         return Some(&diagnostics::File_specification_cannot_end_in_a_recursive_directory_wildcard_Asterisk_Asterisk_Colon_0);
     }

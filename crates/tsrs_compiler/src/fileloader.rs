@@ -1937,6 +1937,15 @@ pub(crate) fn source_file_from_reference(
 ) -> (String, Option<sourceFileFromReferenceDiagnostic>) {
     let allow_non_ts_extensions = options.allow_non_ts_extensions.is_true();
     let diagnostic_file_name = tspath::normalize_slashes(reference_text);
+    if tspath::is_network_path(file_name) {
+        return (
+            String::new(),
+            Some(sourceFileFromReferenceDiagnostic {
+                message: &diagnostics::Network_path_0_is_not_supported,
+                args: vec![diagnostic_file_name],
+            }),
+        );
+    }
     if tspath::has_extension(file_name) {
         let canonical_file_name =
             tspath::get_canonical_file_name(file_name, fs.use_case_sensitive_file_names());

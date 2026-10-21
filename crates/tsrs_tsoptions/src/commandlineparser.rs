@@ -26,7 +26,7 @@ use crate::parsinghelpers::{
 };
 use crate::tsconfigparsing::{
     COMMAND_LINE_COMPILER_OPTIONS_MAP, ParseConfigHost, convert_map_to_options,
-    validate_json_option_value,
+    is_network_path_value, validate_json_option_value,
 };
 
 impl CommandLineParser {
@@ -413,7 +413,16 @@ impl CommandLineParser {
                             None,
                             None,
                         );
-                        if err.is_empty() {
+                        if let CompilerOptionsValue::String(path) = &val
+                            && err.is_empty()
+                            && opt.is_file_path
+                            && is_network_path_value(path, &self.current_directory)
+                        {
+                            self.errors.push(new_compiler_diagnostic(
+                                &diagnostics::Network_path_0_is_not_supported,
+                                &[path],
+                            ));
+                        } else if err.is_empty() {
                             self.options.set(opt.name.to_string(), val);
                         } else {
                             self.errors.extend(err);

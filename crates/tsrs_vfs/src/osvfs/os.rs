@@ -79,22 +79,37 @@ impl FS for OsFS {
     }
 
     fn read_file(&self, path: &str) -> Option<String> {
+        if tspath::is_network_path(path) {
+            return None;
+        }
         self.common.read_file(path)
     }
 
     fn directory_exists(&self, path: &str) -> bool {
+        if tspath::is_network_path(path) {
+            return false;
+        }
         self.common.directory_exists(path)
     }
 
     fn file_exists(&self, path: &str) -> bool {
+        if tspath::is_network_path(path) {
+            return false;
+        }
         self.common.file_exists(path)
     }
 
     fn get_accessible_entries(&self, path: &str) -> Entries {
+        if tspath::is_network_path(path) {
+            return Entries::default();
+        }
         self.common.get_accessible_entries(path)
     }
 
     fn stat(&self, path: &str) -> Option<FileInfo> {
+        if tspath::is_network_path(path) {
+            return None;
+        }
         self.common.stat(path)
     }
 
@@ -111,11 +126,17 @@ impl FS for OsFS {
     }
 
     fn remove(&self, path: &str) -> Result<(), String> {
+        if tspath::is_network_path(path) {
+            return Err("network paths are not supported".to_string());
+        }
         // todo: #701 add retry mechanism?
         remove_all(path).map_err(|e| e.to_string())
     }
 
     fn chtimes(&self, path: &str, a_time: SystemTime, m_time: SystemTime) -> Result<(), String> {
+        if tspath::is_network_path(path) {
+            return Err("network paths are not supported".to_string());
+        }
         let file = fs::File::options()
             .write(true)
             .open(path)
@@ -130,6 +151,9 @@ fn os_fs_realpath(path: &str) -> String {
     let _ = internal::root_length(path); // Assert path is rooted
 
     let orig = path;
+    if tspath::is_network_path(orig) {
+        return orig.to_string();
+    }
     let path = from_slash(path);
     let Ok(path) = native_realpath(&path) else {
         return orig.to_string();
@@ -137,6 +161,11 @@ fn os_fs_realpath(path: &str) -> String {
     let Ok(path) = abs(&path) else {
         return orig.to_string();
     };
+    // A mapped drive may resolve to a network share. Keep using its local
+    // spelling so later accesses do not open the share directly.
+    if tspath::is_network_path(&path) {
+        return orig.to_string();
+    }
     tspath::normalize_slashes(&path)
 }
 
@@ -363,6 +392,9 @@ pub(crate) fn clean(path: &str) -> String {
 }
 
 fn is_reparse_point(path: &str) -> bool {
+    if tspath::is_network_path(path) {
+        return false;
+    }
     match fs::symlink_metadata(from_slash(path)) {
         Ok(info) => info.file_type().is_symlink(),
         Err(_) => false,
@@ -398,6 +430,9 @@ impl OsFS {
 
     fn write_file_ensuring_dir(path: &str, content: &str, append: bool) -> Result<(), String> {
         let _ = internal::root_length(path); // Assert path is rooted
+        if tspath::is_network_path(path) {
+            return Err("network paths are not supported".to_string());
+        }
         if Self::write_file_with_flag(path, content, append).is_ok() {
             return Ok(());
         }

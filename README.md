@@ -39,6 +39,7 @@ The source-51 compiler reports TS18117 for deferred imports without a namespace 
 Source 62 adds the ESNext iterator typings for `chunks`, `join`, `includes`, `zip`, and `zipKeyed`; the published pin is unchanged during the upgrade.
 Source 101 creates private Unix API socket directories and restricts Windows API named pipes to the current user.
 Source 102 makes sync SDK generator instances single-use across batch calls, matching upstream TypeScript.
+Source 104 rejects network filesystem paths before OS access and reports TS5116 for affected config and source references.
 
 <a href="https://github.com/oxc-project/tsrs/blob/main/bench/RESULTS.md">
   <picture>

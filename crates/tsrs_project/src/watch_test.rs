@@ -3,7 +3,39 @@ use std::sync::Arc;
 use tsrs_core::collections::SyncMap;
 use tsrs_core::tspath::{self, Path};
 
-use super::create_resolution_lookup_glob_mapper;
+use super::{
+    create_resolution_lookup_glob_mapper, file_system_watcher_glob_string,
+    new_watched_files_for_paths,
+};
+
+// watch_test.go:33 TestWatchedFilesOmitsNetworkPaths
+#[test]
+fn watched_files_omits_network_paths() {
+    let files =
+        ["/workspace/a.ts", "/external/b.ts", "//server/share/c.ts", "/??/UNC/server/share/d.ts"];
+    for (workspace, expected) in [
+        ("/workspace", &["/workspace/a.ts", "file:///external/**/*"][..]),
+        ("//server/share", &["file:///external/**/*", "file:///workspace/**/*"][..]),
+    ] {
+        let watcher = new_watched_files_for_paths(
+            "test".to_string(),
+            tsrs_lsproto::WatchKind::Create,
+            true,
+            workspace,
+            "/",
+            true,
+        )
+        .clone_with(files.iter().map(|file| (*file).to_string()).collect());
+        let watchers = watcher.watchers();
+        let globs: Vec<String> = watchers
+            .workspace_watchers
+            .iter()
+            .chain(&watchers.outside_workspace_watchers)
+            .map(file_system_watcher_glob_string)
+            .collect();
+        assert_eq!(globs, expected);
+    }
+}
 
 fn watched_files(file_names: &[&str], case_sensitive: bool) -> Arc<SyncMap<Path, String>> {
     let files = Arc::new(SyncMap::default());

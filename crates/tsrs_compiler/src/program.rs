@@ -2018,6 +2018,7 @@ impl Program {
             };
 
         if let Some(paths) = &options.paths {
+            let paths_base_path = options.get_paths_base_path(self.get_current_directory());
             for (key, value) in paths {
                 // !!! This code does not handle cases where where the path mappings have the wrong types,
                 // as that information is mostly lost during the parsing process.
@@ -2064,6 +2065,17 @@ impl Program {
                             i,
                             &diagnostics::Non_relative_paths_are_not_allowed_Did_you_forget_a_leading_Slash,
                             &[],
+                        );
+                    } else if tspath::is_network_path(&tspath::get_normalized_absolute_path(
+                        subst,
+                        &paths_base_path,
+                    )) {
+                        create_diagnostic_for_option_path_key_value(
+                            &mut diags,
+                            key,
+                            i,
+                            &diagnostics::Network_path_0_is_not_supported,
+                            &[subst],
                         );
                     }
                 }

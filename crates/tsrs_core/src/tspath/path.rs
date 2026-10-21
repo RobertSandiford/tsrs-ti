@@ -95,6 +95,24 @@ fn is_any_directory_separator(char: u8) -> bool {
     char == b'/' || char == b'\\'
 }
 
+// Reports whether Windows may resolve path over the network. This includes
+// UNC paths, Win32 device paths, and NT object paths, with either separator.
+// Check the original bytes before normalizing: normalization can erase a
+// network prefix on POSIX hosts, where these paths are also refused.
+pub fn is_network_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    if bytes.len() < 2 || !is_any_directory_separator(bytes[0]) {
+        return false;
+    }
+    if is_any_directory_separator(bytes[1]) {
+        return true;
+    }
+    bytes.len() >= 3
+        && bytes[1] == b'?'
+        && bytes[2] == b'?'
+        && (bytes.len() == 3 || is_any_directory_separator(bytes[3]))
+}
+
 // Determines whether a path starts with a URL scheme (e.g. starts with `http://`, `ftp://`, `file://`, etc.).
 pub fn is_url(path: &str) -> bool {
     matches!(get_encoded_root_length(path), EncodedRootLength::Url(_))

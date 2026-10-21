@@ -259,7 +259,15 @@ impl<T> WatchedFiles<T> {
         self.compute_watchers_once.call_once(|| {
             let mut st = self.mu.write().unwrap();
             let result = (self.compute_glob_patterns)(&self.input);
-            let globs = sorted_compact(result.patterns_inside_workspace);
+            // A network path can make Windows authenticate to an arbitrary host.
+            // Never ask the client to watch it, even when it is inside the workspace.
+            let globs = sorted_compact(
+                result
+                    .patterns_inside_workspace
+                    .into_iter()
+                    .filter(|path| !tspath::is_network_path(path))
+                    .collect(),
+            );
 
             // ignored is only used for logging and doesn't affect watcher identity
             st.ignored = result.ignored;
@@ -283,7 +291,13 @@ impl<T> WatchedFiles<T> {
                     .collect();
                 changed = true;
             }
-            let dirs_outside = sorted_compact(result.directories_outside_workspace);
+            let dirs_outside = sorted_compact(
+                result
+                    .directories_outside_workspace
+                    .into_iter()
+                    .filter(|path| !tspath::is_network_path(path))
+                    .collect(),
+            );
             let same_dirs = st.outside_workspace_watchers.len() == dirs_outside.len()
                 && st.outside_workspace_watchers.iter().zip(&dirs_outside).all(|(a, b)| {
                     file_system_watcher_glob_string(a)

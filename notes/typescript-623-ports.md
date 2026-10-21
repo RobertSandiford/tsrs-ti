@@ -4921,3 +4921,65 @@ The checker instruction count, wall time, and peak RSS therefore cannot
 change from this port; source 101's public compiler performance evidence
 carries through without a new runtime measurement. Outcome lists and the
 JavaScript comparison script are under `target/port-623/0103-0ee02846fb/`.
+
+## 104. `ce30dd50a5` — Ban network paths wholesale
+
+Upstream `ce30dd50a5dd0b81b83538c591b17347eca422d5` refuses UNC,
+Win32 device, and NT object path roots before OS filesystem access because a
+Windows network path can authenticate to an arbitrary host. The Rust port
+adds the same byte-prefix check to the shared path utilities and applies it
+to OS-backed reads, metadata, writes and removals, realpath and reparse-point
+lookups, filesystem watcher subscriptions, and LSP watcher registration.
+Watcher batches roll back already prepared subscriptions when a later path is
+rejected; a mapped-drive realpath retains its local spelling. Config parsing
+rejects rooted network option values, `extends`, explicit files and project
+references, and remote include/exclude specs; command-line rooted options
+receive the same check. The compiler reports new TS5116 for network
+triple-slash references and `paths` substitutions. File-spec `/??/*.ts`
+remains a valid local wildcard, and normalization can remove an `/??/`
+prefix before access. Profiling remains unimplemented, so the upstream
+profile-directory guard has no Rust counterpart. The published TypeScript
+pin remains unchanged until the final migration entry.
+
+Exact-source Go network-path, OS VFS, filesystem-watcher, project-watcher,
+config/response-file, and `networkPathReferences` compiler tests pass. Rust
+path, VFS, watcher, config/response-file, and project-watcher unit tests pass;
+the new compiler fixture matches its diagnostic and JavaScript baselines.
+The dev CLI/testrunner build, full workspace suite, all 40 regression cases,
+WebAssembly target check, exact-source Fourslash
+(4,091 exercised groups passing, 470 skipped, none failing), warnings-denied
+Clippy, source lint, formatting, and generated-code regeneration pass. The
+initial Fourslash and workspace runs were denied local Unix-socket binding
+by the sandbox; reruns with socket access passed.
+
+All 18 Go-history, 18 canonical, and 36 emit named outcome lists preserve
+every source-103 pass with no new failure, crash, or timeout. Only
+`compiler/networkPathReferences` is added: it passes diagnostics and
+JavaScript output and intentionally skips type/symbol and map baselines.
+Go-history and canonical checking each pass 13,581 diagnostic baselines,
+with 12,884 and 12,883 type/symbol passes respectively. Emit passes 13,585
+diagnostic, 12,884 type/symbol, 13,511 JavaScript/declaration, 149
+JavaScript-map, and 156 source-map baselines. The complete outcome lists and
+their JavaScript comparison are under `target/port-623/0104-ce30dd50a5/`.
+
+Five alternating release-binary pairs per public project and checker mode
+compare frozen source-103 and source-104 binaries. Every exit status and
+output hash matches. macOS `/usr/bin/time -l` supplies instructions retired
+and peak RSS; wall time includes process launch:
+
+| Project | Mode | Instructions, billions before → after | Peak RSS MiB before → after | Wall seconds before → after |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions | single | 3.26988 → 3.22081 | 59.13 → 59.08 | 0.238 → 0.224 |
+| Compiler-Unions | default | 3.95636 → 3.90783 | 82.17 → 81.80 | 0.106 → 0.106 |
+| webpack | single | 10.80858 → 10.80388 | 306.44 → 306.45 | 0.898 → 0.912 |
+| webpack | default | 15.23556 → 15.23900 | 499.83 → 500.63 | 0.169 → 0.163 |
+| VS Code | single | 81.32857 → 81.26917 | 1586.63 → 1586.66 | 7.524 → 7.578 |
+| VS Code | default | 93.59376 → 93.64996 | 2081.19 → 2086.81 | 0.989 → 0.993 |
+
+The largest instruction increase is +0.060% and the largest peak-RSS
+increase is +0.270%; no material regression is detected in this cohort.
+The Compiler-Unions instruction decreases are measured binary effects, not
+evidence that network-path checks cause a speedup. The deterministic Linux
+`bench/count.py` counter was unavailable on this macOS host. Raw runs,
+matching output hashes, and the JavaScript collector are retained under
+`target/port-623/0104-ce30dd50a5/perf/`.

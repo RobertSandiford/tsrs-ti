@@ -363,6 +363,18 @@ fn test_response_file_parsing() {
     assert!(parsed.compiler_options().unwrap().strict.is_true());
     assert_eq!(parsed.compiler_options().unwrap().out_dir, "/project/dist");
 
+    // Rooted path options in response files must not retain network paths.
+    let host = new_vfs_parse_config_host(
+        &[("/project/args.txt", r"--pprofDir \\server\share --outDir dist")],
+        "/project",
+        true,
+    );
+    let parsed = parse_command_line(&args(&["@args.txt"]), host);
+    assert_eq!(parsed.errors.len(), 1);
+    assert_eq!(parsed.errors[0].code(), diagnostics::Network_path_0_is_not_supported.code());
+    assert_eq!(parsed.compiler_options().unwrap().pprof_dir, "");
+    assert_eq!(parsed.compiler_options().unwrap().out_dir, "/project/dist");
+
     // cyclic response files
     let host = new_vfs_parse_config_host(
         &[

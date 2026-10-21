@@ -2,6 +2,55 @@ use super::*;
 use crate::tspath::*;
 
 #[test]
+fn test_is_network_path() {
+    for path in [
+        "//server",
+        "//server/share/file.ts",
+        "\\\\server\\share\\file.ts",
+        "/\\server/share",
+        "\\/server/share",
+        "//?/UNC/server/share",
+        "\\\\?\\UNC\\server\\share",
+        "//./UNC/server/share",
+        "\\\\.\\GLOBALROOT\\Device\\Mup\\server\\share",
+        "\\\\?\\c:\\file.ts",
+        "\\\\wsl$\\Ubuntu\\home",
+        "//wsl.localhost/Ubuntu/home",
+        "/??",
+        "/??/UNC/server/share",
+        "\\??\\UNC\\server\\share",
+        "\\??\\GLOBALROOT\\Device\\Mup\\server\\share",
+    ] {
+        assert!(is_network_path(path), "{path:?}");
+    }
+    for path in [
+        "",
+        "/",
+        "\\",
+        "a",
+        "a//b",
+        "./a",
+        "../a",
+        "/a",
+        "/a//b",
+        "/?",
+        "/???",
+        "/??a",
+        "/a/??/b",
+        "c:",
+        "c:/",
+        "c:\\file.ts",
+        "c:file.ts",
+        "file:///c:/file.ts",
+        "file://server/share",
+        "^/untitled/ts-nul-authority/Untitled-1",
+        "bundled:///libs/lib.d.ts",
+    ] {
+        assert!(!is_network_path(path), "{path:?}");
+    }
+}
+
+#[test]
 fn test_normalize_slashes() {
     assert_eq!(normalize_slashes("a"), "a");
     assert_eq!(normalize_slashes("a/b"), "a/b");

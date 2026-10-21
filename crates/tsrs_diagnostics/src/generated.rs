@@ -9813,6 +9813,16 @@ pub static Instantiations_of_the_following_types_appear_infinitely_circular_Colo
         reports_deprecated: false,
     };
 
+pub static Network_path_0_is_not_supported: Message = Message {
+    code: 5116,
+    category: Category::Error,
+    key: Key("Network_path_0_is_not_supported_5116"),
+    text: "Network path '{0}' is not supported.",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
+
 pub static Generates_a_sourcemap_for_each_corresponding_d_ts_file: Message = Message {
     code: 6000,
     category: Category::Message,
@@ -19199,7 +19209,7 @@ pub static JSDoc_comment: Message = Message {
     reports_deprecated: false,
 };
 
-pub(crate) static ALL_MESSAGES: [&Message; 2228] = [
+pub(crate) static ALL_MESSAGES: [&Message; 2229] = [
     &Unterminated_string_literal,
     &Identifier_expected,
     &X_0_expected,
@@ -20395,6 +20405,7 @@ pub(crate) static ALL_MESSAGES: [&Message; 2228] = [
     &X_0_is_only_assignable_to_the_non_distributed_1_but_1_has_been_distributed_here,
     &Instantiations_of_type_0_appear_infinitely_circular,
     &Instantiations_of_the_following_types_appear_infinitely_circular_Colon_0,
+    &Network_path_0_is_not_supported,
     &Generates_a_sourcemap_for_each_corresponding_d_ts_file,
     &Concatenate_and_emit_output_to_single_file,
     &Generates_corresponding_d_ts_file,

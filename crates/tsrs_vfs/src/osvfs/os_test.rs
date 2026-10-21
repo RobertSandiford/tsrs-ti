@@ -63,6 +63,38 @@ fn test_os_realpath() {
 }
 
 #[test]
+fn test_os_rejects_network_paths() {
+    if cfg!(windows) {
+        // On POSIX, a leading // still names the same local directory.
+        return;
+    }
+    let dir = temp_dir();
+    std::fs::write(format!("{dir}/a.txt"), "a").unwrap();
+    let network_dir = format!("/{dir}");
+    let network_file = format!("{network_dir}/a.txt");
+    let new_network_file = format!("{network_dir}/b.txt");
+    assert!(tspath::is_network_path(&network_file));
+
+    let fs = fs();
+    assert!(!fs.directory_exists(&network_dir));
+    assert!(!fs.file_exists(&network_file));
+    assert_eq!(fs.read_file(&network_file), None);
+    assert!(fs.stat(&network_file).is_none());
+    let entries = fs.get_accessible_entries(&network_dir);
+    assert!(entries.files.is_empty() && entries.directories.is_empty());
+    assert_eq!(fs.realpath(&network_file), network_file);
+
+    assert!(fs.write_file(&new_network_file, "b").is_err());
+    assert!(fs.append_file(&new_network_file, "b").is_err());
+    assert!(fs.chtimes(&network_file, SystemTime::now(), SystemTime::now()).is_err());
+    assert!(fs.remove(&network_file).is_err());
+
+    assert!(std::fs::metadata(format!("{dir}/a.txt")).is_ok());
+    assert!(!std::path::Path::new(&format!("{dir}/b.txt")).exists());
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn test_os_use_case_sensitive_file_names() {
     let fs = fs();
 
