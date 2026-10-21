@@ -4489,3 +4489,80 @@ Thus source 94's public paired instructions-retired, peak-RSS, and wall-time
 measurements above apply unchanged to the same inputs: source 95 introduces no
 Rust performance regression. Logs and the binary comparison are under
 `target/port-623/0095-e67b60e338/`.
+
+## 96. `e36179bde8` — Use paged indexes for type-node and signature caches
+
+Upstream `e36179bde849072301c41d1090c4d75616cd3c47` switches the checker's
+`typeNodeLinks` and `signatureLinks` from pointer-keyed maps to `nodeLinkStore`.
+That store assigns a checker-local reserved node ID on first access, indexes
+ordinary preassigned IDs separately, and distinguishes an absent link from an
+untouched cell of an allocated page. Go's new test covers 4,096 nodes with
+alternating preassigned IDs, two independent checkers, `Has` before `Get`,
+retention across arena release and garbage collection, and an absent clone.
+
+Rust now uses `NodeValueLinkStore` for those two caches. It reuses Go-compatible
+`NodeIdGenerator` assignment, preserves per-slot absence and stable arena
+addresses, falls back to an ordinary-ID map, and copies frozen shared-graph
+links into a fork on first write. The old hash-only key fields leave
+`TypeNodeLinks` and `SignatureLinks`; their compressed records shrink from
+16 to 8 and 16 to 12 bytes, respectively (the `P` arena rounds the latter
+allocation to 16). The existing inline `NodeLinkStore` remains appropriate for
+its four-byte `SymbolNodeLinks` value but could not serve these stores: it
+reports every cell in an allocated group as present. A focused Rust test mirrors
+the upstream mixed-ID, two-checker and clone cases; both it and exact-source
+Go `TestCheckerNodeLinkStores` pass. A `tsrs_core/shared-graph` focused test
+also verifies that a fork reads its seed link and copies it before mutation.
+
+The first implementation used Go-sized 256-id pages. In a reversed ten-pair
+public VS Code/default run its peak RSS rose 1.34% against source 95, while
+instructions fell 0.25%. Rust therefore uses 32-id value-pointer groups behind
+a 1,024-id two-level index, preserving the Go lookup semantics and avoiding
+allocation for neighboring untouched groups. This is an internal page-size
+deviation made to prevent the measured multi-checker memory regression. It
+differs from the dense-link-table ideas rejected in
+`notes/mem-dense-link-tables.md` and `notes/perf-round2-followups.md`: at that
+time almost none of these pointer-keyed records had node IDs, and assigning IDs
+would change Go-visible numbering. This upstream commit explicitly assigns the
+IDs; the smaller groups also avoid the rejected large sparse pages. We reviewed
+those notes, `docs/RUST.md` Techniques, and the newest `notes/mem-round4.md`
+before the layout change.
+
+The ignored `ts-ref` checkout advances to this exact source commit. The
+published TypeScript pin stays at the base revision until the complete upgrade.
+No fixture, library, user-visible capability, or compatibility count changed;
+the capability table and README summaries remain current. All 18 Go-history,
+18 canonical, and 36 emit named compiler outcome lists match source 95 exactly,
+with no lost pass, crash or timeout. Go-history checking has 13,572 diagnostic
+and 12,876 type/symbol passes; canonical has 13,572 and 12,875. Emit has
+13,502 JavaScript, 149 JavaScript-map, and 156 source-map passes. Exact-source
+Fourslash passes 4,091 exercised groups, skips 470, and fails none. The full
+Rust workspace, 40 CLI regressions, `wasm32-wasip1` check, warnings-denied
+Clippy, source lint, and formatting pass. The workspace and Fourslash runs
+needed local Unix-socket access after the sandbox denied socket creation.
+
+Paired local macOS release runs compare source 95's frozen executable with
+source 96, five alternating pairs per public cell. All exit statuses and
+diagnostic hashes match. Instructions below are billions retired from macOS
+`/usr/bin/time -l` (including kernel work), RSS is peak MiB, and wall time is
+the paired process duration:
+
+| Public case | Checkers | Instructions, before → after | Peak RSS, before → after | Wall change |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions | one | 3.27180 → 3.26909 (−0.083%) | 59.20 → 59.25 (+0.079%) | −0.16% |
+| Compiler-Unions | default | 3.96420 → 3.95844 (−0.145%) | 83.09 → 82.34 (−0.903%) | +1.23% |
+| webpack | one | 10.82855 → 10.80580 (−0.210%) | 309.25 → 306.67 (−0.834%) | +0.98% |
+| webpack | default | 15.18968 → 15.12131 (−0.450%) | 499.02 → 494.20 (−0.964%) | −0.48% |
+| VS Code | one | 81.41974 → 82.27369 (+1.049%)* | 1603.67 → 1586.80 (−1.052%) | −5.63% |
+| VS Code | default | 93.82296 → 93.56103 (−0.279%) | 2073.67 → 2079.02 (+0.258%) | −8.55% |
+
+*The VS Code/one instruction increase did not repeat in an independent
+reversed ten-pair run: instructions −0.183%, RSS −1.052%, wall −1.46%.
+Another reversed ten-pair VS Code/default run measured instructions −0.242%,
+RSS +0.064%, wall −1.95%. The Linux deterministic `bench/count.py` counter
+was unavailable on this macOS host; kernel-inclusive instruction and wall
+readings can vary across runs. The final layout has no confirmed material
+performance regression. Both candidate and final release binaries, raw
+paired samples, output hashes, exact-source Go and Rust gates, and the
+JavaScript comparator/collector are under `target/port-623/0096-e36179bde8/`.
+The final measured release binary has SHA-256
+`1f432c5d028b43491e2f8c92c9a0fb2e82841e874cfac4399924a3daab2c111a`.

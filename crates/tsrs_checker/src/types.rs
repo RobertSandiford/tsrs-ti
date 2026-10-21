@@ -779,13 +779,10 @@ pub struct SymbolNodeLinks {
     pub resolved_symbol: Cell<Option<P<Symbol>>>, // Resolved symbol associated with node
 }
 
-// KeyedLinkStore's compressed handles need every array element to start at an eight-byte boundary.
-#[cfg_attr(target_pointer_width = "64", repr(align(8)))]
 #[derive(Default)]
 pub struct TypeNodeLinks {
     pub resolved_type: Cell<Option<P<Type>>>, // Resolved type associated with node
     outer_type_parameters: Cell<Option<P<ThinSliceCell<P<Type>>>>>, // Outer type parameters of anonymous object type; nil means not computed
-    link_key: Cell<tsrs_core::PKey>, // tsrs: the node this record is filed under (`KeyedLinkStore`)
 }
 
 impl TypeNodeLinks {
@@ -809,20 +806,13 @@ impl TypeNodeLinks {
     }
 }
 
-impl crate::links::KeyedLinks for TypeNodeLinks {
-    #[inline]
-    fn link_key(&self) -> &Cell<tsrs_core::PKey> {
-        &self.link_key
-    }
-}
-
-// With compressed pointers, the optional outer list and key take four bytes each, then align to eight.
+// The optional outer list stays in one handle, alongside the resolved type.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(
-    std::mem::size_of::<TypeNodeLinks>() == if tsrs_core::COMPRESSED_PTRS { 16 } else { 24 }
+    std::mem::size_of::<TypeNodeLinks>() == if tsrs_core::COMPRESSED_PTRS { 8 } else { 16 }
 );
 #[cfg(target_pointer_width = "32")]
-const _: () = assert!(std::mem::size_of::<TypeNodeLinks>() == 12);
+const _: () = assert!(std::mem::size_of::<TypeNodeLinks>() == 8);
 
 #[derive(Default)]
 pub struct ComputedNameNodeLinks {
@@ -868,23 +858,15 @@ pub struct SignatureLinks {
     pub resolved_signature: Cell<Option<P<Signature>>>, // Cached signature of signature node or call expression
     pub effects_signature: Cell<Option<P<Signature>>>, // Signature with possible control flow effects
     pub decorator_signature: Cell<Option<P<Signature>>>, // Signature for decorator as if invoked by the runtime
-    link_key: Cell<tsrs_core::PKey>, // tsrs: the node this record is filed under (`KeyedLinkStore`), in what was padding
 }
 
-impl crate::links::KeyedLinks for SignatureLinks {
-    #[inline]
-    fn link_key(&self) -> &Cell<tsrs_core::PKey> {
-        &self.link_key
-    }
-}
-
-// 12 -> 16 bytes, which a `PSlot` (8-aligned with compressed pointers) took anyway; plain pointers: 24 -> 32.
+// Three optional signature handles; the `P` arena rounds compressed 12-byte values to 16-byte slots.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(
-    std::mem::size_of::<SignatureLinks>() == if tsrs_core::COMPRESSED_PTRS { 16 } else { 32 }
+    std::mem::size_of::<SignatureLinks>() == if tsrs_core::COMPRESSED_PTRS { 12 } else { 24 }
 );
 #[cfg(target_pointer_width = "32")]
-const _: () = assert!(std::mem::size_of::<SignatureLinks>() == 16);
+const _: () = assert!(std::mem::size_of::<SignatureLinks>() == 12);
 
 // Note that for types of different kinds, the numeric values of TypeFlags determine the order
 // computed by the CompareTypes function and therefore the order of constituent types in union types.
