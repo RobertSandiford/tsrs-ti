@@ -5261,3 +5261,44 @@ server produces unversioned wire-protocol mismatches and an idle timeout.
 The exact-source 968/968 comparison above is the parity evidence until the
 final TypeScript pin advances. Logs, named-list comparison, and binary hash
 are under `target/port-623/0109-39be28ba77/`.
+
+## 110. `9de8b7a3b8` — Preserve API `pathsBasePath` across config handoff
+
+Upstream `9de8b7a3b8c68a5ad51ffa4529b622215a32a185` makes
+`RawCompilerOptions.Finalize` treat the internal `pathsBasePath` field as a
+directory path. When an API client parses a config in `/project` and sends its
+serialized options back to create a program while the session is in another
+directory, `paths` aliases must still resolve relative to `/project`. Rust
+already rooted `paths_base_path` in its API raw-option conversion since source
+31. We added an assertion for a relative raw `pathsBasePath` and an API
+round-trip regression that parses, serializes, creates a snapshot, and checks
+that the aliased declaration file enters the program. No runtime code or
+capability status changes. The ignored `ts-ref` checkout advances to source
+110; the published TypeScript pin remains at the base until the entire port
+finishes.
+
+The two exact-source Go regression tests pass. All `tsrs_api` unit and
+integration tests pass, including the new round trip. The dev CLI and test
+runner build, full workspace, 40 CLI regressions, WebAssembly target check,
+warnings-denied Clippy, source lint, and formatting pass. The full workspace
+needed an unsandboxed rerun because the sandbox denied Unix socket binding in
+the pre-existing private-pipe transport tests.
+
+All 18 Go-history, 18 canonical, and 36 emit named compiler outcome lists are
+byte-identical to source 109. Go-history checking retains 13,581 diagnostic
+and 12,884 type/symbol passes; canonical retains 13,581 and 12,883. Emit
+retains 13,585 diagnostic, 12,884 type/symbol, 13,511
+JavaScript/declaration, 149 JavaScript-map, and 156 source-map passes. There
+is no lost pass, new failure, crash, or timeout.
+
+The exact-source Go Fourslash gate exercises 4,092 passing groups, skips 470,
+and fails none. Generator freshness passes all seven generators. The release
+CLI rebuilt byte-identically to the frozen source-109 executable: both have
+SHA-256 `bf49874f30b6ffe935b89fbce36b504a42ccc25d076e3ed99a6d379b44a2a3c9`.
+Its public instructions-retired, wall-time, and peak-RSS behavior is therefore
+unchanged for identical inputs. Source 109's VS Code cold single-thread
+reference was 81.26878 billion instructions and 1586.67 MiB peak RSS; default
+was 93.69340 billion instructions and 2081.72 MiB. The deterministic Linux
+`bench/count.py` counter was unavailable on this macOS host. The exact-source
+Go/Rust logs, 72 named-list comparison, Fourslash result, and release hash are
+under `target/port-623/0110-9de8b7a3b8/`.

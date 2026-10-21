@@ -52,6 +52,34 @@ fn api_raw_compiler_options_resolve_against_server_directory() {
 }
 
 #[test]
+fn create_snapshot_resolves_paths_relative_to_parsed_config_directory() {
+    let dir = TempDir::new("parsed_paths_base_path");
+    let main =
+        dir.write("project/main.ts", "import { x } from \"lib\"; export const y: number = x;");
+    let lib = dir.write("project/types/lib.d.ts", "export declare const x: number;");
+    dir.write("somewhere-else/marker", "");
+    let project_dir = dir.path("project");
+    let s = session(&dir.path("somewhere-else"), false);
+
+    let config = r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","noLib":true,"types":[],"paths":{"lib":["./types/lib.d.ts"]}}}"#;
+    let parsed = call(
+        &s,
+        "parseJsonConfigFileContent",
+        &format!("{{\"json\":{config},\"configDirectory\":{}}}", quote(&project_dir)),
+    );
+    assert_eq!(str_of(get(&parsed, "options.pathsBasePath")), project_dir);
+
+    let encoded_options = json::marshal(get(&parsed, "options")).unwrap();
+    let (snapshot, project) = create_program(&s, &[main], &encoded_options);
+    let names = call(
+        &s,
+        "getSourceFileNames",
+        &format!(r#"{{"snapshot":{snapshot},"project":{}}}"#, quote(&project)),
+    );
+    assert!(arr(&names).iter().any(|name| str_of(name) == lib));
+}
+
+#[test]
 fn create_program_reports_non_composite_project_reference_without_config_file() {
     let dir = TempDir::new("synthetic_project_reference");
     let root = dir.write("src/index.ts", "export const x = 1;");
