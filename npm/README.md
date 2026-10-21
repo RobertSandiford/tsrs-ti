@@ -117,6 +117,8 @@ Source commit `655f0268afaa` makes sync API generator instances single-use acros
 including after its first batch completes. This is present in the migration source tree, not published packages yet.
 The package exports `./schemas/tsconfig.schema.json` and `./schemas/jsconfig.schema.json`, copied from upstream.
 The source-62 schemas reflect the new `esnext.iterator` library, which the in-progress compiler maps to `lib.esnext.iterator.d.ts`.
+Source 109 adds `TS_API_TIMING_DIR` to sync and async SDK clients. A nonempty value enables timing collection and
+writes one JSON snapshot per client on `close()`, including client measurements and server timing when available.
 To advance the SDK during the migration, check out the source commit in `ts-ref` and run
 `node npm/sdk/sync-upstream.mjs --source-commit <sha>`. `node npm/sdk/sync-upstream.mjs --check` verifies
 the revision recorded in `UPSTREAM.json` and fails if the copy drifted.
@@ -139,8 +141,8 @@ Deliberate patches (the only differences from the recorded SDK sources; each pat
 - `npm/sdk/patches/async-client-connection-loss.patch` (`src/api/async/client.ts`): upstream, if the server dies or
   closes the connection while the async client is open, in-flight and queued requests never settle. Now every
   pending and later request rejects with an `Error` whose message starts with `API server connection lost: `.
-  A normal `close()` is unchanged; `close()` after a crash rejects promptly with that error if it had snapshots to
-  release.
+  The patch preserves upstream's idempotent `close()` and timing-dump behavior; `close()` after a crash rejects
+  promptly with that error if it had snapshots to release.
 - `npm/sdk/patches/vscode-jsonrpc-send-request-write-error.patch` (vendored vscode-jsonrpc 9.0.2): a request written
   to a dead server also became an unhandled rejection that terminated Node; the request's own rejection is kept.
 - `npm/sdk/patches/vscode-jsonrpc-msgpack-version.patch`: keeps tsrs's existing vendored development dependency

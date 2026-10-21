@@ -63,6 +63,12 @@ coverage of the protocol is still incomplete; [the method inventory](../npm/sdk/
 base per method, and the coverage matrix below tracks the incremental port.
 Source 102 makes sync API generators single-use across `API.batch` calls. Reusing an instance, even after its first
 batch completes, throws `Cannot execute the same generator instance more than once`, as in upstream TypeScript.
+Source 109 adds `TS_API_TIMING_DIR`: a nonempty directory enables timing collection even with `collectTiming: false`.
+Each sync or async API client writes one uniquely named JSON snapshot when closed, with client timing and either
+server timing or a server timing error. Repeated `close()` calls do not write another snapshot. An external socket
+server with timing disabled still yields the client's measured snapshot. After a synchronous filesystem callback
+throws, later channel requests rethrow that error rather than reading an out-of-sequence response; closing still
+writes the client snapshot.
 TypeScript consumers need `esnext.disposable` (or a newer lib) for the declarations' `Symbol.dispose` and
 `Symbol.asyncDispose` members. The async `Snapshot`, `Program`, and `BuildOrchestrator` use
 `Symbol.asyncDispose`, so `await using` waits for the returned cleanup Promise. The JS API runs on the package's

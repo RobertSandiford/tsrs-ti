@@ -5215,3 +5215,49 @@ The deterministic Linux `bench/count.py` counter was unavailable on this
 macOS host; the macOS instruction count includes kernel work. Frozen binary
 hashes, raw runs, output hashes, and confirmations are under
 `target/port-623/0108-0a27badde0/perf/`.
+
+## 109. `39be28ba77` — Dump Node API timing on close
+
+Upstream `39be28ba77f436d2a09b35fecb61ab203e2024eb` adds
+`TS_API_TIMING_DIR` to the sync and async JavaScript API clients. A nonempty
+directory enables timing collection even when `collectTiming` is false, and
+each client writes one uniquely named JSON snapshot before closing. The
+snapshot includes client timing, server timing when available, and any error
+fetching the server snapshot. Closing twice does not create another file;
+when the server has timing disabled, the client's measurements remain intact.
+The sync channel now remembers a thrown filesystem callback error and rejects
+later requests with that error instead of reading an out-of-sequence reply.
+The SDK source and new `timingDump.test.ts` are copied from upstream, with the
+existing tsrs async connection-loss patch rebased onto the source-109 client.
+The Rust server and Go compiler are unchanged; the ignored `ts-ref` checkout
+advances, while the published Cargo/npm TypeScript pin remains at the base.
+
+The exact-source timing fixture passes 12/12 against both the Go and Rust API
+servers, including unset/empty/enabled environment values, callback failure,
+async socket error and disconnect, and a server with timing disabled. The
+complete source-109 SDK suite passes 968/968 against each server. Strict SDK
+sync reports 194 matching files; the SDK builds, and the packed npm consumer
+passes all 25 smoke steps, including the existing connection-loss cases.
+The dev CLI and testrunner build, warnings-denied Clippy, source lint,
+formatting, and generator freshness checks pass. All 18 Go-history, 18
+canonical, and 36 emit compiler named outcome lists are byte-identical to
+source 108. Go-history checking retains 13,581 diagnostic and 12,884
+type/symbol passes; canonical retains 13,581 and 12,883. Emit retains 13,585
+diagnostic, 12,884 type/symbol, 13,511 JavaScript/declaration, 149
+JavaScript-map, and 156 source-map passes. The exact-source Fourslash gate
+passes 4,092 exercised groups, skips 470, and fails none.
+
+The source-109 release CLI is byte-identical to the frozen source-108 binary
+(SHA-256 `bf49874f30b6ffe935b89fbce36b504a42ccc25d076e3ed99a6d379b44a2a3c9`).
+Thus the previous public CLI instructions-retired, peak-RSS, and wall-time
+measurements apply unchanged: source 108's VS Code cold single-thread result
+was 81.26878 billion instructions and 1586.67 MiB peak RSS; its default
+result was 93.69340 billion instructions and 2081.72 MiB. This SDK-only
+commit adds no Rust checker performance regression. The new SDK timing
+collection is opt-in via the environment variable or existing option.
+The current draft PR's Node API CI lane still checks out the old published
+client at `b85298b6a81f`; pairing that client with the migration's advancing
+server produces unversioned wire-protocol mismatches and an idle timeout.
+The exact-source 968/968 comparison above is the parity evidence until the
+final TypeScript pin advances. Logs, named-list comparison, and binary hash
+are under `target/port-623/0109-39be28ba77/`.
