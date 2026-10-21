@@ -4673,3 +4673,48 @@ Linux deterministic `bench/count.py` counter was unavailable on this macOS
 host. Frozen release binaries, every paired sample and output hash, exact
 Go and Rust results, and the JavaScript measurement collector are under
 `target/port-623/0098-f5cdce998e/`.
+
+## 99. `d9c578ddb4` — Update localization files
+
+Upstream `d9c578ddb44a9e8dd0791a58c364f433c0011766` adds the existing
+diagnostic key `A_deferred_import_must_specify_a_namespace_binding_18117` to
+the `pt-BR`, `tr-TR`, and `zh-TW` OneLoc handbacks and their runtime gzip
+archives. No other key or translation changes. The six files under
+`crates/tsrs_diagnostics/loc/` match their upstream source-99 counterparts
+byte for byte, including CRLF JSON and deterministic gzip headers and
+payloads. The other ten locale pairs remain at source 61. The localization
+README and capability table record those revisions; `--locale` still leaves
+tsrs diagnostics in English because the Rust compiler does not load these
+catalogs. The ignored `ts-ref` checkout advances to source 99 while the
+published TypeScript pin stays at the base revision until the full upgrade.
+
+The localization checker validates all 13 pairs against 2,228 Rust English
+diagnostics; its two importer cases and the exact-source Go diagnostics
+package test pass. The dev CLI and testrunner build, SDK-only build,
+WebAssembly target check, warnings-denied Clippy, source lint, formatting,
+and generator checks pass. The generator was rerun after staging the six
+intended locale files so its final unstaged-diff guard could detect genuine
+generator drift. The SDK source sync check still reports the preexisting
+source-79 `outputExtensions` addition to
+`npm/tsrs/src/vscode/extensionApi.ts` as one line beyond the recorded SDK
+source (`2d8450f9b54a2a9688a1823a57102402d6862ef5`); this localization
+port makes no SDK edit.
+
+All full compiler outcome lists are byte-identical to source 98: 18
+Go-history checker, 18 canonical checker, and 36 emit lists. Go-history
+checking retains 13,580 diagnostic and 12,884 type/symbol passes; canonical
+retains 13,580 and 12,883. Emit retains 13,584 diagnostic, 12,884
+type/symbol, 13,510 JavaScript/declaration, 149 JavaScript-map, and 156
+source-map passes. There is no lost pass, new failure, crash, or timeout.
+Upstream changed no Fourslash fixture, Go source, or English diagnostic, and
+this port changes no Rust runtime code. Source 98's exact-source Fourslash
+result (4,091 passing exercised groups, 470 skipped, none failing) and
+workspace/regression results therefore apply to the same inputs and runtime.
+
+The release CLI rebuilt byte-identically to the frozen source-98 binary:
+both have SHA-256 `d6cec8cc11d097da9a71b21c39d8f3b87199ae37abf0fb601c192c10b65fb946`.
+No source-99 runtime instruction, wall-time, or peak-RSS regression is
+possible for an identical executable on the same public inputs; source 98's
+paired instruction and peak-RSS measurements remain applicable. The
+byte comparisons, complete conformance lists, validation logs, and release
+hashes are under `target/port-623/0099-d9c578ddb4/`.
