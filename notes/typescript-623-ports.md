@@ -4826,3 +4826,56 @@ are +0.0006% and −0.305%, and their peak-RSS changes are −0.076% and
 −0.208%. No material source-101 performance regression is detected on this
 public cohort. The Linux deterministic `bench/count.py` instruction counter
 was unavailable on this macOS host.
+
+## 102. `655f0268af` — Avoid WeakSet for executed SDK generators
+
+Upstream `655f0268afaa43cde07b65b39782688463a99517` changes the sync
+SDK's generator scheduler to mark executed extensible generator objects with a
+private symbol rather than grow a `WeakSet` for every batch. Non-extensible
+generators use a module-wide fallback `WeakSet`. The mark persists across
+`API.batch` calls, so reusing the same generator instance after completion now
+throws the upstream duplicate-generator error. The two upstream tests change
+their cross-executor expectations accordingly. We synced the exact upstream
+implementation and adapted tests into `npm/tsrs` (192 managed files verified
+by `sync-upstream.mjs`), with no tsrs-specific SDK patch. The upstream
+`api-comparison.bench.ts` is outside the copied test set by design; its two
+100,000-generator long-batch modes were reproduced in the ignored JavaScript
+benchmark artifact. The published TypeScript pin remains at the base.
+
+The focused generator suite passes 44/44, and all 956 SDK source tests pass.
+Additional direct checks cover frozen native generators, non-extensible
+deferred wrappers, and nested `all` wrappers on the fallback path. The SDK
+build, packed consumer smoke (25/25), warnings-denied Clippy, source lint,
+formatting, dev CLI/testrunner build, and full Rust workspace suite pass. The
+first workspace run was blocked by the sandbox's Unix-socket bind denial in
+source-101 transport tests; the rerun with socket access passes. The
+generated-code freshness check also passes. The upstream commit changes no `tsc`
+compiler file, and this tsrs commit changes no Rust source or
+compiler input. Source 101's full 18 Go-history, 18 canonical, and 36 emit
+named outcome lists and exact-source Fourslash result (4,091 pass, 470 skip,
+no failure)
+therefore apply unchanged. The source 101 pass counts and public compiler
+performance measurements remain applicable. We reviewed `docs/RUST.md`
+Techniques, `notes/perf-round2-followups.md` Measured and rejected, and the
+latest `notes/mem-round4.md`; this SDK change does not retry a rejected Rust
+optimization.
+
+On Node 24/macOS, ten alternating before/after process pairs per mode ran
+the same 100,000-generator direct and 100-round `yield* defer` workloads
+against byte-frozen source-101 and source-102 scheduler files. A small
+1,000-generator setup precedes each timed batch. `/usr/bin/time -l`
+instructions and peak RSS include the Node process and setup; wall time
+measures the large batch itself. Medians are:
+
+| SDK workload | Instructions retired, billions before → after | Peak RSS, MB before → after | Batch wall time, ms before → after |
+| --- | ---: | ---: | ---: |
+| Direct | 2.02263 → 2.03534 (+0.63%) | 175.37 → 172.63 (−1.56%) | 37.34 → 33.25 (−10.94%) |
+| `yield* defer` | 1.73088 → 1.46786 (−15.20%) | 112.06 → 110.16 (−1.70%) | 30.50 → 18.42 (−39.61%) |
+
+Direct-mode retired instructions rise by 0.63%, below the 1% threshold,
+while its elapsed time and memory improve; deferred mode improves all three
+measures. The raw pairs and JavaScript collectors are under
+`target/port-623/0102-655f0268af/perf/`. The local JS workload is not a
+Linux `bench/count.py` compiler-project measurement, and no two-publish
+wall-time claim follows from it. No material performance regression was
+detected in this SDK cohort, and the Rust compiler runtime is unchanged.

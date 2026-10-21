@@ -113,6 +113,8 @@ JavaScript; the published compiler pin remains at the base during the migration.
 Source commit `c0ca4744c917` promotes the API exports to `tsrs/sync`, `tsrs/async`, `tsrs/ast`, `tsrs/vscode`,
 and related stable subpaths for the upstream beta. It removes deprecated SDK aliases, strips internal declarations,
 and validates the emitted declarations during package builds. The published compiler pin and npm version are still deferred.
+Source commit `655f0268afaa` makes sync API generator instances single-use across batch calls; reusing one now throws,
+including after its first batch completes. This is present in the migration source tree, not published packages yet.
 The package exports `./schemas/tsconfig.schema.json` and `./schemas/jsconfig.schema.json`, copied from upstream.
 The source-62 schemas reflect the new `esnext.iterator` library, which the in-progress compiler maps to `lib.esnext.iterator.d.ts`.
 To advance the SDK during the migration, check out the source commit in `ts-ref` and run

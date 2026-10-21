@@ -61,6 +61,8 @@ Source 58 promotes these entry points to the upstream beta names. It also remove
 no longer sends the removed duplicate fields. The API is served by the `tsrs` binary (`tsrs --api`), whose
 coverage of the protocol is still incomplete; [the method inventory](../npm/sdk/METHODS.md) tracks the published
 base per method, and the coverage matrix below tracks the incremental port.
+Source 102 makes sync API generators single-use across `API.batch` calls. Reusing an instance, even after its first
+batch completes, throws `Cannot execute the same generator instance more than once`, as in upstream TypeScript.
 TypeScript consumers need `esnext.disposable` (or a newer lib) for the declarations' `Symbol.dispose` and
 `Symbol.asyncDispose` members. The async `Snapshot`, `Program`, and `BuildOrchestrator` use
 `Symbol.asyncDispose`, so `await using` waits for the returned cleanup Promise. The JS API runs on the package's
