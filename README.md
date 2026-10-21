@@ -18,7 +18,7 @@ Try checking and emitting code in the [browser playground](https://tsrs-playgrou
 
 ## Conformance
 
-`tsrs` currently targets the main branch of [microsoft/TypeScript](https://github.com/microsoft/typescript).
+The 0.19.0 source upgrade targets [microsoft/TypeScript at `5237fd468909`](https://github.com/microsoft/TypeScript/tree/5237fd46890956e4bb8177a1a05dcd69e4166560).
 We aim to release a stable version against TypeScript 7.1 with 100% conformance. In our testing on existing projects,
 we have yet to find a correctness bug in `tsrs`.
 
@@ -30,13 +30,14 @@ between runs.
 `--init` and `--showConfig` are not supported. See [compatibility and evidence](https://github.com/oxc-project/tsrs/blob/main/docs/COMPATIBILITY.md)
 for supported features and known gaps.
 The seven watch-tuning flags removed by TypeScript 7 are rejected by tsrs as well.
-The in-progress [#623 source upgrade](https://github.com/oxc-project/tsrs/issues/623) supports source-phase
-`import source` and `import.source()` syntax; published packages stay on the earlier TypeScript pin until it completes.
-Its in-progress Node API also exposes the project checker's merged, declaration, node, and parent symbol lookups.
+The [#623 source upgrade](https://github.com/oxc-project/tsrs/issues/623) ports all 112 upstream commits and supports
+source-phase `import source` and `import.source()` syntax. The last published release, 0.18.0, uses the earlier pin;
+the 0.19.0 candidate pins the final commit. Its Node API exposes the project checker's merged, declaration, node,
+and parent symbol lookups.
 The source-31 SDK adds typed paths; source 58 promotes the SDK exports to `tsrs/path`, `tsrs/sync`,
 `tsrs/async`, `tsrs/ast`, and `tsrs/vscode` for an explicitly selected API package.
 The source-51 compiler reports TS18117 for deferred imports without a namespace binding, including in JavaScript.
-Source 62 adds the ESNext iterator typings for `chunks`, `join`, `includes`, `zip`, and `zipKeyed`; the published pin is unchanged during the upgrade.
+Source 62 adds the ESNext iterator typings for `chunks`, `join`, `includes`, `zip`, and `zipKeyed`.
 Source 101 creates private Unix API socket directories and restricts Windows API named pipes to the current user.
 Source 102 makes sync SDK generator instances single-use across batch calls, matching upstream TypeScript.
 Source 104 rejects network filesystem paths before OS access and reports TS5116 for affected config and source references.

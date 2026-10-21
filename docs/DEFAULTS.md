@@ -1,7 +1,7 @@
 # Differences from pinned TypeScript
 
 This page records known differences from the Go implementation of TypeScript at the commit pinned in
-[`Cargo.toml`](../Cargo.toml), currently [`b85298b6a81f`](https://github.com/microsoft/TypeScript/tree/b85298b6a81f772d080b0455de0ca9d744cd6fd6/tsc). It covers changed defaults, unsupported features and
+[`Cargo.toml`](../Cargo.toml), currently [`5237fd468909`](https://github.com/microsoft/TypeScript/tree/5237fd46890956e4bb8177a1a05dcd69e4166560/tsc). It covers changed defaults, unsupported features and
 remaining parity gaps. These are comparisons with that pinned compiler, not with TypeScript 5/6 or a newer nightly.
 The [compatibility table](COMPATIBILITY.md#what-it-does-and-doesnt-do) summarizes support and conformance.
 
@@ -10,7 +10,7 @@ Go paths are relative to `tsc/internal/` in a microsoft/TypeScript checkout, Rus
 ## Shared defaults
 
 The compiler, build, watch and type-acquisition option declarations match the reference, as do the named enum
-maps and the 113 bundled library files. An option being declared does not mean its feature is implemented;
+maps and the 116 bundled library files. An option being declared does not mean its feature is implemented;
 unsupported commands and API behavior are listed below.
 
 The computed compiler defaults follow `core/compileroptions.go`: target, module kind and resolution, strictness,
@@ -184,10 +184,11 @@ Sources: pinned TypeScript's `packages/typescript/lib/tsc.js` and
 
 ## Verification
 
-Reviewed against tsrs 0.18.0 (main `470b1bdb`) and TypeScript `b85298b6a81f` on 2026-10-20. The compiler, build
+The detailed defaults review compared tsrs 0.18.0 (main `470b1bdb`) with TypeScript `b85298b6a81f` on 2026-10-20. The compiler, build
 and watch declarations were regenerated into scratch files and compared; all 174 enum-map entries and all 113
 library files matched. Probes with source-built binaries on macOS covered help, version, unsupported commands,
 locale handling, statistics, incremental metadata, tracing, profiling, non-UTF-8 arguments and API startup errors. Direct Go/Rust
 probes confirmed the unknown `moduleDetection` and tsbuildinfo enum conversions. Platform-specific watcher
-behavior, runtime scheduling and the remaining server/API details were checked in source. The broader conformance
-evidence remains the [recorded suite results](COMPATIBILITY.md#conformance).
+behavior, runtime scheduling and the remaining server/API details were checked in source. The current 0.19.0
+source pin is `5237fd468909`; its broader conformance evidence is in the
+[recorded suite results](COMPATIBILITY.md#conformance) and [port log](../notes/typescript-623-ports.md).

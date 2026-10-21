@@ -203,12 +203,13 @@ tsrs's errors (the table's errors paragraph names such projects).
   tables, an errors paragraph names only the projects where tsgo and tsrs disagree: a differing count is a
   **Mismatch** and a differing location set "Same count, different locations", both bold. This is a correctness
   signal, not a performance one.
-- tsrs ports a TypeScript 7.1-dev commit (`b85298b6`, `Cargo.toml`), not the newer nightly that is timed, so some
-  differences are TypeScript version differences. When the two disagree, the harness also runs `typescript@7.1.0-dev.20260930.4` (the nightly
-  built from `b85298b6` plus one CI-only commit; `reference` in `projects.json`) once: if it reports exactly tsrs's
-  errors the project is listed as a TypeScript version difference and not flagged. On 2026-10-01 that explains both
-  differences (vscode 359 vs 371, webpack 848 vs 840: tsrs's lists equal the nightly's line for line). When the port moves to a
-  newer TypeScript commit, update `reference` to the nightly built from it (the harness warns when they differ).
+- The reference nightly in `projects.json` is built from the TypeScript commit pinned in `Cargo.toml`. When the
+  timed `tsgo` is newer, the harness runs the reference once on mismatches: if it reports exactly tsrs's errors,
+  the project is listed as a TypeScript version difference. Currently both `tsgo` and `reference` use
+  `typescript@7.1.0-dev.20261018.1`, built from `5237fd468909`, so current mismatches cannot be attributed to
+  version skew. In the 2026-10-01 historical run, the earlier `b85298b6` reference explained the vscode and webpack
+  differences. When the port moves to another TypeScript commit, update `reference` to its matching nightly (the
+  harness warns when they differ).
 
 ## Watch mode
 
@@ -590,8 +591,9 @@ compare on one wide machine, the way Bun's `bun check` announcement measured the
 mean of 20 runs). It runs four compilers on the same checkouts:
 
 - `tsgo`: the timed nightly (`tsgo` in `projects.json`, as in `run.py`);
-- `tsgo-dev`: `typescript@7.1.0-dev.20260930.4` (`reference` in `projects.json`), built from the TypeScript commit
-  tsrs ports, so it is both the like-for-like Go baseline and the error oracle;
+- `tsgo-dev`: `typescript@7.1.0-dev.20261018.1` (`reference` in `projects.json`), built from the TypeScript commit
+  tsrs ports. At this pin it is the same package as `tsgo`; it remains the explicit like-for-like Go baseline and
+  error oracle when `tsgo` advances;
 - `tsrs`: the binary given with `--tsrs`;
 - `bun`: `bun check` from the binary given with `--bun` (1.4.3 canary or later), run as
   `bun check -p <project> --no-pretty --all` (`--all` turns off the grouping of repeated errors so every error line is

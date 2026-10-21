@@ -6,10 +6,10 @@ Install the package with `pnpm add -D tsrs`. `require("tsrs")` exports `version`
 `typescriptCommit`.
 
 The package also ships TypeScript 7's programmatic API, copied from microsoft/TypeScript
-`packages/typescript` under the same subpaths as the `typescript` 7 package. During the
-[commit-by-commit migration](../notes/typescript-623-ports.md), the SDK advances with each API commit;
-[`UPSTREAM.json`](../npm/tsrs/UPSTREAM.json) records the copied SDK revision, while the published compiler pin
-remains at the base until the final source update:
+`packages/typescript` under the same subpaths as the `typescript` 7 package. The
+[commit-by-commit migration](../notes/typescript-623-ports.md) advanced the SDK with each API commit;
+[`UPSTREAM.json`](../npm/tsrs/UPSTREAM.json) records the copied SDK revision. The 0.19.0 source pin is
+`5237fd468909`, while the last published release, 0.18.0, uses the earlier pin:
 
 | subpath | contents |
 | --- | --- |
@@ -77,9 +77,8 @@ minimum Node (16.20; checked on 16.20, 18, 20, 22 and 24). Where Node lacks the 
 
 ## Implementation and status
 
-Port of the TypeScript 7 native API, with the workspace `Cargo.toml` still pinned at the base
-`b85298b6a81f772d080b0455de0ca9d744cd6fd6` while the commit-by-commit migration includes API changes
-through `c0ca4744c917430282a7de06c3e8f22d2cb87353`: server side `tsc/internal/api` + `tsc/internal/ipc`, client
+Port of the TypeScript 7 native API through the workspace `Cargo.toml` pin
+`5237fd46890956e4bb8177a1a05dcd69e4166560`: server side `tsc/internal/api` + `tsc/internal/ipc`, client
 side `packages/typescript/src/{api,ast}` exported as `sync` and `async`. The wire
 format, method names, params and response schemas follow the ported Go revision; tsrs does not define its own
 protocol or a one-shot CLI wrapper, and it is not compatible with TS5 `createProgram` objects.

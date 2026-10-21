@@ -4,6 +4,7 @@
 // and references. Values are oracle-recorded; captured runs also pair these responses method by method.
 
 import { API } from "@typescript/typescript/async";
+import { SyntaxKind } from "@typescript/typescript/ast";
 import { describe, test } from "node:test";
 import { createVirtualFileSystem } from "../testUtils.ts";
 import { cwd, golden } from "./utils.ts";
@@ -62,7 +63,7 @@ describe("parity: async binding coverage", () => {
             const fnType = await checker.getTypeOfSymbol(syms[0]!);
             const [sig] = await checker.getSignaturesOfType(fnType, 0);
             g.check("parameterTypes", [await checker.typeToString(await checker.getParameterType(sig, 0)), await checker.typeToString(await checker.getParameterType(sig, 1))]);
-            const decl = await checker.signatureToSignatureDeclaration(sig, 263 /* SyntaxKind.FunctionDeclaration at the pin */);
+            const decl = await checker.signatureToSignatureDeclaration(sig, SyntaxKind.FunctionDeclaration);
             g.check("signatureDeclaration", decl ? { kind: decl.kind, parameters: (decl as any).parameters?.length ?? null } : null);
 
             g.check("referencesInFile", (await checker.getReferencesToSymbolInFile("/src/index.ts", syms[0]!)).map(h => [h.index, h.kind, h.path]));

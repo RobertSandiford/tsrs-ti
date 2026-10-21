@@ -5345,3 +5345,94 @@ default was 93.69340 billion instructions and 2081.72 MiB. The deterministic
 Linux `bench/count.py` counter was unavailable on this macOS host. Exact
 scenario, compiler, Fourslash, and repository-check evidence is under
 `target/port-623/0111-2e9fb00f5f/`.
+
+## 112. `5237fd4689` — Cache undefined widening properties per symbol
+
+Upstream `5237fd46890956e4bb8177a1a05dcd69e4166560` keys the checker cache
+for synthetic optional `undefined` properties by the source symbol rather than
+its name. Rust previously kept both forms and used the name-keyed cache in Go
+history mode. This port uses the symbol-keyed cache in both modes. A property
+with the same name in another object now retains its own declaration order
+when a widened object-literal type is printed. The exact-source Go fixtures
+`undefinedPropertyDeclarationOrder` and `objectLiteralNormalization` pass
+their diagnostic, JavaScript, `.types`, and `.symbols` baselines in both Go
+and Rust. The canonical history's old `objectLiteralNormalization` type and
+symbol failures become passes.
+
+This is the final source in #623. The `ts-ref` checkout, Cargo metadata,
+benchmark reference, bundled SDK manifest, npm dependency and lockfile now
+pin the same upstream commit. npm `typescript@7.1.0-dev.20261018.1` reports
+that exact commit as its `gitHead`. The workspace and root/npm package
+versions advance to `0.19.0` and `0.19.0-ts7.1.0-dev.20261018` respectively;
+the previously published 0.18.0 still points to the old source. The release
+notes, compatibility table, and root/npm READMEs describe the candidate's
+capabilities and existing gaps.
+
+All 18 Go-history no-emit, 18 canonical no-emit, and 36 Go-history emit named
+outcome lists preserve every source-111 pass, with no new failure, crash, or
+timeout. Go-history and canonical checking each pass 13,696 diagnostic and
+12,998 type/symbol baselines; emit passes 13,700 diagnostic, 12,998
+type/symbol, 13,626 JavaScript/declaration, 149 JavaScript-map, and 156
+source-map baselines. The two no-emit diagnostic failures in each history are
+the unchanged emit-only harness artifacts; full emit has none. The exact-source
+Go Fourslash gate passes 4,092 exercised groups, skips 470, and fails none.
+The pinned upstream SDK source suite passes 968/968 against the Rust server.
+The upstream Node API parity lane passes 885/885 against each of the exact
+Go and Rust servers. A local all-suite parity fixture still carried the old
+`SyntaxKind.FunctionDeclaration` numeric value, so it now reads the final
+pin's enum and expects `kind: 264`. The full parity lane against both servers
+has 934 passes, four existing skips, two todos, and no failures. The existing
+soft-mismatch cells and the Go lone-surrogate todo remain non-gating.
+
+The dev CLI, test runner and Fourslash server build; the full workspace tests,
+40 CLI regressions, WebAssembly target check, warnings-denied Clippy, source
+lint, formatting, and all seven generator freshness checks pass. The Go
+Fourslash bridge and workspace API transport needed local Unix-socket access
+outside the sandbox. Determinism self-tests and 756 output/exit comparisons
+across XState, webpack, and all 40 regression cases pass. Nuxt and Drizzle
+ORM checkouts are absent locally, so their CI determinism lane awaits the PR
+CI run. The existing mapper fixture skips and the source-75 synthetic
+two-builder peak-RSS increase of about 20% remain disclosed in the
+compatibility table and release notes.
+
+The PR determinism job previously compared ordered diagnostics with the
+0.18.0 base binary even when the TypeScript source pin had advanced. That
+cross-version comparison is invalid for this upgrade; CI now performs the
+base-binary comparison only when both Cargo source pins match, while always
+checking every configured project and regression case across checker
+schedules. The two source-pin branches were exercised locally, and the
+full four-project lane will run in PR CI.
+
+The stamped `tsrs_cli/noembed` release build reports the exact npm nightly,
+package version, and source commit. The packed macOS arm64 and main packages
+contain all 116 default library declarations; an offline installed consumer
+passes all 25 checks, including NodeNext declaration typing and the sync and
+async API. The release binary's SHA-256 is
+`f39e4348efe0815d5e47239416ba55724a8e37e05c8858bc7292fe664dd08a6a`.
+
+Five alternating pairs of frozen source-111 and source-112 default-feature
+release binaries on three public projects, in single-threaded and default
+modes, produced identical output and exit status in every pair. The binaries'
+SHA-256 values are `bf49874f30b6ffe935b89fbce36b504a42ccc25d076e3ed99a6d379b44a2a3c9`
+and `d3702668639dbeee0ac0a58fe831783199f962efb49bcf358df8202bd227175a`.
+macOS `/usr/bin/time -l` provided retired instructions and peak RSS; wall time
+includes process launch:
+
+| Project | Mode | Instructions, billions before → after | Peak RSS MiB before → after | Wall seconds before → after |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions | single | 3.221 → 3.221 | 59.13 → 58.98 | 0.231 → 0.233 |
+| Compiler-Unions | default | 3.912 → 3.910 | 82.27 → 82.30 | 0.105 → 0.104 |
+| webpack | single | 10.827 → 10.830 | 306.48 → 306.33 | 0.896 → 0.902 |
+| webpack | default | 15.206 → 15.172 | 496.06 → 496.08 | 0.164 → 0.168 |
+| VS Code | single | 82.425 → 82.444 | 1586.67 → 1586.53 | 7.828 → 7.886 |
+| VS Code | default | 93.599 → 93.613 | 2080.98 → 2073.72 | 1.027 → 0.982 |
+
+The largest instruction increase is 0.028% and largest peak-RSS increase is
+0.038%. webpack/default's initial short-run wall increase was 2.492%; a
+reversed ten-pair check measured +3.130%, but a longer 30-pair check measured
+−0.993% wall, −0.161% instructions and +0.006% peak RSS. The subsecond wall
+samples vary more than their instruction counts; there is no persistent
+performance regression at the repository's threshold. The deterministic
+Linux `bench/count.py` counter was unavailable on this macOS host, and macOS
+instruction counts include kernel work. Raw runs, output hashes, and both
+confirmations are under `target/port-623/0112-5237fd4689/perf/`.

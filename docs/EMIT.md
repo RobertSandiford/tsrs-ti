@@ -159,7 +159,7 @@ and API formats retain their reference behavior; see
 ### Version
 
 The tsbuildinfo `version` is `core::version()` as in Go. Go's release builds stamp it with ldflags
-(the npm nightly built from the pinned commit: `7.1.0-dev.20260930.4`); tsrs reads `TSRS_TS_VERSION` at build time for
+(the npm nightly built from the pinned commit: `7.1.0-dev.20261018.1`); tsrs reads `TSRS_TS_VERSION` at build time for
 the same purpose (source default `7.1.0-dev`), so a tsrs built with the tsgo version reads and writes
 tsbuildinfo files that tsgo accepts, and vice versa. Different versions simply rebuild from scratch, as in Go. Release
 builds stamp `[workspace.metadata.typescript] nightly` (Cargo.toml); release.yml checks that the nightly was built from

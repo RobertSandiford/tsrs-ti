@@ -1,8 +1,10 @@
 # Node API validation (parity lane)
 
 How the `tsrs --api` server is validated against the pinned TypeScript 7 native API
-(microsoft/TypeScript `b85298b6a81f772d080b0455de0ca9d744cd6fd6`, the commit in `Cargo.toml`). The
-contract itself is `docs/NODE_API.md`; this file covers the independent evidence.
+(microsoft/TypeScript `5237fd46890956e4bb8177a1a05dcd69e4166560`, the commit in `Cargo.toml`). The
+contract itself is `docs/NODE_API.md`; this file covers the independent evidence. Historical runs below used
+the earlier `b85298b6a81f` pin; current source-upgrade runs are recorded in the
+[port log](../notes/typescript-623-ports.md).
 
 ## Principles
 

@@ -39,25 +39,26 @@ launcher and the JS API on each given Node; 16.20.0, 18, 20, 22 and 24 pass.)
 
 ## Versions
 
-One source of truth, the workspace `Cargo.toml`:
+One source of truth, the workspace `Cargo.toml`. The version below prepares the 0.19.0 release; 0.18.0 is the
+latest published version until it ships:
 
 ```toml
 [workspace.package]
-version = "0.10.0"
+version = "0.19.0"
 
 [workspace.metadata.typescript]
-version = "7.1.0-dev.20260929"                         # the TypeScript version the port follows
-commit = "b85298b6a81f772d080b0455de0ca9d744cd6fd6"    # and its commit (CI checks out its tsc/testdata)
-nightly = "7.1.0-dev.20260930.4"                      # npm nightly used for the compiler's reported version
+version = "7.1.0-dev.20261018"                         # the TypeScript version the port follows
+commit = "5237fd46890956e4bb8177a1a05dcd69e4166560"    # and its commit (CI checks out its tsc/testdata)
+nightly = "7.1.0-dev.20261018.1"                      # npm nightly used for the compiler's reported version
 ```
 
-npm version: `<version>-ts<typescript version>` = `0.10.0-ts7.1.0-dev.20260929`, for every package including
+npm version: `<version>-ts<typescript version>` = `0.19.0-ts7.1.0-dev.20261018`, for every package including
 `@tsrs/wasm` (`npm/tsrs-wasm/package.json` holds a placeholder that `npm/build.mjs` replaces). `tsrs --version`
 and `tsrs-wasm --version` include the package version, embedded at build time by `crates/tsrs_execute/build.rs`.
-The example package version below illustrates the format; read `Cargo.toml` for the current version:
+The example below shows the 0.19.0 release version; read `Cargo.toml` for the current source pin:
 
 ```
-Version 7.1.0-dev.20260930.4 (tsrs 0.10.0-ts7.1.0-dev.20260929, microsoft/TypeScript@b85298b6a81f)
+Version 7.1.0-dev.20261018.1 (tsrs 0.19.0-ts7.1.0-dev.20261018, microsoft/TypeScript@5237fd468909)
 ```
 
 To release a fix on the same TypeScript commit, bump `[workspace.package] version`; after porting a newer TypeScript
@@ -223,12 +224,12 @@ Auxiliary workflows saved as `.github/workflows/*.yml.bak` are disabled; their l
 
 ## Adopting it in a pnpm workspace
 
-After a release is on npm (version below as an example):
+After a release is on npm:
 
 ```sh
 # 1. Add it next to the TypeScript compiler. If the workspace sets pnpm's minimumReleaseAge, either wait or list
 #    the main package and the platform packages in minimumReleaseAgeExclude.
-pnpm add -D tsrs@0.10.0-ts7.1.0-dev.20260929
+pnpm add -D tsrs
 #    Review the pnpm-lock.yaml diff: a non-frozen install can re-resolve unrelated entries.
 
 # 2. Run it.
