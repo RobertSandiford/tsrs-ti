@@ -4718,3 +4718,46 @@ possible for an identical executable on the same public inputs; source 98's
 paired instruction and peak-RSS measurements remain applicable. The
 byte comparisons, complete conformance lists, validation logs, and release
 hashes are under `target/port-623/0099-d9c578ddb4/`.
+
+## 100. `76c4f5078b` — Fast-path comparisons of sibling AST nodes
+
+Upstream `76c4f5078b1e77cc2ac54a18b2cc79e346a1d7a0` adds a
+`compareNodes` fast path for distinct nodes with the same non-nil parent:
+their positions determine the order without walking to both source files.
+It also replaces subtraction of two symbol IDs with `cmp.Compare`, preserving
+correct ordering when the difference would overflow `int`. Rust already has
+both equivalents in `crates/tsrs_checker/src/utilities.rs`: `compare_nodes`
+orders sibling nodes by `pos().cmp`, and `compare_symbols_worker` uses the
+`SymbolId` `Ord` comparison. The sibling fast path landed in `3525a693`
+before this migration. Rust additionally excludes `SourceFile` nodes from
+the fast path to preserve cross-file program order if they ever share a
+parent; ordinary siblings follow the exact Go rule. No Rust runtime change
+or new fixture is needed. The ignored `ts-ref` checkout advances to this
+commit; the published TypeScript pin remains at the base revision until the
+complete upgrade. No user-visible capability or pass count changes.
+
+The existing implementation was measured in `notes/perf-icount-round4.md`
+at −0.39% checker instructions in the deterministic 8-checker locality mode
+on a large private monorepo. That is prior evidence for the already-landed
+code, not an additional source-100 gain. We reviewed `docs/RUST.md`
+Techniques, `notes/perf-round2-followups.md` Measured and rejected, and the
+newest `notes/mem-round4.md`; no rejected optimization is being retried.
+Exact-source Go checker package tests and all 20 Rust checker unit tests
+pass. The dev CLI and testrunner build, warnings-denied Clippy, source lint,
+formatting, and generator freshness checks pass.
+
+The full compiler suite was rerun at source 100. Its 18 Go-history, 18
+canonical, and 36 emit named outcome lists are byte-identical to source 99,
+with no lost pass, new failure, crash, or timeout. Go-history checking
+retains 13,580 diagnostic and 12,884 type/symbol passes; canonical retains
+13,580 and 12,883. Emit retains 13,584 diagnostic, 12,884 type/symbol,
+13,510 JavaScript/declaration, 149 JavaScript-map, and 156 source-map passes.
+Source 98's exact-source Fourslash result, unchanged through source 99 and
+with no new source-100 fixture, remains 4,091 exercised groups passing,
+470 skipped, and none failing. The rebuilt release CLI is
+byte-identical to source 99 (SHA-256
+`d6cec8cc11d097da9a71b21c39d8f3b87199ae37abf0fb601c192c10b65fb946`).
+Thus source 99's public paired instructions-retired, peak-RSS, and wall-time
+measurements apply to source 100 on identical inputs; this port introduces
+no Rust performance regression. Logs and the binary comparison are under
+`target/port-623/0100-76c4f5078b/`.
