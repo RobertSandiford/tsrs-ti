@@ -5108,3 +5108,36 @@ code executes only for language-server import actions, not compiler checks.
 The deterministic Linux `bench/count.py` counter was unavailable on this
 macOS host. Frozen binaries, raw runs, output hashes, and confirmation
 samples are retained under `perf/` and `perf-confirmation*/`.
+
+## 107. `abcbb2e69d` — Allow CRLF in release workflow version files
+
+Upstream `abcbb2e69d2a86d9ffee66582a0dd0339b674733` removes
+`git diff --check` from three release-branch workflows so their generated
+version files may use CRLF line endings. tsrs does not have the corresponding
+release-branch creation, version-setting, or branch-sync workflows. Its
+`release.yml` publishes artifacts and contains no equivalent whitespace
+check, so there is no tsrs workflow or runtime change to make. The ignored
+`ts-ref` checkout advances exactly one commit; the published TypeScript pin
+remains at the migration base. No capability status or pass count changes.
+
+The upstream `tsc` tree and `packages/typescript/src` tree are byte-identical
+to source 106. The dev CLI and testrunner build, warnings-denied Clippy,
+source lint, formatting, and generated-code freshness checks pass. The
+full compiler suite was rerun against the exact source-107 checkout: all 18
+Go-history, 18 canonical, and 36 emit named outcome lists are byte-identical
+to source 106. Go-history and canonical each retain 13,581 diagnostic
+passes, with 12,884 and 12,883 type/symbol passes, respectively. Emit retains
+13,585 diagnostic, 12,884 type/symbol, 13,511 JavaScript/declaration, 149
+JavaScript-map, and 156 source-map passes. There is no lost pass, new
+failure, crash, or timeout. Source 106's full exact-source Fourslash gate
+(4,092 exercised groups passing, 470 skipped, none failing), workspace,
+and regressions remain applicable to unchanged source and runtime inputs.
+
+The freshly built release CLI is byte-identical to source 106's frozen
+binary (SHA-256
+`27bc3f27b6031661aec33ef11cf80d50fc7b8fa8289e8c232478205260f32b49`).
+On the same public inputs, its instructions retired, wall time, and peak RSS
+are unaffected by this evidence-only port; source 106's paired measurements
+remain the before-and-after evidence. The full outcome lists, comparison
+script, build/check logs, and release hash are under
+`target/port-623/0107-abcbb2e69d/`.
