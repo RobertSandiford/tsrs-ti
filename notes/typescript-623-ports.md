@@ -5050,3 +5050,61 @@ only LSP startup behavior plus the Windows-only test, not compiler work.
 The Linux deterministic `bench/count.py` counter was unavailable on this
 macOS host. All raw paired measurements and output hashes are retained in
 `perf/`, `perf-confirmation/`, and `perf-confirmation-2/`.
+
+## 106. `0e081d6fb3` — Escape quotes in synthesized module specifiers
+
+Upstream `0e081d6fb33dde09e084154a0a4daada31fa5a41` escapes quotes and
+backslashes in synthesized module specifiers. The Rust language service now
+uses the printer's quote-specific string escaping when inserting a JSDoc
+`import(...)` type. Import-statement completions quote the module specifier
+first, then double its backslashes and escape snippet metacharacters only for
+snippet-capable clients. Plain completions retain the quoted text directly.
+This follows the Go fix without an algorithmic deviation. The ignored
+`ts-ref` checkout advances to source 106; the published TypeScript pin
+remains at the migration base until the full series is ported.
+
+The new exact-source Go `TestAutoImportQuotedModuleSpecifier` passes all ten
+single/double-quote and named/default/require/JSDoc cases. All ten also pass
+against the Rust LSP through the Go Fourslash subprocess runner. The full
+exact-source gate now passes 4,092 exercised groups of 4,562, skips 470,
+and fails none. The capability table records the new passing group. The
+first Rust-backed run was denied permission to bind a local Unix socket by
+the sandbox; the rerun with socket access passed. The dev CLI, testrunner,
+and Fourslash server build, full workspace, 40 CLI regressions, WebAssembly
+target check, warnings-denied Clippy, source lint, formatting, and generated
+code check pass. The workspace's first sandboxed run had the same local-socket
+denial in source-101 transport tests; its rerun passed.
+
+All 18 Go-history, 18 canonical, and 36 emit compiler named outcome lists
+are byte-identical to source 105. Both checker modes retain 13,581 passing
+diagnostic baselines; Go history has 12,884 passing type/symbol baselines
+and canonical has 12,883. Emit retains 13,585 passing diagnostic, 12,884
+type/symbol, 13,511 JavaScript/declaration, 149 JavaScript-map, and 156
+source-map baselines, with no new failure, crash, or timeout. The comparison
+script and full results are under `target/port-623/0106-0e081d6fb3/`.
+
+Five alternating release-binary pairs per public project and checker mode
+compared frozen sources 105 and 106. Every pair had the same exit status
+and diagnostic hash. macOS `/usr/bin/time -l` supplied retired instructions
+and peak RSS; wall time includes process launch:
+
+| Project | Mode | Instructions, billions before → after | Peak RSS MiB before → after | Wall seconds before → after |
+| --- | --- | ---: | ---: | ---: |
+| Compiler-Unions | single | 3.22114 → 3.22103 | 59.14 → 59.11 | 0.230 → 0.229 |
+| Compiler-Unions | default | 3.91174 → 3.90849 | 81.98 → 82.64 | 0.104 → 0.108 |
+| webpack | single | 10.81831 → 10.81362 | 306.48 → 306.48 | 0.903 → 0.918 |
+| webpack | default | 15.16895 → 15.33576 | 495.95 → 499.73 | 0.167 → 0.174 |
+| VS Code | single | 81.38490 → 81.34459 | 1586.69 → 1586.67 | 7.995 → 7.901 |
+| VS Code | default | 93.62049 → 93.68459 | 2094.98 → 2085.75 | 1.073 → 1.054 |
+
+The initial webpack/default cell rose 1.100% in instructions and 4.181%
+in wall time. A reversed ten-pair confirmation measured −1.485% and
+−0.407%; a second ten-pair confirmation measured +0.455% and +1.935%.
+The initial Compiler-Unions/default wall increase of 3.276% likewise
+measured +0.345% on confirmation. No material regression persisted across
+the confirmations. The largest initial peak-RSS increase was 0.800%; both
+webpack/default confirmations remained below 1% or improved. The changed
+code executes only for language-server import actions, not compiler checks.
+The deterministic Linux `bench/count.py` counter was unavailable on this
+macOS host. Frozen binaries, raw runs, output hashes, and confirmation
+samples are retained under `perf/` and `perf-confirmation*/`.

@@ -15,6 +15,7 @@ use tsrs_lsproto as lsproto;
 use tsrs_modulespecifiers::{
     self as modulespecifiers, ImportModuleSpecifierPreference, ResultKind,
 };
+use tsrs_printer::{self as printer, QuoteChar};
 use tsrs_scanner as scanner;
 
 use super::export::{Export, ExportSyntax, ModuleID};
@@ -258,11 +259,15 @@ pub(crate) fn add_import_type(
         panic!("UsagePosition must be set for JSDoc type import fix");
     };
     let quote_preference = lsutil::get_quote_preference(file, preferences);
-    let mut quote_char = "\"";
-    if quote_preference == QuotePreference::Single {
-        quote_char = "'";
-    }
-    let import_type_prefix = format!("import({}{}{}).", quote_char, f.module_specifier, quote_char);
+    let (quote_char, quote_kind) = if quote_preference == QuotePreference::Single {
+        ('\'', QuoteChar::SingleQuote)
+    } else {
+        ('"', QuoteChar::DoubleQuote)
+    };
+    let import_type_prefix = format!(
+        "import({quote_char}{}{quote_char}).",
+        printer::escape_string(&f.module_specifier, quote_kind)
+    );
     tracker.insert_text(file, usage_position, &import_type_prefix);
     diagnostics::Change_0_to_1.localize(&[&f.name, &format!("{}{}", import_type_prefix, f.name)])
 }
