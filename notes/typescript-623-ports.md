@@ -4566,3 +4566,51 @@ paired samples, output hashes, exact-source Go and Rust gates, and the
 JavaScript comparator/collector are under `target/port-623/0096-e36179bde8/`.
 The final measured release binary has SHA-256
 `1f432c5d028b43491e2f8c92c9a0fb2e82841e874cfac4399924a3daab2c111a`.
+
+## 97. `6c976dad5d` — Reuse ordered property counts during intersection reduction
+
+Upstream `6c976dad5d65d2c67f5707f3ba4a04ae991b8481` pools the Go
+checker's ordered property-count map used by `somePropertyReducesToNever`.
+Its new tests cover zero allocations after warmup, ordered and isolated nested
+borrows, reuse after clearing, and dropping an unusually large table. All
+three new tests pass in the exact-source Go checker.
+
+The Rust checker already implemented this optimization in `3525a693e`
+(#327). Its per-checker `name_counts_pool` lends a separate `NameCounts` to
+each nested call; the entries retain first-occurrence order, and the table
+and vectors reuse their allocations. The existing custom open-addressed table
+also avoids a heap allocation for each property name. A focused Rust
+regression now checks counting order, isolation while an inner table is in
+use, and reset/reuse of the outer table. No Rust production code or test
+fixture changes in this port. Go discards tables with more than 4,096 names
+to avoid retaining GC references; Rust's names live in a checker arena and
+its existing pool retains its high-water buffers. The memory census in
+`notes/mem-round4.md` finds the checker's free lists at no more than 6 KiB,
+so the Go retention cutoff has no demonstrated benefit to transfer here.
+
+Before this port we reviewed `docs/RUST.md` Techniques, the measured and
+rejected list in `notes/perf-round2-followups.md`, and the newest
+`notes/mem-round4.md`. An earlier count-pool candidate measured −0.88%
+instructions on mui-docs and −0.83% on mikro-orm but was initially left
+out of the heap-churn work; it later landed as part of #327. That round
+measured −0.6% instructions for the pooled name counts on a large private
+monorepo. This upstream commit therefore maps to an optimization already
+adopted in tsrs, rather than reviving a rejected experiment.
+
+The ignored `ts-ref` checkout advances to this exact source commit. Its
+test corpus and baselines are unchanged; the published TypeScript pin stays
+at the base revision until the complete upgrade. No user-visible capability
+or compatibility count changes. The dev CLI and testrunner build, focused
+Go and Rust tests, warnings-denied Clippy, source lint, and formatting pass.
+Only a test-only Rust module and this ledger changed, so source 96's full
+18 Go-history, 18 canonical, and 36 emit named compiler outcome lists apply
+unchanged, with no lost pass. Its exact-source Fourslash result remains
+4,091 exercised groups passing, 470 skipped, and none failing; its full
+workspace and 40 CLI regressions also apply to the identical runtime.
+
+The source 97 release CLI rebuild is byte-identical to source 96 (both
+SHA-256 `1f432c5d028b43491e2f8c92c9a0fb2e82841e874cfac4399924a3daab2c111a`).
+Thus source 96's paired public instructions-retired, peak-RSS, and wall-time
+measurements above apply unchanged to the same inputs: source 97 introduces
+no Rust performance regression. Focused test logs, validation logs, and
+the binary comparison are under `target/port-623/0097-6c976dad5d/`.
