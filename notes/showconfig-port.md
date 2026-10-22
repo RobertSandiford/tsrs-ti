@@ -175,6 +175,32 @@ all of these, and none is in the showConfig code. So after the move I re-ran onl
 (`--showConfig` output and exit 0 unchanged). The 18-of-18 scenario result and the `tsc` count of 201 of 223 were
 measured before the move, with the watch branch's fixes present; the converter and wiring are unchanged since.
 
+### Update at the new pin (2026-10-22)
+
+After `origin/main` was merged, the pin moved to `3e9236361fa9`, which contains the `--showConfig` rework. Its Go
+diff is large but its behaviour change is small: options are serialized by generated code (`options_generated.go`)
+instead of reflection, and the generator skips options marked `showConfig: false`, which are `listFiles` and
+`listEmittedFiles` (the latter was already deleted by name). The generated list otherwise matches the reflective walk;
+Go keeps the old walk in `showconfig_test.go` as a cross-check. Paths now use typed rooted-path types in Go; the
+output is the same. So the port needed one change, `SHOW_CONFIG_FALSE_OPTIONS` in `showconfig.rs`.
+
+- With the dump regenerated at the new pin, the 22 `--showConfig` scenarios (21 in `tsc/showConfig`, now with the 4
+  file-listing ones, plus `configDir-template-showConfig`) all pass on Windows. Without the `listFiles` exclusion
+  exactly the 4 new file-listing baselines fail, so the change is covered.
+- Whole suite on Windows at the new pin: `tsc` 228 of 250, `tsbuild` 190 of 193, `tscWatch` 40 of 42, `tsbuildWatch` 65 of
+  65. The 22 `tsc` failures are `--help` / `--init` / `--locale` / `--generateTrace` (16), 3 `forceConsistentCasing…`,
+  2 `ignoreConfig` and `incremental/internal-symbolname-in-tsbuildInfo`. This replaces the 201 of 223 above.
+- On this branch alone the `tsrs_execute` tests do not build on Windows (see "Moved onto main"), so the suite was run
+  in a throwaway worktree of this branch with `watch-windows` merged in; the worktree is gone and nothing from the
+  merge is on this branch.
+- Diff against a binary: tsgo built from `ts-ref/tsc/cmd/tsc` at the new pin and the dev `tsrs.exe` gave byte-identical
+  `--showConfig` output and exit codes on 10 of 10 configs, on Windows. Nine were written for the purpose (`extends` from a
+  sibling directory, references with `circular`, outputs on another drive, absolute and `../..` paths, implied options,
+  enum aliases and upper-case names, empty lists, `compileOnSave`); one was a real project config with 833 lines of
+  output and TightScript-only options, which both tools drop. Ten configs do not show identical output everywhere; UNC
+  paths were not tried.
+- Not re-checked at the new pin: Linux/macOS.
+
 ### Notes for whoever lands this
 
 1. **Counts were measured on Windows.** The `tsctests` summary table prints `0 / 0` for every row on Windows (it

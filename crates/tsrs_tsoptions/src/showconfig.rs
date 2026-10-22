@@ -93,6 +93,9 @@ static IMPLIED_OPTIONS: [ImpliedOption; 14] = [
     ),
 ];
 
+// File listings are left out of --showConfig despite their Compiler Diagnostics category (`showConfig: false`).
+const SHOW_CONFIG_FALSE_OPTIONS: [&str; 2] = ["listEmittedFiles", "listFiles"];
+
 // Options that only make sense on the command line.
 const COMMAND_LINE_ONLY_OPTIONS: [&str; 10] = [
     "showConfig",
@@ -223,7 +226,7 @@ fn serialize_compiler_options(
 
     for_each_compiler_option_value(
         options,
-        |option| !is_skipped_category(option),
+        |option| !is_skipped_category(option) && !SHOW_CONFIG_FALSE_OPTIONS.contains(&option.name),
         |option, value, _| {
             if value.is_zero() {
                 return false;

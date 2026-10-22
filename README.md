@@ -27,7 +27,7 @@ parallel parse, resolution, and check order, while `tsrs` canonicalizes some che
 closest comparison, use `--checkerAssignment go --noLazyMembers`; tsgo parser and resolver races can still vary
 between runs.
 
-`--init` and `--showConfig` are not supported. See [compatibility and evidence](https://github.com/oxc-project/tsrs/blob/main/docs/COMPATIBILITY.md)
+`--init` is not supported. See [compatibility and evidence](https://github.com/oxc-project/tsrs/blob/main/docs/COMPATIBILITY.md)
 for supported features and known gaps.
 The seven watch-tuning flags removed by TypeScript 7 are rejected by tsrs as well.
 The [#623 source upgrade](https://github.com/oxc-project/tsrs/issues/623) ports all 112 upstream commits and supports
