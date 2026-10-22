@@ -22,14 +22,14 @@
 //! reports any diagnostics of its own. Message arguments are pre-formatted into `String`s
 //! (`ScanError::args`); pass them on as `&[&dyn Display]`.
 //!
-//! Speculation (Go `Mark` / `Rewind`). `mark()` returns a `Copy` `ScannerState` snapshot
-//! (positions, token, token value, flags, `JSDoc` asterisk depth and the slice of comment directives
-//! collected so far); `rewind(state)` restores it. Adding a directive copies the slice into a new
-//! arena slice, so a saved snapshot is never modified, which is what Go's shared-backing-array
-//! slice restore amounts to. Buffered
-//! errors are *not* part of the state (in Go they are the callback's business): an owner that
-//! drains after every call has nothing pending at `mark()` time and truncates its own diagnostics
-//! on rewind, as the Go parser does.
+//! Speculation (Go `Mark` / `Rewind`). `mark()` saves the token state and directive count;
+//! `rewind(state)` restores the token state and truncates the directive buffer. These snapshots
+//! are for speculation within the current text. Across temporary text changes (`JSDoc` parsing),
+//! use `take_state()` / `restore_state()` to move the buffer with the state. This preserves Go's
+//! saved directive slice across `set_text` without copying its entries.
+//!
+//! Buffered errors are not part of either snapshot (in Go they are the callback's business).
+//! The owner drains after each scanner call and truncates its own diagnostics on rewind.
 
 use std::borrow::Cow;
 use std::fmt::{Display, Write as _};
@@ -206,6 +206,7 @@ keywords! {
     "return" => ReturnKeyword,
     "satisfies" => SatisfiesKeyword,
     "set" => SetKeyword,
+    "source" => SourceKeyword,
     "static" => StaticKeyword,
     "string" => StringKeyword,
     "super" => SuperKeyword,
@@ -313,8 +314,15 @@ pub struct ScannerState {
     pub(crate) token: Kind,         // Kind of current token
     pub(crate) token_value: &'static str, // Parsed value of current token
     pub(crate) token_flags: TokenFlags, // Flags for current token
-    pub(crate) comment_directives: &'static [CommentDirective], // a snapshot, like Go's slice header: Rewind restores it
+    pub(crate) comment_directives_len: usize, // Snapshot of the number of comment directives collected so far
     pub(crate) skip_jsdoc_leading_asterisks: u32, // Leading asterisks to skip when scanning types inside JSDoc. Should be 0 outside JSDoc
+}
+
+/// An owning snapshot for temporary text changes, unlike a `mark()` snapshot.
+#[must_use]
+pub struct SavedScannerState {
+    state: ScannerState,
+    comment_directives: Vec<CommentDirective>,
 }
 
 #[derive(Default)]
@@ -327,6 +335,7 @@ pub struct Scanner {
     errors: Vec<ScanError>,
     skip_trivia: bool,
     pub(crate) state: ScannerState,
+    comment_directives: Vec<CommentDirective>,
 
     number_cache: FxHashMap<&'static str, &'static str>,
     hex_number_cache: FxHashMap<&'static str, &'static str>,
@@ -588,16 +597,37 @@ impl Scanner {
         TextRange::new(self.state.token_start, self.state.pos)
     }
 
-    pub fn comment_directives(&self) -> &'static [CommentDirective] {
-        self.state.comment_directives
+    pub fn comment_directives(&self) -> &[CommentDirective] {
+        &self.comment_directives[..self.state.comment_directives_len]
     }
 
+    /// Saves a snapshot for speculation within the current text.
     pub fn mark(&self) -> ScannerState {
         self.state
     }
 
+    /// Restores a snapshot without changing text. Use `restore_state` after `set_text`.
     pub fn rewind(&mut self, state: ScannerState) {
+        debug_assert!(
+            state.comment_directives_len <= self.comment_directives.len(),
+            "rewind requires the saved directive buffer; use take_state across text changes"
+        );
         self.state = state;
+        self.comment_directives.truncate(state.comment_directives_len);
+    }
+
+    /// Moves the token state and directive buffer out before a temporary text change.
+    pub fn take_state(&mut self) -> SavedScannerState {
+        SavedScannerState {
+            state: std::mem::take(&mut self.state),
+            comment_directives: std::mem::take(&mut self.comment_directives),
+        }
+    }
+
+    /// Restores the owned snapshot after the caller has restored the scanner's text.
+    pub fn restore_state(&mut self, saved: SavedScannerState) {
+        self.state = saved.state;
+        self.comment_directives = saved.comment_directives;
     }
 
     /// Go: `onError != nil`. Enables buffering of scanner diagnostics (see the module docs).
@@ -699,6 +729,7 @@ impl Scanner {
         self.text = text;
         self.end = text.len() as u32;
         self.state = ScannerState::default();
+        self.comment_directives.clear();
     }
 
     pub fn set_language_variant(&mut self, language_variant: LanguageVariant) {
@@ -1664,11 +1695,8 @@ impl Scanner {
         } else {
             return;
         };
-        // Directives are rare; copying keeps every saved state's snapshot intact (Go shares the backing array,
-        // but never rewrites elements below a saved length).
-        let mut directives = self.state.comment_directives.to_vec();
-        directives.push(CommentDirective { loc: TextRange::new(start, end), kind });
-        self.state.comment_directives = tsrs_core::alloc_vec(directives);
+        self.comment_directives.push(CommentDirective { loc: TextRange::new(start, end), kind });
+        self.state.comment_directives_len += 1;
     }
 
     pub fn re_scan_less_than_token(&mut self) -> Kind {

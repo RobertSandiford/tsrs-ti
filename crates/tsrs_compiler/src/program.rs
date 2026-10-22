@@ -486,7 +486,7 @@ impl Program {
 // (mimalloc `no_thp`, notes/mem-no-thp.md) the parallel parse is bound by page-fault contention, not threads (vscode
 // on 64 vCPUs: 0.124 s at 32 threads, 0.131 s at 64), and every allocating thread keeps its own partly filled
 // allocator pages and arena chunk tail (64 -> 32 threads: -0.09 GiB peak). RAYON_NUM_THREADS still sets the count
-// exactly, as before (bench/run.py's single-threaded counter uses 1).
+// exactly, as before (single-threaded runs with `node bench/bench.mjs count` use 1).
 const PARSE_THREAD_CAP: usize = 32;
 
 /// Runs worker jobs on the calling thread for threadless targets.
@@ -934,6 +934,8 @@ impl Program {
                 equal_module_specifiers(n1, n2)
                     && self.get_mode_for_usage_location(file1, n1)
                         == self.get_mode_for_usage_location(file2, n2)
+                    && n1.parent().is_some_and(ast::is_source_phase_import)
+                        == n2.parent().is_some_and(ast::is_source_phase_import)
             })
             && equal_func(
                 file1.module_augmentations(),
@@ -1061,6 +1063,10 @@ impl Program {
     // program.go:536
     pub fn content_mapper_extensions(&self) -> Vec<String> {
         self.opts.config.content_mapper_extensions()
+    }
+
+    pub fn content_mapper_extension_rewrites(&self) -> Vec<tspath::ExtensionRewrite> {
+        self.opts.config.content_mapper_extension_rewrites().to_vec()
     }
 
     // program.go:537
@@ -1241,11 +1247,7 @@ impl Program {
         mode: ResolutionMode,
     ) -> Option<P<ResolvedModule>> {
         let resolutions = self.resolved_modules.get(path)?;
-        // Keys hold `&'static str`; a borrowed name cannot build a lookup key, and per-file caches are small.
-        resolutions
-            .iter()
-            .find(|(k, _)| k.name == module_reference && k.mode == mode)
-            .map(|(_, v)| *v)
+        tsrs_module::mode_aware_cache_get(resolutions, module_reference, mode).copied()
     }
 
     pub fn get_resolved_module_from_module_specifier(
@@ -1257,6 +1259,9 @@ impl Program {
             ast::is_string_literal_like(module_specifier),
             "moduleSpecifier must be a StringLiteralLike"
         );
+        if module_specifier.parent().is_some_and(ast::is_source_phase_import) {
+            return None;
+        }
         let mode = self.get_mode_for_usage_location(file, module_specifier);
         self.get_resolved_module(file, module_specifier.text(), mode)
     }
@@ -2009,6 +2014,7 @@ impl Program {
             };
 
         if let Some(paths) = &options.paths {
+            let paths_base_path = options.get_paths_base_path(self.get_current_directory());
             for (key, value) in paths {
                 // !!! This code does not handle cases where where the path mappings have the wrong types,
                 // as that information is mostly lost during the parsing process.
@@ -2055,6 +2061,17 @@ impl Program {
                             i,
                             &diagnostics::Non_relative_paths_are_not_allowed_Did_you_forget_a_leading_Slash,
                             &[],
+                        );
+                    } else if tspath::is_network_path(&tspath::get_normalized_absolute_path(
+                        subst,
+                        &paths_base_path,
+                    )) {
+                        create_diagnostic_for_option_path_key_value(
+                            &mut diags,
+                            key,
+                            i,
+                            &diagnostics::Network_path_0_is_not_supported,
+                            &[subst],
                         );
                     }
                 }
@@ -2408,6 +2425,16 @@ impl Program {
         if !options.no_emit.is_true() && !options.suppress_output_path_check.is_true() {
             let mut emit_files_seen: FxHashSet<String> = FxHashSet::default();
             let mut emit_file_names: Vec<String> = Vec::new();
+            let external_output_source_files: Vec<P<SourceFile>> = self
+                .source_files()
+                .iter()
+                .copied()
+                .filter(|source_file| {
+                    !source_file.content_mapper().is_empty()
+                        && !self.is_source_file_from_external_library(*source_file)
+                        && self.get_project_reference_from_source(source_file.path()).is_none()
+                })
+                .collect();
             tsoptions::outputpaths::for_each_emitted_file(
                 &*self,
                 &options,
@@ -2416,9 +2443,11 @@ impl Program {
                     emit_file_names.push(paths.source_map_file_path().to_string());
                     emit_file_names.push(paths.declaration_file_path().to_string());
                     emit_file_names.push(paths.declaration_map_path().to_string());
+                    emit_file_names.push(paths.external_output_file_path().to_string());
                     false
                 },
                 &self.get_source_files_to_emit(None, false, false),
+                &external_output_source_files,
                 false,
             );
             emit_file_names.push(self.opts.config.get_build_info_file_name());
@@ -2622,10 +2651,11 @@ impl Program {
         };
         // The declaration transform runs in a scratch region of its own, freed once its diagnostics are collected
         // (notes/mem-emit-regions.md; the diagnostics themselves escape it).
-        let emit_resolver = c.get_emit_resolver();
         let region = tsrs_core::arena::Region::new_scratch(64 << 10);
         let diagnostics = {
             let _scratch = region.enter_scratch();
+            let emit_context = tsrs_printer::new_scratch_emit_context();
+            let emit_resolver = c.new_emit_resolver(emit_context);
             let checker_slot = P::new(tsrs_checker::CheckerSlot::default());
             let host = crate::emithost::new_emit_host(self, emit_resolver, checker_slot);
             checker_slot
@@ -3277,7 +3307,9 @@ impl Program {
                     continue;
                 }
                 'imports: for &imp in file.imports() {
-                    if tspath::is_external_module_name_relative(imp.text()) {
+                    if imp.parent().is_some_and(ast::is_source_phase_import)
+                        || tspath::is_external_module_name_relative(imp.text())
+                    {
                         continue;
                     }
                     if self.resolved_modules.contains_key(file.path()) {
@@ -3851,6 +3883,7 @@ fn plain_js_errors() -> &'static FxHashSet<i32> {
             &diagnostics::A_continue_statement_can_only_jump_to_a_label_of_an_enclosing_iteration_statement,
             &diagnostics::A_default_clause_cannot_appear_more_than_once_in_a_switch_statement,
             &diagnostics::A_default_export_must_be_at_the_top_level_of_a_file_or_module_declaration,
+            &diagnostics::A_deferred_import_must_specify_a_namespace_binding,
             &diagnostics::A_definite_assignment_assertion_is_not_permitted_in_this_context,
             &diagnostics::A_destructuring_declaration_must_have_an_initializer,
             &diagnostics::A_get_accessor_cannot_have_parameters,
@@ -3864,6 +3897,7 @@ fn plain_js_errors() -> &'static FxHashSet<i32> {
             &diagnostics::A_return_statement_cannot_be_used_inside_a_class_static_block,
             &diagnostics::A_set_accessor_cannot_have_rest_parameter,
             &diagnostics::A_set_accessor_must_have_exactly_one_parameter,
+            &diagnostics::A_source_phase_import_must_specify_a_local_binding,
             &diagnostics::An_export_declaration_can_only_be_used_at_the_top_level_of_a_module,
             &diagnostics::An_export_declaration_cannot_have_modifiers,
             &diagnostics::An_import_declaration_can_only_be_used_at_the_top_level_of_a_module,
@@ -3887,11 +3921,15 @@ fn plain_js_errors() -> &'static FxHashSet<i32> {
             &diagnostics::Jump_target_cannot_cross_function_boundary,
             &diagnostics::Line_terminator_not_permitted_before_arrow,
             &diagnostics::Modifiers_cannot_appear_here,
+            &diagnostics::Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import,
             &diagnostics::Only_a_single_variable_declaration_is_allowed_in_a_for_in_statement,
             &diagnostics::Only_a_single_variable_declaration_is_allowed_in_a_for_of_statement,
+            &diagnostics::Optional_chaining_cannot_be_used_with_import_source,
             &diagnostics::Private_identifiers_are_not_allowed_outside_class_bodies,
             &diagnostics::Private_identifiers_are_only_allowed_in_class_bodies_and_may_only_be_used_as_part_of_a_class_member_declaration_property_access_or_on_the_left_hand_side_of_an_in_expression,
             &diagnostics::Property_0_is_not_accessible_outside_class_1_because_it_has_a_private_identifier,
+            &diagnostics::Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls,
+            &diagnostics::Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve,
             &diagnostics::Tagged_template_expressions_are_not_permitted_in_an_optional_chain,
             &diagnostics::The_left_hand_side_of_a_for_of_statement_may_not_be_async,
             &diagnostics::The_variable_declaration_of_a_for_in_statement_cannot_have_an_initializer,
@@ -3900,6 +3938,7 @@ fn plain_js_errors() -> &'static FxHashSet<i32> {
             &diagnostics::Variable_declaration_list_cannot_be_empty,
             &diagnostics::X_0_and_1_operations_cannot_be_mixed_without_parentheses,
             &diagnostics::X_0_expected,
+            &diagnostics::X_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_defer_or_source,
             &diagnostics::X_0_is_not_a_valid_meta_property_for_keyword_1_Did_you_mean_2,
             &diagnostics::X_0_list_cannot_be_empty,
             &diagnostics::X_0_modifier_already_seen,
@@ -3934,6 +3973,10 @@ impl tsoptions::outputpaths::OutputPathsHost for Program {
 
     fn content_mapper_extensions(&self) -> Vec<String> {
         self.opts.config.content_mapper_extensions()
+    }
+
+    fn content_mapper_extension_rewrites(&self) -> Vec<tspath::ExtensionRewrite> {
+        Program::content_mapper_extension_rewrites(self)
     }
 
     fn get_current_directory(&self) -> &str {

@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_ast as ast;
 use tsrs_ast::*;
 use tsrs_core::*;
@@ -1366,8 +1366,22 @@ pub const stKindGlobals: symbolTableID = 3 << stKindShift;
 pub const stKindResolvedExports: symbolTableID = 4 << stKindShift; // resolved/derived exports from getExportsOfSymbol, distinct from raw sym.Exports
 
 // stKindMask extracts the kind bits from a symbolTableID.
-// Go writes `(iota - 1) << stKindShift` as the sixth constant of the block, so iota is 5 here.
-pub const stKindMask: symbolTableID = (5 - 1) << stKindShift;
+pub const stKindMask: symbolTableID = !((1 << stKindShift) - 1);
+
+#[cfg(test)]
+mod symbol_table_kind_tests {
+    use super::*;
+
+    #[test]
+    fn mask_extracts_every_table_kind_without_source_id_bits() {
+        let source_id = 0x12345;
+        for kind in
+            [stKindLocals, stKindExports, stKindMembers, stKindGlobals, stKindResolvedExports]
+        {
+            assert_eq!((kind | source_id) & stKindMask, kind);
+        }
+    }
+}
 
 // symbolaccessibility.go:417
 pub(crate) fn symbol_table_id_from_locals(node: P<Node>) -> symbolTableID {
@@ -1709,6 +1723,23 @@ impl Checker {
         }
         if symbol == self.get_merged_symbol(symbol_from_symbol_table) {
             like_symbols = true;
+        }
+        if !like_symbols {
+            if let Some(mut resolved_alias_symbol) =
+                resolved_alias_symbol.filter(|symbol| symbol.flags().intersects(SymbolFlags::Alias))
+            {
+                let mut seen_aliases = FxHashSet::default();
+                while resolved_alias_symbol.flags().intersects(SymbolFlags::Alias)
+                    && seen_aliases.insert(resolved_alias_symbol)
+                {
+                    let target = self.resolve_alias(resolved_alias_symbol);
+                    resolved_alias_symbol = self.get_merged_symbol(target);
+                    if symbol == resolved_alias_symbol {
+                        like_symbols = true;
+                        break;
+                    }
+                }
+            }
         }
         if !like_symbols {
             return false;

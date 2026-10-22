@@ -5,7 +5,7 @@ use tsrs_ast::{self as ast, Diagnostic, DiagnosticExt, Node, SourceFile, Symbol}
 use tsrs_checker::Program as _;
 use tsrs_compiler::{Checker, Context, Program as CompilerProgram};
 use tsrs_core::P;
-use tsrs_core::collections::Set;
+use tsrs_core::collections::{Set, SyncMap};
 use tsrs_core::tspath::{self, Path};
 
 use crate::program::Program;
@@ -76,6 +76,19 @@ struct toProgramSnapshot {
     global_scope_lost: bool,
 }
 
+fn for_each_deleted_file(
+    old_file_infos: &SyncMap<Path, FileInfo>,
+    new_file_infos: &SyncMap<Path, FileInfo>,
+    mut on_deleted_file: impl FnMut(&Path, &FileInfo),
+) {
+    old_file_infos.range(|file_path, old_info| {
+        if new_file_infos.load(file_path).is_none() {
+            on_deleted_file(file_path, old_info);
+        }
+        true
+    });
+}
+
 impl toProgramSnapshot {
     // programtosnapshot.go:50
     fn reuse_from_old_program(&self) {
@@ -87,16 +100,24 @@ impl toProgramSnapshot {
                     .borrow_mut()
                     .clone_from(&old.latest_changed_dts_file.borrow());
             }
+            self.snapshot.build_info_emit_pending.set(old.build_info_emit_pending.get());
             // Copy old snapshot's changed files set
             old.changed_files_set.range(|key| {
-                self.snapshot.changed_files_set.add(key.clone());
+                if self.program.get_source_file_by_path(key).is_some() {
+                    self.snapshot.changed_files_set.add(key.clone());
+                } else {
+                    self.snapshot.build_info_emit_pending.set(true);
+                }
                 true
             });
             old.affected_files_pending_emit.range(|key, &emit_kind| {
-                self.snapshot.affected_files_pending_emit.store(key.clone(), emit_kind);
+                if self.program.get_source_file_by_path(key).is_some() {
+                    self.snapshot.affected_files_pending_emit.store(key.clone(), emit_kind);
+                } else {
+                    self.snapshot.build_info_emit_pending.set(true);
+                }
                 true
             });
-            self.snapshot.build_info_emit_pending.set(old.build_info_emit_pending.get());
             self.snapshot.has_errors_from_old_state.set(old.has_errors.get());
             self.snapshot.has_semantic_errors_from_old_state.set(old.has_semantic_errors.get());
             self.snapshot
@@ -437,24 +458,33 @@ impl toProgramSnapshot {
             return;
         }
         if let Some(old_program) = self.old_program {
-            // If the global file is removed, add all files as changed
-            old_program.snapshot.file_infos.range(|file_path, old_info| {
-                if self.snapshot.file_infos.load(file_path).is_none() {
-                    if old_info.affects_global_scope {
-                        for &file in self
-                            .snapshot
-                            .get_all_files_excluding_default_library_file(self.program, None)
-                        {
-                            self.snapshot.add_file_to_change_set(file.path().clone());
-                        }
-                        self.global_file_removed = true;
-                    } else {
-                        self.snapshot.build_info_emit_pending.set(true);
-                    }
-                    return false;
-                }
-                true
-            });
+            let snapshot = self.snapshot;
+            for_each_deleted_file(
+                &old_program.snapshot.file_infos,
+                &snapshot.file_infos,
+                |file_path, old_info| self.handle_deleted_file(file_path, old_info),
+            );
+            if self.global_file_removed {
+                self.invalidate_global_scope();
+            }
+        }
+    }
+
+    fn handle_deleted_file(&mut self, file_path: &Path, old_info: &FileInfo) {
+        self.snapshot.build_info_emit_pending.set(true);
+        self.snapshot.changed_files_set.delete(file_path);
+        self.snapshot.affected_files_pending_emit.delete(file_path);
+        self.global_file_removed |= old_info.affects_global_scope;
+    }
+
+    fn invalidate_global_scope(&self) {
+        self.snapshot.build_info_emit_pending.set(true);
+        for &file in self.program.get_source_files() {
+            if !self.program.is_source_file_default_library(file.path()) {
+                self.snapshot.add_file_to_change_set(file.path().clone());
+            } else if !self.program.skip_type_checking(file, true) {
+                self.snapshot.semantic_diagnostics_per_file.delete(file.path());
+            }
         }
     }
 
@@ -466,11 +496,7 @@ impl toProgramSnapshot {
         // Go ranges the old file infos for a file that affected the global scope and no longer does; each file's
         // compute function recorded that for its own file (fileChange::global_scope_lost).
         if self.global_scope_lost {
-            for &file in
-                self.snapshot.get_all_files_excluding_default_library_file(self.program, None)
-            {
-                self.snapshot.add_file_to_change_set(file.path().clone());
-            }
+            self.invalidate_global_scope();
         }
     }
 
@@ -583,11 +609,7 @@ fn add_referenced_files_from_import_literal(
 
 // Gets the path to reference file from file name, it could be resolvedPath if present otherwise path
 // programtosnapshot.go:281 (addReferencedFileFromFileName, returning the path it adds)
-fn referenced_file_path_from_file_name(
-    program: &CompilerProgram,
-    file_name: &str,
-    source_file_directory: &str,
-) -> Path {
+fn referenced_file_path_from_file_name(program: &CompilerProgram, file_name: &str) -> Path {
     let redirect = program.get_parse_file_redirect(file_name);
     if !redirect.is_empty() {
         tspath::to_path(
@@ -596,7 +618,11 @@ fn referenced_file_path_from_file_name(
             program.use_case_sensitive_file_names(),
         )
     } else {
-        tspath::to_path(file_name, source_file_directory, program.use_case_sensitive_file_names())
+        tspath::to_path(
+            file_name,
+            program.get_current_directory(),
+            program.use_case_sensitive_file_names(),
+        )
     }
 }
 
@@ -690,11 +716,11 @@ fn referenced_files_of(
     // Triple slash references, then type reference directives.
     let mut file_name_paths: Vec<Path> = Vec::new();
     file_name_paths.extend(file.referenced_files().iter().map(|referenced_file| {
-        referenced_file_path_from_file_name(
-            program,
+        let file_name = tspath::get_normalized_absolute_path(
             &referenced_file.file_name,
             &source_file_directory,
-        )
+        );
+        referenced_file_path_from_file_name(program, &file_name)
     }));
     if let Some(type_refs_in_file) =
         program.get_resolved_type_reference_directives().get(file.path())
@@ -702,11 +728,7 @@ fn referenced_files_of(
         // the paths go into a set, and references_equal does not depend on their order
         file_name_paths.extend(type_refs_in_file.values().filter_map(|type_ref| {
             if !type_ref.resolved_file_name.is_empty() {
-                Some(referenced_file_path_from_file_name(
-                    program,
-                    type_ref.resolved_file_name,
-                    &source_file_directory,
-                ))
+                Some(referenced_file_path_from_file_name(program, type_ref.resolved_file_name))
             } else {
                 None
             }

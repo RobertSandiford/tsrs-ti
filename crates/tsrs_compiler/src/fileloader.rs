@@ -510,6 +510,8 @@ impl fileLoader {
     }
 
     pub(crate) fn sort_libs(&self, lib_files: &mut [P<SourceFile>]) {
+        // Replacement libraries share a priority, so preserve their discovery order.
+        // This is the stable counterpart of Go's slices.SortStableFunc.
         lib_files.sort_by_key(|f| self.get_default_lib_file_priority(*f));
     }
 
@@ -1053,7 +1055,7 @@ pub(crate) fn source_file_meta_data(
         .get_resolution_data()
         .get()
         .new_resolver(project_references.host)
-        .get_package_scope_for_path(&tspath::get_directory_path(file_name));
+        .get_package_scope_for_path(&tspath::get_directory_path_cow(file_name));
     let module_resolution_kind =
         opts.config.compiler_options().unwrap().get_module_resolution_kind();
 
@@ -1210,7 +1212,7 @@ fn tripleslash_reference_lookup(
     module_name: &str,
     containing_file: &str,
 ) -> (String, (String, Option<sourceFileFromReferenceDiagnostic>)) {
-    let base_path = tspath::get_directory_path(containing_file);
+    let base_path = tspath::get_directory_path_cow(containing_file);
     let mut referenced_file_name = module_name.to_string();
 
     if !tspath::is_rooted_disk_path(module_name) {
@@ -1277,12 +1279,34 @@ pub(crate) fn prefetch_resolutions(
             imports_of_file.iter().copied().chain(augmentations).enumerate()
         {
             let module_name = entry.text();
-            if module_name.is_empty() {
+            if module_name.is_empty() || entry.parent().is_some_and(ast::is_source_phase_import) {
                 imports.push(None);
                 continue;
             }
             let mode =
                 get_mode_for_usage_location(file.file_name(), meta, entry, Some(&options_for_file));
+            // A module declared in this file resolves locally, even if a package with the same name exists.
+            if file.ambient_module_names().contains(&module_name) {
+                let resolved_module = P::new(ResolvedModule::default());
+                resolutions_in_file.insert(
+                    ModeAwareCacheKey { name: alloc_str(module_name), mode },
+                    resolved_module,
+                );
+                let trace = if options_for_file.trace_resolution.is_true() {
+                    vec![DiagAndArgs {
+                        message: &diagnostics::Module_0_was_resolved_as_locally_declared_ambient_module_in_file_1,
+                        args: vec![module_name.to_string(), file.file_name().to_string()],
+                    }]
+                } else {
+                    Vec::new()
+                };
+                imports.push(Some(prefetchedImport {
+                    resolution: Ok((resolved_module, trace)),
+                    mode,
+                    prepared: None,
+                }));
+                continue;
+            }
             let resolution = resolver.resolve_module_name(module_name, &file_name, mode, redirect);
             // As resolve_imports_and_module_augmentations inserts them, in the same order (a failed resolution gets a
             // default module).
@@ -1600,7 +1624,8 @@ impl fileLoader {
                     _ => None,
                 };
                 let module_name = entry.text();
-                if module_name.is_empty() {
+                if module_name.is_empty() || entry.parent().is_some_and(ast::is_source_phase_import)
+                {
                     continue;
                 }
 
@@ -1613,6 +1638,24 @@ impl fileLoader {
                         entry,
                         Some(&options_for_file),
                     );
+                    // Keep this path in sync with prefetch_resolutions: traced and synthetic imports bypass it.
+                    if file.ambient_module_names().contains(&module_name) {
+                        let trace = if options_for_file.trace_resolution.is_true() {
+                            vec![DiagAndArgs {
+                                message: &diagnostics::Module_0_was_resolved_as_locally_declared_ambient_module_in_file_1,
+                                args: vec![module_name.to_string(), file.file_name().to_string()],
+                            }]
+                        } else {
+                            Vec::new()
+                        };
+                        let resolved_module = P::new(ResolvedModule::default());
+                        resolutions_in_file.insert(
+                            ModeAwareCacheKey { name: alloc_str(module_name), mode },
+                            resolved_module,
+                        );
+                        resolutions_trace.extend(trace);
+                        continue;
+                    }
                     (
                         self.resolver.resolve_module_name(module_name, &file_name, mode, redirect),
                         mode,
@@ -1894,6 +1937,15 @@ pub(crate) fn source_file_from_reference(
 ) -> (String, Option<sourceFileFromReferenceDiagnostic>) {
     let allow_non_ts_extensions = options.allow_non_ts_extensions.is_true();
     let diagnostic_file_name = tspath::normalize_slashes(reference_text);
+    if tspath::is_network_path(file_name) {
+        return (
+            String::new(),
+            Some(sourceFileFromReferenceDiagnostic {
+                message: &diagnostics::Network_path_0_is_not_supported,
+                args: vec![diagnostic_file_name],
+            }),
+        );
+    }
     if tspath::has_extension(file_name) {
         let canonical_file_name =
             tspath::get_canonical_file_name(file_name, fs.use_case_sensitive_file_names());
@@ -2128,12 +2180,16 @@ pub(crate) fn get_emit_syntax_for_usage_location_worker(
         return ModuleKind::CommonJS;
     }
     let file_emit_mode = ast::get_emit_module_format_of_file_worker(file_name, options, meta);
-    if ast::walk_up_parenthesized_expressions(parent).is_some_and(ast::is_import_call) {
-        return if ast::should_transform_import_call(file_name, options, file_emit_mode) {
-            ModuleKind::CommonJS
-        } else {
-            ModuleKind::ESNext
-        };
+    if let Some(call) =
+        ast::walk_up_parenthesized_expressions(parent).filter(|&n| ast::is_import_call(n))
+    {
+        if ast::is_source_phase_import_call(call) {
+            return ModuleKind::ESNext;
+        }
+        if ast::should_transform_import_call(file_name, options, file_emit_mode) {
+            return ModuleKind::CommonJS;
+        }
+        return ModuleKind::ESNext;
     }
     // If we're in --module preserve on an input file, we know that an import
     // is an import. But if this is a declaration file, we'd prefer to use the

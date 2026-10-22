@@ -5,7 +5,7 @@ use tsrs_core::collections::OrderedMap;
 use tsrs_core::tspath;
 use tsrs_core::{
     CompilerOptions, JsxEmit, ModuleDetectionKind, ModuleKind, ModuleResolutionKind, NewLineKind,
-    PollingKind, ScriptTarget, WatchDirectoryKind, WatchFileKind,
+    ScriptTarget,
 };
 
 use crate::commandlineoption::CompilerOptionsValue;
@@ -204,7 +204,6 @@ pub static LIB_MAP: LazyLock<OrderedMap<&'static str, CompilerOptionsValue>> =
             ("esnext.regexp", CompilerOptionsValue::String("lib.es2024.regexp.d.ts".to_string())),
             ("esnext.string", CompilerOptionsValue::String("lib.es2024.string.d.ts".to_string())),
             ("esnext.float16", CompilerOptionsValue::String("lib.es2025.float16.d.ts".to_string())),
-            ("esnext.promise", CompilerOptionsValue::String("lib.es2025.promise.d.ts".to_string())),
             ("esnext.array", CompilerOptionsValue::String("lib.es2026.array.d.ts".to_string())),
             (
                 "esnext.collection",
@@ -212,13 +211,14 @@ pub static LIB_MAP: LazyLock<OrderedMap<&'static str, CompilerOptionsValue>> =
             ),
             ("esnext.error", CompilerOptionsValue::String("lib.es2026.error.d.ts".to_string())),
             (
-                "esnext.iterator",
-                CompilerOptionsValue::String("lib.es2026.iterator.d.ts".to_string()),
-            ),
-            (
                 "esnext.typedarrays",
                 CompilerOptionsValue::String("lib.es2026.typedarrays.d.ts".to_string()),
             ),
+            (
+                "esnext.iterator",
+                CompilerOptionsValue::String("lib.esnext.iterator.d.ts".to_string()),
+            ),
+            ("esnext.promise", CompilerOptionsValue::String("lib.esnext.promise.d.ts".to_string())),
             // ESNext By-feature options
             ("esnext.date", CompilerOptionsValue::String("lib.esnext.date.d.ts".to_string())),
             (
@@ -230,6 +230,10 @@ pub static LIB_MAP: LazyLock<OrderedMap<&'static str, CompilerOptionsValue>> =
                 CompilerOptionsValue::String("lib.esnext.disposable.d.ts".to_string()),
             ),
             ("esnext.intl", CompilerOptionsValue::String("lib.esnext.intl.d.ts".to_string())),
+            (
+                "esnext.modulesource",
+                CompilerOptionsValue::String("lib.esnext.modulesource.d.ts".to_string()),
+            ),
             (
                 "esnext.sharedmemory",
                 CompilerOptionsValue::String("lib.esnext.sharedmemory.d.ts".to_string()),
@@ -373,60 +377,3 @@ pub fn get_default_lib_file_name(options: &CompilerOptions) -> &'static str {
         None => "lib.d.ts",
     }
 }
-
-pub(crate) static WATCH_FILE_ENUM_MAP: LazyLock<OrderedMap<&'static str, CompilerOptionsValue>> =
-    LazyLock::new(|| {
-        new_map(&[
-            (
-                "fixedpollinginterval",
-                CompilerOptionsValue::WatchFileKind(WatchFileKind::FixedPollingInterval),
-            ),
-            (
-                "prioritypollinginterval",
-                CompilerOptionsValue::WatchFileKind(WatchFileKind::PriorityPollingInterval),
-            ),
-            (
-                "dynamicprioritypolling",
-                CompilerOptionsValue::WatchFileKind(WatchFileKind::DynamicPriorityPolling),
-            ),
-            (
-                "fixedchunksizepolling",
-                CompilerOptionsValue::WatchFileKind(WatchFileKind::FixedChunkSizePolling),
-            ),
-            ("usefsevents", CompilerOptionsValue::WatchFileKind(WatchFileKind::UseFsEvents)),
-            (
-                "usefseventsonparentdirectory",
-                CompilerOptionsValue::WatchFileKind(WatchFileKind::UseFsEventsOnParentDirectory),
-            ),
-        ])
-    });
-
-pub(crate) static WATCH_DIRECTORY_ENUM_MAP: LazyLock<
-    OrderedMap<&'static str, CompilerOptionsValue>,
-> = LazyLock::new(|| {
-    new_map(&[
-        ("usefsevents", CompilerOptionsValue::WatchDirectoryKind(WatchDirectoryKind::UseFsEvents)),
-        (
-            "fixedpollinginterval",
-            CompilerOptionsValue::WatchDirectoryKind(WatchDirectoryKind::FixedPollingInterval),
-        ),
-        (
-            "dynamicprioritypolling",
-            CompilerOptionsValue::WatchDirectoryKind(WatchDirectoryKind::DynamicPriorityPolling),
-        ),
-        (
-            "fixedchunksizepolling",
-            CompilerOptionsValue::WatchDirectoryKind(WatchDirectoryKind::FixedChunkSizePolling),
-        ),
-    ])
-});
-
-pub(crate) static FALLBACK_ENUM_MAP: LazyLock<OrderedMap<&'static str, CompilerOptionsValue>> =
-    LazyLock::new(|| {
-        new_map(&[
-            ("fixedinterval", CompilerOptionsValue::PollingKind(PollingKind::FixedInterval)),
-            ("priorityinterval", CompilerOptionsValue::PollingKind(PollingKind::PriorityInterval)),
-            ("dynamicpriority", CompilerOptionsValue::PollingKind(PollingKind::DynamicPriority)),
-            ("fixedchunksize", CompilerOptionsValue::PollingKind(PollingKind::FixedChunkSize)),
-        ])
-    });

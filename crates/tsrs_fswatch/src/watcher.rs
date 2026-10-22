@@ -2,6 +2,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, LazyLock, Mutex};
+use tsrs_core::tspath;
 
 use crate::canonicalize::canonicalize_path;
 use crate::debounce::debounce;
@@ -110,6 +111,9 @@ pub(crate) static errRootPath: Sentinel = Sentinel("fswatch: cannot watch a root
 // errNotAbsolute is returned by [Watcher.WatchDirectory] and
 // [Watcher.WatchFile] when the supplied path is not absolute.
 pub(crate) static errNotAbsolute: Sentinel = Sentinel("fswatch: path must be absolute");
+
+// Returned when a requested watch may resolve to a network location.
+pub(crate) static errNetworkPath: Sentinel = Sentinel("fswatch: network paths are not supported");
 
 // ErrOverflow indicates that the kernel event queue overflowed and
 // some filesystem changes were missed. The watch remains
@@ -772,6 +776,10 @@ impl Watcher for watcher {
                 rollback(&prepared);
                 return Err(errNilCallback.into());
             };
+            if tspath::is_network_path(&request.dir) {
+                rollback(&prepared);
+                return Err(errNetworkPath.into());
+            }
             let dir = filepath_clean(&request.dir);
             if !dir.starts_with('/') {
                 rollback(&prepared);
@@ -849,6 +857,9 @@ impl Watcher for watcher {
     fn watch_file(&self, path: &str, f: WatchCallback) -> Result<Box<dyn Watch>, Error> {
         if !self.available() {
             return Err(ErrUnavailable.into());
+        }
+        if tspath::is_network_path(path) {
+            return Err(errNetworkPath.into());
         }
         let path = filepath_clean(path);
         if !path.starts_with('/') {
@@ -1614,7 +1625,7 @@ pub(crate) fn physical_dir_for(dir: &str) -> String {
         return dir.to_string();
     };
     let realpath = realpath.to_string_lossy().into_owned();
-    if realpath == dir {
+    if realpath == dir || tspath::is_network_path(&realpath) {
         return dir.to_string();
     }
     canonicalize_path(&filepath_clean(&realpath))

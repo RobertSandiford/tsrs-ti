@@ -390,7 +390,10 @@ impl classFieldsTransformer {
         if node.kind() == Kind::PropertyAccessExpression
             && ast::is_identifier(node.as_property_access_expression().name())
         {
-            return Some(self.visit_property_access_expression_for_substitution(node));
+            return Some(self.visit_property_access_expression_for_substitution(
+                node,
+                self.substitution_visitor(),
+            ));
         }
         self.substitution_visitor().visit_each_child(Some(node))
     }
@@ -927,9 +930,13 @@ impl classFieldsTransformer {
         }
 
         // leave invalid code untransformed
-        let info = self.access_private_identifier(node.name().unwrap());
+        let info = self.get_private_identifier(
+            self.get_private_identifier_environment(),
+            node.name().unwrap(),
+        );
         assert!(info.is_some(), "Undeclared private name for property declaration.");
-        if !info.unwrap().is_valid {
+        let info = info.unwrap();
+        if info.kind == PrivateIdentifierKind::Untransformed || !info.is_valid {
             return Some(node);
         }
 
@@ -1212,12 +1219,15 @@ impl classFieldsTransformer {
     pub(crate) fn transform_private_field_initializer(&self, mut node: P<Node>) -> Option<P<Node>> {
         if self.should_transform_class_element_to_weak_map(node) {
             // If we are transforming private elements into WeakMap/WeakSet, we should elide the node.
-            let info = self.access_private_identifier(node.name().unwrap());
+            let info = self.get_private_identifier(
+                self.get_private_identifier_environment(),
+                node.name().unwrap(),
+            );
             assert!(info.is_some(), "Undeclared private name for property declaration.");
             let info = info.unwrap();
 
             // Leave invalid code untransformed
-            if !info.is_valid {
+            if info.kind == PrivateIdentifierKind::Untransformed || !info.is_valid {
                 return Some(node);
             }
 
@@ -1478,7 +1488,9 @@ impl classFieldsTransformer {
         // Private identifier names are still visited through VisitEachChild so they can be
         // transformed by visitPrivateIdentifier.
         if ast::is_identifier(pa.name()) {
-            return Some(self.visit_property_access_expression_for_substitution(node));
+            return Some(
+                self.visit_property_access_expression_for_substitution(node, self.visitor()),
+            );
         }
         self.visitor().visit_each_child(Some(node))
     }
@@ -1490,9 +1502,10 @@ impl classFieldsTransformer {
     pub(crate) fn visit_property_access_expression_for_substitution(
         &self,
         node: P<Node>,
+        mut visitor: NodeVisitor,
     ) -> P<Node> {
         let pa = node.as_property_access_expression();
-        let expression = self.visitor().visit_node(Some(pa.expression)).unwrap();
+        let expression = visitor.visit_node(Some(pa.expression)).unwrap();
         if expression != pa.expression {
             return self.factory().update_property_access_expression(
                 node,

@@ -11,8 +11,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use rustc_hash::{FxHashMap, FxHashSet};
 use tsrs_core::CompilerOptions;
 use tsrs_core::P;
-use tsrs_core::collections::{OrderedMap, Set};
+use tsrs_core::collections::Set;
 use tsrs_core::context::{self, CancelCauseFunc, CancelFunc, Context, ContextError, Locale};
+use tsrs_core::json::JsonMap;
 use tsrs_core::tspath::{self, Path};
 use tsrs_ls::{LanguageService, lsutil};
 use tsrs_lsproto as lsproto;
@@ -1189,7 +1190,7 @@ impl Server {
                     go_sprint_value(user_prefs)
                 ));
                 if let lsproto::Value::Object(config) = user_prefs {
-                    let mut items = OrderedMap::default();
+                    let mut items = JsonMap::new();
                     items.insert("js/ts".to_string(), lsproto::Value::Object(config.clone()));
                     return Ok(lsutil::parse_user_preferences(&items));
                 }
@@ -1223,7 +1224,7 @@ impl Server {
             Ok(configs) => configs,
             Err(err) => return Err(Error::wrap("configure request failed: ", err)),
         };
-        let mut config_map: OrderedMap<String, lsproto::Value> = OrderedMap::default();
+        let mut config_map = JsonMap::new();
         config_map.extend(configs.into_iter().enumerate().filter_map(|(i, config)| match i {
             0 => Some(("js/ts".to_string(), config)),
             1 => Some(("typescript".to_string(), config)),
@@ -2676,17 +2677,8 @@ impl Server {
         let Some(data) = params.data.clone() else {
             return Err(Error::new("completion item data is nil"));
         };
-        // tsrs-only: Go turns any file name into a URI and panics on one that is not a rooted path ("", a URI).
-        if !tspath::is_rooted_disk_path(&data.file_name) && !data.file_name.starts_with("^/") {
-            return Err(Error::wrap_code(
-                ErrorCode::InvalidParams,
-                Error::new(format!("completion item data has no file name: {:?}", data.file_name)),
-            ));
-        }
-        let language_service = self.session().get_language_service(
-            ctx,
-            &tsrs_ls::lsconv::file_name_to_document_uri(&data.file_name),
-        )?;
+        let uri = completion_item_file_name_to_document_uri(&data.file_name)?;
+        let language_service = self.session().get_language_service(ctx, &uri)?;
         // `defer s.recover(reqMsg)`: Go answers the recovered panic with an internal error and then sends the nil
         // result; here the handler returns an error instead of a second (null) result.
         match recover_scope(|| language_service.resolve_completion_item(ctx, params, Some(&data))) {
@@ -3673,6 +3665,25 @@ fn file_name_or_empty(uri: &lsproto::DocumentUri) -> String {
     if uri.check().is_ok() { uri.file_name() } else { String::new() }
 }
 
+pub(crate) fn completion_item_file_name_to_document_uri(
+    file_name: &str,
+) -> Result<lsproto::DocumentUri, Error> {
+    if !tspath::path_is_absolute(file_name) {
+        return Err(Error::new("completion item data fileName must be absolute"));
+    }
+    if tspath::is_dynamic_file_name(file_name) {
+        return lsproto::DocumentUri::try_dynamic_file_name_to_document_uri(file_name).ok_or_else(
+            || Error::new("completion item data fileName must be a valid dynamic path"),
+        );
+    }
+    let uri = tsrs_ls::lsconv::file_name_to_document_uri(file_name);
+    // A URL-shaped name has an absolute path root, but converting it as a disk file name can
+    // produce an invalid file URI. Keep a malformed completion payload from ending the session.
+    uri.check()
+        .map_err(|err| Error::new(format!("completion item data fileName is invalid: {err}")))?;
+    Ok(uri)
+}
+
 // server.go:1431 (Go's req field is never read)
 struct crossProjectOrchestrator {
     server: Arc<Server>,
@@ -3992,8 +4003,8 @@ fn go_sprint_value(v: &lsproto::Value) -> String {
             format!("[{}]", items.iter().map(go_sprint_value).collect::<Vec<_>>().join(" "))
         }
         lsproto::Value::Object(members) => {
-            let mut keys: Vec<&String> = members.keys().collect();
-            keys.sort();
+            let mut keys: Vec<&str> = members.keys().collect();
+            keys.sort_unstable();
             format!(
                 "map[{}]",
                 keys.iter()

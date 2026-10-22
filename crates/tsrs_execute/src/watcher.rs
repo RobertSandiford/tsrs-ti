@@ -1107,13 +1107,32 @@ impl Watcher {
         &self,
         changed_paths: &FxHashMap<String, EventKind>,
     ) -> bool {
+        let options = self.compare_paths_options();
+        let mut changed_path_keys: Option<FxHashSet<Path>> = None;
         self.config
             .content_mappers()
             .iter()
             .filter(|m| !m.package_directory.is_empty() && m.contribution_id.is_empty())
             .any(|m| {
-                changed_paths
-                    .contains_key(&tspath::combine_paths(&m.package_directory, &["package.json"]))
+                let keys = changed_path_keys.get_or_insert_with(|| {
+                    changed_paths
+                        .keys()
+                        .map(|path| {
+                            tspath::to_path(
+                                path,
+                                &options.current_directory,
+                                options.use_case_sensitive_file_names,
+                            )
+                        })
+                        .collect()
+                });
+                let manifest = tspath::combine_paths(&m.package_directory, &["package.json"]);
+                let manifest_key = tspath::to_path(
+                    &manifest,
+                    &options.current_directory,
+                    options.use_case_sensitive_file_names,
+                );
+                keys.contains(&manifest_key)
             })
     }
 
@@ -1205,15 +1224,7 @@ fn sorted_keys(changed_paths: &FxHashMap<String, EventKind>) -> Vec<&String> {
     keys
 }
 
-// Go `reflect.DeepEqual(w.config.ParsedConfig, configParseResult.ParsedConfig)`: the compiler options by value
-// (`P`'s equality is identity).
+// Go `w.config.ParsedConfig.Equals(configParseResult.ParsedConfig)`.
 fn parsed_configs_equal(a: &ParsedCommandLine, b: &ParsedCommandLine) -> bool {
-    let (a, b) = (&a.parsed_config, &b.parsed_config);
-    a.compiler_options.as_deref() == b.compiler_options.as_deref()
-        && a.watch_options == b.watch_options
-        && a.type_acquisition == b.type_acquisition
-        && a.file_names == b.file_names
-        && a.project_references == b.project_references
-        && a.project_references_is_nil == b.project_references_is_nil
-        && a.content_mappers == b.content_mappers
+    a.parsed_config.equals(&b.parsed_config)
 }

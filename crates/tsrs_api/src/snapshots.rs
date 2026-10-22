@@ -7,9 +7,11 @@ use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
 use tsrs_core::P;
-use tsrs_core::collections::{OrderedMap, Set};
-use tsrs_core::json::Value;
+use tsrs_core::collections::Set;
+use tsrs_core::json::{JsonMap, Value};
 use tsrs_core::tspath::Path;
+use tsrs_ls::autoimport::ProjectID as AutoImportProjectID;
+use tsrs_ls::lsutil;
 use tsrs_project::dirty::Shared;
 use tsrs_project::{
     APICreateProgramRequest, APIReconfigureProgramRequest, APISnapshotRequest, FileChangeSummary,
@@ -42,23 +44,14 @@ impl DocumentIdentifier {
 /// Go `NewProjectResponse`.
 pub fn project_response(p: &Project) -> Value {
     let command_line = p.command_line.expect("project_response called with unloaded project");
-    let config_file_name = if p.kind == tsrs_project::Kind::Configured {
-        p.config_file_name().to_string()
-    } else {
-        String::new()
-    };
-    let options = match command_line.compiler_options() {
-        Some(o) => gojson::compiler_options_to_go_json(&o),
-        None => Value::Null,
-    };
+    let config_file_name =
+        (p.kind == tsrs_project::Kind::Configured).then(|| s(p.config_file_name().to_string()));
     Obj::new()
         .set("id", s(p.id().0))
-        .set("configFileName", s(config_file_name))
+        .set_opt("configFileName", config_file_name)
         .set("currentDirectory", s(p.current_directory()))
         .set("dirty", b(p.is_dirty()))
         .set("parsedCommandLine", config_file_response(&command_line))
-        .set("rootFiles", strings(command_line.file_names().iter().cloned()))
-        .set("compilerOptions", options)
         .build()
 }
 
@@ -79,7 +72,7 @@ fn compute_snapshot_changes(prev: &Snapshot, next: &Snapshot) -> Value {
     let prev_projects = prev.project_collection.projects_by_id();
     let next_projects = next.project_collection.projects_by_id();
     let mut removed = Vec::new();
-    let mut changed = OrderedMap::default();
+    let mut changed = JsonMap::new();
     for (id, old) in &prev_projects {
         match next_projects.get(id) {
             None => removed.push(s(old.id().0)),
@@ -161,9 +154,7 @@ impl Session {
             .iter()
             .map(|d| d.to_absolute_file_name(cwd))
             .collect();
-        let mut options = gojson::compiler_options_from_go_json(p.get("compilerOptions"))
-            .map_err(ApiError::invalid_request)?;
-        crate::predecode::exact_compiler_options_ints(p.get("compilerOptions"), &mut options);
+        let options = crate::raw_options::compiler_options_from_raw(p.get("compilerOptions"), cwd)?;
         let mut request = APICreateProgramRequest {
             root_file_names,
             compiler_options: Some(P::new(options)),
@@ -501,6 +492,51 @@ impl Session {
         Ok(())
     }
 
+    /// Go `validatePreparedAutoImports`: a prepared snapshot is returned only if its
+    /// registry can serve auto-imports for the requested file and default project.
+    fn validate_prepared_auto_imports(
+        &self,
+        snapshot: &Snapshot,
+        file: Option<&DocumentIdentifier>,
+    ) -> ApiResult<()> {
+        let Some(file) = file else { return Ok(()) };
+        let uri = file.to_uri(self.current_directory());
+        let prepared = snapshot.get_default_project(&uri).is_some_and(|project| {
+            snapshot.auto_import_registry().is_some_and(|registry| {
+                registry.is_prepared_for_importing_file(
+                    &uri.file_name(),
+                    &AutoImportProjectID(project.id().0),
+                    snapshot.user_preferences(),
+                )
+            })
+        });
+        if prepared {
+            Ok(())
+        } else {
+            Err(ApiError::client(format!("could not prepare auto-imports for {file}")))
+        }
+    }
+
+    /// Go's two snapshot handlers copy the extra fields after `toAPISnapshotRequest`.
+    fn snapshot_preferences_and_auto_imports(
+        &self,
+        p: Params,
+        req: &mut APISnapshotRequest,
+    ) -> ApiResult<Option<DocumentIdentifier>> {
+        if let Value::Object(config) = p.get("userPreferences") {
+            req.user_preferences = Some(lsutil::parse_api_user_preferences(config));
+        }
+        let file = if p.has("prepareAutoImports") {
+            Some(p.document("prepareAutoImports")?)
+        } else {
+            None
+        };
+        if let Some(file) = &file {
+            req.prepare_auto_imports = file.to_uri(self.current_directory());
+        }
+        Ok(file)
+    }
+
     /// Go `requestfilesystem.NewForUpdate` for the request's optional `fileSystem`.
     fn request_file_system(
         &self,
@@ -529,6 +565,7 @@ impl Session {
             p.object()?;
         }
         let (mut req, echo) = self.to_api_snapshot_request(p)?;
+        let prepare_auto_imports = self.snapshot_preferences_and_auto_imports(p, &mut req)?;
         let open_state = self.reconcile_snapshot_opens(&mut req, &OpenState::default());
         let mut file_changes = self.to_file_change_summary(p.get("fileNotifications"))?;
         let snapshot_fs =
@@ -560,6 +597,12 @@ impl Session {
                 )));
             }
         };
+        if let Err(e) =
+            self.validate_prepared_auto_imports(&snapshot, prepare_auto_imports.as_ref())
+        {
+            snapshot.deref();
+            return Err(e);
+        }
         if let Err(e) = Self::module_resolution_error(&snapshot) {
             snapshot.deref();
             return Err(e);
@@ -585,6 +628,7 @@ impl Session {
             changes.object()?;
         }
         let (mut req, echo) = self.to_api_snapshot_request(changes)?;
+        let prepare_auto_imports = self.snapshot_preferences_and_auto_imports(changes, &mut req)?;
         let open_state = self.reconcile_snapshot_opens(&mut req, &base.open_state);
         let mut file_changes = self.to_file_change_summary(changes.get("fileNotifications"))?;
         let new_fs =
@@ -615,6 +659,12 @@ impl Session {
                 )));
             }
         };
+        if let Err(e) =
+            self.validate_prepared_auto_imports(&snapshot, prepare_auto_imports.as_ref())
+        {
+            snapshot.deref();
+            return Err(e);
+        }
         if let Err(e) = Self::module_resolution_error(&snapshot) {
             snapshot.deref();
             return Err(e);

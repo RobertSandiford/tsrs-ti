@@ -5,6 +5,22 @@ change are identified separately from measurements of the packaged release. For 
 see the [compatibility table](COMPATIBILITY.md); detailed investigations are indexed in the
 [engineering notes](../notes/README.md). The early development log follows the release entries.
 
+## 2026-10-22: 0.19.0 source upgrade candidate
+
+The source and package metadata now target `microsoft/TypeScript@3e9236361fa97a9e6c685f4833ac457ae2d8c50a`
+(`v7.1-beta`), with the matching npm package `7.1.0-beta`. All 112 upstream commits in
+[#623](https://github.com/oxc-project/tsrs/issues/623) have a corresponding tsrs commit and evidence in the
+[port log](../notes/typescript-623-ports.md); the beta-tag follow-ups are in their own
+[port log](../notes/typescript-7.1-beta-ports.md). The candidate package version is
+`0.19.0-ts7.1.0-beta`; 0.18.0 remains the latest published release until this candidate ships.
+
+With the upstream emit sequence, the pinned compiler passes all 13,700 error baselines and all 12,998 `.types` and
+`.symbols` baselines in both checker histories. Emit passes all 13,626 `.js`, 149 `.js.map`, and 156 `.sourcemap.txt`
+baselines. Checking-only harness runs retain four diagnostic artifacts. The
+[compatibility table](COMPATIBILITY.md#what-it-does-and-doesnt-do) records remaining gaps. Source 75 increased peak
+RSS by about 20% in a synthetic two-builder graph; source 79's mapper fixtures remain partly skipped by the
+compiler and Fourslash harnesses. The LSP API-session initialization hook is not ported.
+
 ## 2026-10-19: 0.18.0 release
 
 All seven packages use `0.18.0-ts7.1.0-dev.20260929`. The TypeScript pin remains `b85298b6a81f`; release binaries
@@ -436,7 +452,7 @@ instructions on the five largest projects).
 
 CI and bench: the bench runs once per push to `main`, one concurrency group per commit, where before a push replaced
 the queued bench and bursts of merges went unmeasured; README.md keeps the newest commit's table whatever order the
-runs finish in, the regression flag compares a run with the nearest benchmarked ancestor of its commit, `bench/history.py`
+runs finish in, the regression flag compares a run with the nearest benchmarked ancestor of its commit, `node bench/bench.mjs history`
 prints the per-commit history of each metric, and a `commit` input backfills a commit's results (#175, #176). CI fails
 a code pull request whose title, body or commit subjects carry a CI-skip marker, which the squash commit would copy
 (#182). Notes: leaf freeing at 32 checkers stays off, the give-backs' TLB-flush interrupts cost more than the memory
@@ -516,7 +532,7 @@ the default).
 Bench: the README bench measures each project on its own machine at the same time (push to results 13 min 51 s, was
 26 min 35 s), adds the application projects cal.diy, Formbricks, Supabase Studio and T3 Code (#116), `--checkers 8`
 and `--checkers 64` tables, a 64-vCPU default-mode table with `bun check`, and bolds speedups from 5x and memory
-ratios at 0.25x or less (#117, #122, #126, #127). bench/compare.py runs the 64-thread head-to-head with tsgo, the
+ratios at 0.25x or less (#117, #122, #126, #127). `node bench/bench.mjs compare` runs the 64-thread head-to-head with tsgo, the
 7.1-dev nightly and `bun check` (#119).
 
 ## 2026-10-05: 0.4.0 release

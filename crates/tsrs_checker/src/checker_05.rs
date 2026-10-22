@@ -1158,7 +1158,7 @@ impl Checker {
                 }
             }
         }
-        type_argument_types
+        type_argument_types.into_owned()
     }
 
     // checker.go:9448
@@ -2710,9 +2710,10 @@ impl Checker {
         }
     }
 
-    // checker.go:10301
+    // checker.go:10321
     pub(crate) fn check_class_expression_deferred(&mut self, node: P<Node>) {
         self.check_source_elements(node.members());
+        self.check_constructor_declared_properties(node);
         self.register_for_unused_identifiers_check(node);
     }
 
@@ -3115,7 +3116,7 @@ impl Checker {
                 // This signature has already has a contextual inference performed and cached on it
                 return;
             }
-            sig.type_parameters.set(context.type_parameters());
+            sig.set_type_parameters(Some(context.type_parameters()));
         }
         if let Some(context_this_parameter) = context.this_parameter() {
             let parameter = sig.this_parameter();

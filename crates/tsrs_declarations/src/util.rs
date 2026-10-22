@@ -9,13 +9,10 @@ pub(crate) fn needs_scope_marker(result: P<Node>) -> bool {
 }
 
 // util.go:13
-pub(crate) fn can_have_literal_initializer(
-    host: &'static dyn DeclarationEmitHost,
-    node: P<Node>,
-) -> bool {
+pub(crate) fn can_have_literal_initializer(resolver: Resolver, node: P<Node>) -> bool {
     match node.kind() {
         Kind::PropertyDeclaration | Kind::PropertySignature => {
-            host.get_effective_declaration_flags(node, ModifierFlags::Private).is_empty()
+            resolver.get_effective_declaration_flags(node, ModifierFlags::Private).is_empty()
         }
         Kind::Parameter | Kind::VariableDeclaration => true,
         _ => false,
@@ -152,13 +149,10 @@ pub(crate) fn unwrap_parenthesized_expression(o: P<Node>) -> P<Node> {
 }
 
 // util.go:149
-pub(crate) fn is_private_method_type_parameter(
-    host: &'static dyn DeclarationEmitHost,
-    node: P<Node>,
-) -> bool {
+pub(crate) fn is_private_method_type_parameter(resolver: Resolver, node: P<Node>) -> bool {
     let parent = node.parent().unwrap();
     parent.kind() == Kind::MethodDeclaration
-        && !host.get_effective_declaration_flags(parent, ModifierFlags::Private).is_empty()
+        && !resolver.get_effective_declaration_flags(parent, ModifierFlags::Private).is_empty()
 }
 
 // util.go:153
@@ -176,25 +170,11 @@ pub(crate) fn should_emit_function_properties(input: P<Node>) -> bool {
 }
 
 // util.go:164
-pub(crate) fn get_effective_base_type_node(node: P<Node>) -> Option<P<Node>> {
-    let base_type = ast::get_class_extends_heritage_element(node);
-    // !!! TODO: JSDoc support
-    // if (baseType && isInJSFile(node)) {
-    //     // Prefer an @augments tag because it may have type parameters.
-    //     const tag = getJSDocAugmentsTag(node);
-    //     if (tag) {
-    //         return tag.class;
-    //     }
-    // }
-    base_type
-}
-
-// util.go:177
 pub(crate) fn is_scope_marker(node: P<Node>) -> bool {
     ast::is_export_assignment(node) || ast::is_export_declaration(node)
 }
 
-// util.go:181
+// util.go:168
 pub(crate) fn has_scope_marker(statements: Option<P<NodeList>>) -> bool {
     let Some(statements) = statements else {
         return false;

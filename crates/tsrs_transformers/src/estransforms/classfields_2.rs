@@ -214,25 +214,24 @@ impl classFieldsTransformer {
 
         let static_properties_or_class_static_blocks =
             Self::get_static_properties_and_class_static_block(node);
+        let has_transformable_statics = (self
+            .should_transform_private_elements_or_class_static_blocks
+            .get()
+            || self.node_has_transform_private_static_elements_flag(node))
+            && static_properties_or_class_static_blocks.iter().any(|&n| {
+                ast::is_class_static_block_declaration(n)
+                    || ast::is_private_identifier_class_element_declaration(n)
+                    || (self.should_transform_initializers.get() && ast::is_initialized_property(n))
+            });
 
         // Pre-compute whether the class expression will need a temp variable wrapper.
         // Strada registers class aliases AFTER transformClassMembers (since onSubstituteNode runs
         // at emit time), but we must predict this before visiting members since we substitute
         // eagerly. This requires pre-detecting willHavePrivatePendingExpressions.
         let mut is_class_with_constructor_reference = false;
-        let mut has_transformable_statics = false;
         let mut defer_temp_declaration = false;
         if !is_decorated_class_declaration {
             is_class_with_constructor_reference = self.class_contains_constructor_reference(node);
-            has_transformable_statics =
-                (self.should_transform_private_elements_or_class_static_blocks.get()
-                    || self.node_has_transform_private_static_elements_flag(node))
-                    && static_properties_or_class_static_blocks.iter().any(|&n| {
-                        ast::is_class_static_block_declaration(n)
-                            || ast::is_private_identifier_class_element_declaration(n)
-                            || (self.should_transform_initializers.get()
-                                && ast::is_initialized_property(n))
-                    });
 
             // Private instance elements (fields, methods, accessors) transformed to
             // WeakMap/WeakSet will add initialization expressions to pendingExpressions
@@ -345,7 +344,7 @@ impl classFieldsTransformer {
             } else {
                 expressions.push(class_expression);
             }
-        } else {
+        } else if has_transformable_statics || !self.pending_expressions.borrow().is_empty() {
             // Decorated class declaration path: emit static properties as separate statements
             // via pendingStatements, matching the class declaration output structure.
 
@@ -386,6 +385,8 @@ impl classFieldsTransformer {
             } else {
                 expressions.push(class_expression);
             }
+        } else {
+            expressions.push(class_expression);
         }
 
         if expressions.len() > 1 {
@@ -2048,7 +2049,7 @@ impl classFieldsTransformer {
 
     // classfields.go:3320
     pub(crate) fn visit_object_assignment_element(&self, node: P<Node>) -> Option<P<Node>> {
-        assert!(ast::is_object_binding_or_assignment_element(node));
+        assert!(ast::is_object_literal_element(node));
         if ast::is_spread_assignment(node) {
             return self.visit_assignment_rest_property(node);
         }

@@ -16,6 +16,42 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 jobs:
+  benchmark-cli:
+    name: Warm PR benchmark CLI
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'oxc-project/tsrs'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
+
+      # Keep the platform, profile, key and build command aligned with wallclock.yml.
+      - name: Restore benchmark CLI
+        id: cli
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/release/tsrs
+          key: wallclock-cli-v1-ubuntu-24.04-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}
+
+      - uses: oxc-project/setup-rust@3d6fb132fbe7cdcb66bf8ec193911c2945369d12 # v1.0.17
+        if: steps.cli.outputs.cache-hit != 'true'
+        with:
+          save-cache: true
+          cache-key: wallclock-release
+
+      - name: Build benchmark CLI
+        if: steps.cli.outputs.cache-hit != 'true'
+        run: cargo build --release --locked -p tsrs_cli
+
+      - name: Verify benchmark CLI
+        run: target/release/tsrs --version
+
+      - name: Save benchmark CLI
+        if: steps.cli.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/release/tsrs
+          key: ${{ steps.cli.outputs.cache-primary-key }}
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -37,6 +73,20 @@ jobs:
         run: cargo clippy --locked --all-targets --config 'build.warnings="deny"'
 
       - wait: source-checks
+
+  api-transport-windows:
+    name: API transport Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
+      - uses: oxc-project/setup-rust@3d6fb132fbe7cdcb66bf8ec193911c2945369d12 # v1.0.17
+        with:
+          save-cache: ${{ github.ref_name == 'main' }}
+          cache-key: api-transport-windows
+      - name: Check checker layout
+        run: cargo check --locked -p tsrs_checker --config 'build.warnings="deny"'
+      - run: cargo test --locked -p tsrs_api_transport --lib --config 'build.warnings="deny"'
 
   test:
     name: Test Linux
@@ -62,7 +112,7 @@ jobs:
 
       # The conformance suite and workspace tests need the pinned upstream fixtures.
       - name: Check out TypeScript test fixtures and clients
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: microsoft/TypeScript
           ref: ${{ steps.ts.outputs.commit }}
@@ -82,36 +132,125 @@ jobs:
       - name: cargo test (workspace)
         run: cargo test --locked
 
-      - name: npm library paths (noembed)
-        run: cargo test --locked -p tsrs_cli --features noembed --test npm_lib_path
-
       - name: Build correctness binaries
         run: cargo build --profile dev --locked -p tsrs_cli -p tsrs_testrunner
 
-      - name: Conformance suite
+      - name: Conformance suite (all baselines)
         run: .github/scripts/conformance-gate.sh
 
-      - name: Conformance suite (default checker mode)
+      - name: Conformance suite (all baselines, default checker mode)
         env:
           TS_TEST_PROGRAM_SINGLE_THREADED: "false"
           TSRS_HISTORY: canonical
-          MIN_TYPES: "12778"
-          MIN_SYMBOLS: "12778"
           TSRS_TEST_RESULTS: ${{ github.workspace }}/target/test-results-default
         run: .github/scripts/conformance-gate.sh
 
       - name: Regression cases
         run: tools/regressions.sh target/debug/tsrs
 
+      # Finish using the embedded CLI before switching its dependency features.
+      - name: npm library paths (noembed)
+        run: cargo test --locked -p tsrs_cli --features noembed --test npm_lib_path
+
       - name: Upload conformance results
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: conformance-results
           path: |
             target/test-results/*.txt
+            target/test-results/summary.json
             target/test-results-default/*.txt
+            target/test-results-default/summary.json
           if-no-files-found: ignore
+
+  node-api-clients:
+    name: Node API clients and parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
+
+      - uses: oxc-project/setup-node@f46a72f95efdc55273fcd042d61c84e723b2892c # v1.4.1
+
+      - name: Read TypeScript reference commit
+        id: ts
+        run: echo "commit=$(node npm/build.mjs --print-typescript-commit)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out pinned TypeScript client and Go oracle
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: microsoft/TypeScript
+          ref: ${{ steps.ts.outputs.commit }}
+          path: ts-ref
+          fetch-depth: 1
+          persist-credentials: false
+
+      - id: harness-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ts-ref/node_modules
+            ts-ref/packages/typescript/node_modules
+            ts-ref/pnpm-lock.yaml
+            ts-ref/pnpm-workspace.yaml
+          key: node-api-harness-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.node-version', 'pnpm-lock.yaml') }}-${{ steps.ts.outputs.commit }}
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ts-ref/tsc/go.mod
+          cache-dependency-path: ts-ref/tsc/go.sum
+
+      - uses: oxc-project/setup-rust@3d6fb132fbe7cdcb66bf8ec193911c2945369d12 # v1.0.17
+        with:
+          save-cache: ${{ github.ref_name == 'main' }}
+          cache-key: warm-node-api-clients
+
+      - name: Set up pinned upstream client and Go oracle
+        run: tools/node-api/setup.sh
+
+      - name: Check vendored SDK against upstream
+        run: node npm/sdk/sync-upstream.mjs --check
+
+      - name: Check generated compiler sources
+        run: tools/gen-check.sh
+
+      - name: Go oracle client and parity suites
+        run: node tools/node-api/run-upstream.mjs --binary tools/node-api/.work/oracle/tsc --label go-oracle --suite all --no-trace
+
+      - name: Build tsrs API server
+        run: cargo build --profile dev --locked -p tsrs_cli
+
+      - name: tsrs client and parity suites
+        run: node tools/node-api/run-upstream.mjs --binary target/debug/tsrs --label tsrs --suite all --no-trace
+
+      - name: Upload Node API client results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: node-api-clients
+          include-hidden-files: true
+          path: |
+            tools/node-api/.work/go-oracle/summary.json
+            tools/node-api/.work/go-oracle/results.jsonl
+            tools/node-api/.work/go-oracle/run.tap
+            tools/node-api/.work/tsrs/summary.json
+            tools/node-api/.work/tsrs/results.jsonl
+            tools/node-api/.work/tsrs/run.tap
+          if-no-files-found: ignore
+
+      - name: Save Node API harness on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.harness-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ts-ref/node_modules
+            ts-ref/packages/typescript/node_modules
+            ts-ref/pnpm-lock.yaml
+            ts-ref/pnpm-workspace.yaml
+          key: ${{ steps.harness-cache.outputs.cache-primary-key }}
 
   fourslash:
     name: Fourslash
@@ -129,7 +268,7 @@ jobs:
           save-cache: ${{ github.ref_name == 'main' }}
           cache-key: warm-fourslash
 
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.15'
 
@@ -139,7 +278,7 @@ jobs:
           python3 -c 'import tomllib; print("commit=" + tomllib.load(open("Cargo.toml", "rb"))["workspace"]["metadata"]["typescript"]["commit"])' >> "$GITHUB_OUTPUT"
 
       - name: Check out TypeScript source and testdata
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: microsoft/TypeScript
           ref: ${{ steps.ts.outputs.commit }}
@@ -167,7 +306,7 @@ jobs:
 
       - name: Upload Go Fourslash results
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: go-fourslash-results
           path: |
@@ -180,13 +319,12 @@ jobs:
     name: Determinism
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
     steps:
       - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
 
-      - uses: oxc-project/setup-node@f46a72f95efdc55273fcd042d61c84e723b2892c # v1.4.1
-        with:
-          # Public benchmark installs use Yarn 1, which rejects an unset NODE_AUTH_TOKEN in .npmrc.
-          registry-url: ""
+      - uses: ./.github/actions/setup-node-tools
 
       - uses: oxc-project/setup-rust@3d6fb132fbe7cdcb66bf8ec193911c2945369d12 # v1.0.17
         with:
@@ -196,12 +334,28 @@ jobs:
       - name: Build checker
         run: cargo build --profile dev --locked -p tsrs_cli
 
+      - name: Check out the PR or merge queue base
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          path: base-src
+          persist-credentials: false
+
+      - name: Build base checker for ordered diagnostics
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        working-directory: base-src
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/tsrs-base-target
+        run: cargo build --profile dev --locked -p tsrs_cli
+
       - name: Determinism cache keys
         id: determinism-keys
-        run: python3 bench/run.py --print-cache-keys --projects xstate-main,webpack,nuxt,drizzle-orm | tee -a "$GITHUB_OUTPUT"
+        run: node bench/bench.mjs plan --format keys --projects xstate-main,webpack,nuxt,drizzle-orm | tee -a "$GITHUB_OUTPUT"
 
       - name: Restore benchmark compilers
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: shared-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             bench/.work/suite
@@ -209,33 +363,91 @@ jobs:
           key: bench-shared-${{ runner.os }}-${{ steps.determinism-keys.outputs.shared }}
 
       - name: Restore xstate-main
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: xstate-main-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: bench/.work/solutions/xstate-main
           key: bench-xstate-main-${{ runner.os }}-${{ steps.determinism-keys.outputs['xstate-main'] }}
 
       - name: Restore webpack
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: webpack-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: bench/.work/solutions/webpack
           key: bench-webpack-${{ runner.os }}-${{ steps.determinism-keys.outputs['webpack'] }}
 
       - name: Restore nuxt
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: nuxt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: bench/.work/solutions/nuxt
           key: bench-nuxt-${{ runner.os }}-${{ steps.determinism-keys.outputs.nuxt }}
 
       - name: Restore drizzle-orm
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: drizzle-orm-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: bench/.work/solutions/drizzle-orm
           key: bench-drizzle-orm-${{ runner.os }}-${{ steps.determinism-keys.outputs['drizzle-orm'] }}
 
       - name: Set up determinism projects
-        run: python3 bench/run.py --setup-only --projects xstate-main,webpack,nuxt,drizzle-orm
+        run: node bench/bench.mjs prepare --projects xstate-main,webpack,nuxt,drizzle-orm
 
-      # The four pinned projects and every regression case must print the same diagnostics and exit with the same
-      # status regardless of checker assignment, visit order, or work stealing.
-      - name: Determinism
-        run: tools/ci/determinism.sh --self-test && tools/ci/determinism.sh target/debug/tsrs
+      # The current compiler must finish normally on all four pinned projects and every regression case,
+      # with identical output across checker schedules. A base crash may be fixed by the current compiler.
+      # On PRs and merge groups with the same TypeScript source pin, ordered diagnostics and exit codes
+      # must also match the base binary when it finishes normally. A source-pin upgrade is checked against its
+      # new conformance baselines.
+      - name: Determinism and ordered diagnostics
+        run: |
+          python3 tools/ci/compare_diagnostics.py --self-test
+          tools/ci/determinism.sh --self-test
+          if [[ "$GITHUB_EVENT_NAME" = pull_request || "$GITHUB_EVENT_NAME" = merge_group ]]; then
+            current_source_pin="$(grep -E '^commit = "[0-9a-f]{40}"$' Cargo.toml)"
+            base_source_pin="$(grep -E '^commit = "[0-9a-f]{40}"$' base-src/Cargo.toml)"
+            if [[ "$current_source_pin" = "$base_source_pin" ]]; then
+              tools/ci/determinism.sh target/debug/tsrs --base "$RUNNER_TEMP/tsrs-base-target/debug/tsrs"
+            else
+              echo "TypeScript source pin changed; checking schedule determinism without base diagnostics"
+              tools/ci/determinism.sh target/debug/tsrs
+            fi
+          else
+            tools/ci/determinism.sh target/debug/tsrs
+          fi
+
+      - name: Save benchmark compilers on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.shared-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            bench/.work/suite
+            bench/.work/tsgo
+          key: ${{ steps.shared-cache.outputs.cache-primary-key }}
+
+      - name: Save xstate-main on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.xstate-main-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: bench/.work/solutions/xstate-main
+          key: ${{ steps.xstate-main-cache.outputs.cache-primary-key }}
+
+      - name: Save webpack on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.webpack-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: bench/.work/solutions/webpack
+          key: ${{ steps.webpack-cache.outputs.cache-primary-key }}
+
+      - name: Save nuxt on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.nuxt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: bench/.work/solutions/nuxt
+          key: ${{ steps.nuxt-cache.outputs.cache-primary-key }}
+
+      - name: Save drizzle-orm on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.drizzle-orm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: bench/.work/solutions/drizzle-orm
+          key: ${{ steps.drizzle-orm-cache.outputs.cache-primary-key }}

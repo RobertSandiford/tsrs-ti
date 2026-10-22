@@ -15,6 +15,7 @@ use tsrs_lsproto as lsproto;
 use tsrs_modulespecifiers::{
     self as modulespecifiers, ImportModuleSpecifierPreference, ResultKind,
 };
+use tsrs_printer::{self as printer, QuoteChar};
 use tsrs_scanner as scanner;
 
 use super::export::{Export, ExportSyntax, ModuleID};
@@ -81,6 +82,7 @@ impl Fix {
         format_options: FormatCodeSettings,
         converters: &Arc<Converters>,
         preferences: &UserPreferences,
+        include_symbol_name_in_description: bool,
     ) -> (Vec<lsproto::TextEdit>, String, bool) {
         let mut tracker =
             change::new_tracker(ctx, &compiler_options, format_options, Arc::clone(converters));
@@ -103,6 +105,14 @@ impl Fix {
                     preferences,
                 );
                 let (edits, safe) = file_edits(&mut tracker, file);
+                if include_symbol_name_in_description {
+                    return (
+                        edits,
+                        diagnostics::Import_0_from_1
+                            .localize(&[&self.name, &self.module_specifier]),
+                        safe,
+                    );
+                }
                 (edits, diagnostics::Update_import_from_0.localize(&[&self.module_specifier]), safe)
             }
             lsproto::AutoImportFixKind::AddNew => {
@@ -174,6 +184,14 @@ impl Fix {
                 // 	addNamespaceQualifier(tracker, file, qualification)
                 // }
                 let (edits, safe) = file_edits(&mut tracker, file);
+                if include_symbol_name_in_description {
+                    return (
+                        edits,
+                        diagnostics::Import_0_from_1
+                            .localize(&[&self.name, &self.module_specifier]),
+                        safe,
+                    );
+                }
                 (edits, diagnostics::Add_import_from_0.localize(&[&self.module_specifier]), safe)
             }
             lsproto::AutoImportFixKind::PromoteTypeOnly => {
@@ -241,11 +259,15 @@ pub(crate) fn add_import_type(
         panic!("UsagePosition must be set for JSDoc type import fix");
     };
     let quote_preference = lsutil::get_quote_preference(file, preferences);
-    let mut quote_char = "\"";
-    if quote_preference == QuotePreference::Single {
-        quote_char = "'";
-    }
-    let import_type_prefix = format!("import({}{}{}).", quote_char, f.module_specifier, quote_char);
+    let (quote_char, quote_kind) = if quote_preference == QuotePreference::Single {
+        ('\'', QuoteChar::SingleQuote)
+    } else {
+        ('"', QuoteChar::DoubleQuote)
+    };
+    let import_type_prefix = format!(
+        "import({quote_char}{}{quote_char}).",
+        printer::escape_string(&f.module_specifier, quote_kind)
+    );
     tracker.insert_text(file, usage_position, &import_type_prefix);
     diagnostics::Change_0_to_1.localize(&[&f.name, &format!("{}{}", import_type_prefix, f.name)])
 }
@@ -1112,6 +1134,9 @@ impl View {
                 continue;
             }
             let import_clause = import_clause_node.as_import_clause();
+            if import_clause.phase_modifier() == Kind::SourceKeyword {
+                continue;
+            }
 
             let named_bindings = import_clause.named_bindings;
             // A type-only import may not have both a default and named imports, so the only way a name can

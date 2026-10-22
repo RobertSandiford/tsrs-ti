@@ -123,6 +123,7 @@ impl LanguageService {
                         self.format_options(),
                         &self.converters,
                         self.user_preferences(),
+                        false, /*include_symbol_name_in_description*/
                     );
             item.additional_text_edits = Some(edits);
             item.detail = str_ptr_to(&description);
@@ -864,6 +865,7 @@ pub(crate) fn get_jsdoc_parameter_completions(
         .count();
 
     let mut result = Vec::new();
+    let mut emit_context: Option<P<EmitContext>> = None;
     for (param_index, &param) in fun.parameters().iter().enumerate() {
         if param_index < param_tag_count {
             // This parameter is already annotated.
@@ -874,6 +876,7 @@ pub(crate) fn get_jsdoc_parameter_completions(
             let mut tabstop_counter = 1;
             let param_name = param.name().unwrap().text();
             let mut display_text = get_jsdoc_param_annotation(
+                &mut emit_context,
                 param_name,
                 param.initializer(),
                 param.as_parameter_declaration().dot_dot_dot_token(),
@@ -888,6 +891,7 @@ pub(crate) fn get_jsdoc_parameter_completions(
             let mut snippet_text = String::new();
             if is_snippet {
                 snippet_text = get_jsdoc_param_annotation(
+                    &mut emit_context,
                     param_name,
                     param.initializer(),
                     param.as_parameter_declaration().dot_dot_dot_token(),
@@ -924,6 +928,7 @@ pub(crate) fn get_jsdoc_parameter_completions(
             // Destructuring parameter; do it positionally
             let param_path = format!("param{param_index}");
             let display_text_result = generate_jsdoc_param_tags_for_destructuring(
+                &mut emit_context,
                 &param_path,
                 param.name().unwrap(),
                 param.initializer(),
@@ -937,6 +942,7 @@ pub(crate) fn get_jsdoc_parameter_completions(
             let mut snippet_text = String::new();
             if is_snippet {
                 let snippet_text_result = generate_jsdoc_param_tags_for_destructuring(
+                    &mut emit_context,
                     &param_path,
                     param.name().unwrap(),
                     param.initializer(),
@@ -976,6 +982,7 @@ pub(crate) fn get_jsdoc_parameter_completions(
 
 // completions.go:6269
 fn get_jsdoc_param_annotation(
+    emit_context: &mut Option<P<EmitContext>>,
     param_name: &str,
     initializer: Option<P<Node>>,
     dot_dot_dot_token: Option<P<Node>>,
@@ -1024,7 +1031,8 @@ fn get_jsdoc_param_annotation(
                         None, /*idToSymbol*/
                     );
                     if let Some(type_node) = type_node {
-                        let emit_context = printer::new_emit_context();
+                        let emit_context =
+                            *emit_context.get_or_insert_with(printer::new_emit_context);
                         // !!! snippet p
                         let mut p = printer::new_printer(
                             PrinterOptions {
@@ -1083,6 +1091,7 @@ fn get_jsdoc_param_name_with_initializer(param_name: &str, initializer: P<Node>)
 
 // completions.go:6360
 fn generate_jsdoc_param_tags_for_destructuring(
+    emit_context: &mut Option<P<EmitContext>>,
     path: &str,
     pattern: P<Node>,
     initializer: Option<P<Node>>,
@@ -1096,6 +1105,7 @@ fn generate_jsdoc_param_tags_for_destructuring(
     let mut tabstop_counter = 1;
     if !is_js {
         return vec![get_jsdoc_param_annotation(
+            emit_context,
             path,
             initializer,
             dot_dot_dot_token,
@@ -1109,6 +1119,7 @@ fn generate_jsdoc_param_tags_for_destructuring(
         )];
     }
     js_doc_param_pattern_worker(
+        emit_context,
         path,
         pattern,
         initializer,
@@ -1124,6 +1135,7 @@ fn generate_jsdoc_param_tags_for_destructuring(
 
 // completions.go:6400
 fn js_doc_param_pattern_worker(
+    emit_context: &mut Option<P<EmitContext>>,
     path: &str,
     pattern: P<Node>,
     initializer: Option<P<Node>>,
@@ -1138,6 +1150,7 @@ fn js_doc_param_pattern_worker(
     if ast::is_object_binding_pattern(pattern) && dot_dot_dot_token.is_none() {
         let mut child_counter = *counter;
         let root_param = get_jsdoc_param_annotation(
+            emit_context,
             path,
             initializer,
             dot_dot_dot_token,
@@ -1152,6 +1165,7 @@ fn js_doc_param_pattern_worker(
         let mut child_tags: Vec<String> = Vec::new();
         for &element in pattern.elements() {
             let element_tags = js_doc_param_element_worker(
+                emit_context,
                 path,
                 element,
                 initializer,
@@ -1177,6 +1191,7 @@ fn js_doc_param_pattern_worker(
         }
     }
     vec![get_jsdoc_param_annotation(
+        emit_context,
         path,
         initializer,
         dot_dot_dot_token,
@@ -1194,6 +1209,7 @@ fn js_doc_param_pattern_worker(
 // We can't deeply annotate an array binding pattern.
 // completions.go:6469
 fn js_doc_param_element_worker(
+    emit_context: &mut Option<P<EmitContext>>,
     path: &str,
     element: P<Node>,
     _initializer: Option<P<Node>>,
@@ -1217,6 +1233,7 @@ fn js_doc_param_element_worker(
         }
         let param_name = format!("{path}.{property_name}");
         return vec![get_jsdoc_param_annotation(
+            emit_context,
             &param_name,
             element.initializer(),
             element.as_binding_element().dot_dot_dot_token(),
@@ -1236,6 +1253,7 @@ fn js_doc_param_element_worker(
             return Vec::new();
         }
         return js_doc_param_pattern_worker(
+            emit_context,
             &format!("{path}.{property_name}"),
             element.name().unwrap(),
             element.initializer(),

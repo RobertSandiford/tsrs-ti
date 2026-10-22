@@ -143,7 +143,7 @@ pub(crate) fn get_completions_at_position(
         let Some(source_file) = program.get_source_file(&file_name) else {
             return Ok(Ok(None));
         };
-        let ls = language_service(snapshot, program, &sd.project, "")?;
+        let ls = language_service(snapshot, program, &sd.project, source_file.file_name())?;
         let internal = source_file.get_position_map().utf16_to_utf8(position);
         // With includeSymbol the language service takes the API checker itself (Go: same).
         let _lease = if include_symbol { Some(super::lease::acquire(program)?) } else { None };
@@ -154,7 +154,17 @@ pub(crate) fn get_completions_at_position(
     let mut prepared: Option<Arc<Snapshot>> = None;
     let mut result = run(&sd.scope.snapshot, program, &ctx)?;
     if matches!(&result, Err(e) if tsrs_ls::is_err_needs_auto_imports(e)) {
-        let snapshot = host.clone_snapshot_with_auto_imports(&sd.scope.snapshot, &file_name)?;
+        if include_symbol {
+            return Err(CheckerError::client(format!(
+                "snapshot is not prepared for auto-imports for {}",
+                file.display()
+            )));
+        }
+        let Some(source_file) = program.get_source_file(&file_name) else {
+            return Ok(Value::Null);
+        };
+        let snapshot =
+            host.clone_snapshot_with_auto_imports(&sd.scope.snapshot, source_file.file_name())?;
         let outcome =
             program_of(&snapshot, &sd.project).and_then(|program| run(&snapshot, program, &ctx));
         prepared = Some(snapshot);
@@ -247,9 +257,9 @@ pub(crate) fn get_import_adder_edits(host: &dyn CheckerHost, p: &Params) -> Chec
     // error consumes no snapshot): wrong JSON kinds are invalid requests; `null` elements and absent fields
     // are zero values. Semantic validation (unknown kind, missing symbol, unresolvable symbol) is a client
     // error raised later, after the auto-import snapshot clone, in Go's order (it consumes a snapshot ID).
-    struct Action {
+    struct Action<'a> {
         kind: String,
-        symbol: Option<SymbolReference>,
+        symbol: Option<SymbolReference<'a>>,
         valid: bool,
     }
     let mut actions: Vec<Action> = Vec::new();
@@ -313,7 +323,7 @@ pub(crate) fn get_import_adder_edits(host: &dyn CheckerHost, p: &Params) -> Chec
         )
     });
     if !prepared_for_file {
-        let snapshot = host.clone_snapshot_with_auto_imports(&working, &file_name)?;
+        let snapshot = host.clone_snapshot_with_auto_imports(&working, source_file.file_name())?;
         prepared = Some(Arc::clone(&snapshot));
         working = snapshot;
         let resolved = program_of(&working, &sd.project).and_then(|prog| {

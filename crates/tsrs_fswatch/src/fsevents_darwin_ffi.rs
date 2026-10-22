@@ -305,6 +305,21 @@ impl fsEventsCallbackPayload {
     }
 }
 
+// Keep the borrowed CF objects and arrays alive while a test exercises the real event classifier.
+#[cfg(test)]
+pub(crate) fn dispatch_test_event(cb: &streamCallback, path: &str, flags: u32) {
+    let path = cf_string_create(path).unwrap();
+    let paths = cf_array_create(std::slice::from_ref(&path)).unwrap();
+    let id = 1;
+    let payload = fsEventsCallbackPayload {
+        num_events: 1,
+        paths: paths.0,
+        flags: &raw const flags,
+        ids: &raw const id,
+    };
+    fs_events_callback(cb, &payload);
+}
+
 // streamCallback is the per-stream state the C callback receives as FSEventStreamContext.info.
 pub(crate) struct streamCallback {
     queue: dispatch_queue_t, // per-stream serial dispatch queue
@@ -493,4 +508,20 @@ pub(crate) fn teardown_stream(stream: fsEventStream, cb: Option<&mut Box<streamC
         }
         FSEventStreamRelease(stream.0);
     }
+}
+
+#[cfg(test)]
+pub(crate) fn dispatch_test_events(cb: &streamCallback, events: &[(&str, u32)]) {
+    let path_refs: Vec<_> =
+        events.iter().map(|(path, _)| cf_string_create(path).unwrap()).collect();
+    let paths = cf_array_create(&path_refs).unwrap();
+    let flags: Vec<_> = events.iter().map(|(_, flags)| *flags).collect();
+    let ids: Vec<_> = (1..=events.len() as u64).collect();
+    let payload = fsEventsCallbackPayload {
+        num_events: events.len(),
+        paths: paths.0,
+        flags: flags.as_ptr(),
+        ids: ids.as_ptr(),
+    };
+    fs_events_callback(cb, &payload);
 }

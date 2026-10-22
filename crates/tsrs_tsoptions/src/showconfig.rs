@@ -1,7 +1,7 @@
 // Port of Go's tsoptions/showconfig.go: the tsconfig that `--showConfig` prints.
 
 use tsrs_core::collections::OrderedMap;
-use tsrs_core::json::Value;
+use tsrs_core::json::{JsonMap, Value};
 use tsrs_core::tspath::{self, ComparePathsOptions};
 use tsrs_core::{CompilerOptions, Tristate};
 use tsrs_diagnostics as diagnostics;
@@ -149,7 +149,7 @@ pub fn convert_to_tsconfig(
     // Options implied by explicitly set ones, such as moduleResolution by module or useDefineForClassFields by target.
     add_implied_options(&mut option_map, &compiler_options);
 
-    let mut config = OrderedMap::default();
+    let mut config = JsonMap::new();
     config.insert("compilerOptions".to_string(), Value::Object(option_map));
 
     let references = config_parse_result.project_references();
@@ -157,7 +157,7 @@ pub fn convert_to_tsconfig(
         let references = references
             .iter()
             .map(|r| {
-                let mut reference = OrderedMap::default();
+                let mut reference = JsonMap::new();
                 reference.insert("path".to_string(), Value::String(r.original_path.clone()));
                 if r.circular {
                     reference.insert("circular".to_string(), Value::Bool(true));
@@ -213,8 +213,8 @@ fn serialize_compiler_options(
     options: &CompilerOptions,
     config_file_path: &str,
     compare_paths_options: &ComparePathsOptions,
-) -> OrderedMap<String, Value> {
-    let mut result = OrderedMap::default();
+) -> JsonMap {
+    let mut result = JsonMap::new();
     let config_dir = tspath::get_directory_path(config_file_path);
     let relative_to_config = |path: &str| {
         let abs_path = tspath::get_normalized_absolute_path(path, &config_dir);
@@ -301,8 +301,8 @@ fn options_value_to_json(value: &CompilerOptionsValue) -> Value {
 
 // Adds the options implied by explicitly set ones, mirroring TypeScript's computedOptions.
 // For example, module: nodenext implies moduleResolution: nodenext.
-fn add_implied_options(option_map: &mut OrderedMap<String, Value>, options: &CompilerOptions) {
-    let provided: Vec<String> = option_map.keys().cloned().collect();
+fn add_implied_options(option_map: &mut JsonMap, options: &CompilerOptions) {
+    let provided: Vec<String> = option_map.keys().map(str::to_string).collect();
     let default_options = CompilerOptions::default();
 
     for entry in &IMPLIED_OPTIONS {

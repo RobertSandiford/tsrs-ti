@@ -33,9 +33,6 @@ pub trait DeclarationEmitHost: ModuleSpecifierGenerationHost {
 
     fn get_output_paths_for(&self, file: P<SourceFile>, force_dts_paths: bool) -> OutputPaths;
     fn source_file_may_be_emitted(&self, file: P<SourceFile>, force_dts_emit: bool) -> bool;
-    fn get_effective_declaration_flags(&self, node: P<Node>, flags: ModifierFlags)
-    -> ModifierFlags;
-    fn get_emit_resolver(&self) -> Resolver;
 }
 
 // transform.go:46
@@ -150,7 +147,8 @@ pub const declarationEmitNodeBuilderFlags: nodebuilder::Flags =
 
 // transform.go:223
 pub const declarationEmitInternalNodeBuilderFlags: nodebuilder::InternalFlags =
-    nodebuilder::InternalFlags::AllowUnresolvedNames;
+    nodebuilder::InternalFlags::AllowUnresolvedNames
+        .union(nodebuilder::InternalFlags::RewriteModuleSpecifiers);
 
 // tracker.go:12
 pub struct SymbolTrackerImpl {

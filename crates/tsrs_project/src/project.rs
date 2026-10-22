@@ -6,7 +6,7 @@ use tsrs_compiler::{
     CheckerPool, CreateCheckerPool, CreateModuleResolver, Program, ProgramOptions, new_program,
     sort_and_deduplicate_diagnostics,
 };
-use tsrs_core::collections::{Set, SyncSet};
+use tsrs_core::collections::{Set, SyncMap};
 use tsrs_core::context::Context;
 use tsrs_core::tspath::{self, ComparePathsOptions, Path};
 use tsrs_core::{
@@ -106,7 +106,7 @@ impl ID {
 
     // project.go:76
     pub fn inferred(&self) -> Option<InferredProjectID> {
-        if *self == inferred_project_id().as_id() { Some(inferred_project_id()) } else { None }
+        if self.0 == inferredProjectName { Some(inferred_project_id()) } else { None }
     }
 
     // project.go:80
@@ -117,14 +117,8 @@ impl ID {
 
 // project.go:62
 pub fn parse_configured_project_id(value: &Path) -> Option<ConfiguredProjectID> {
-    let id = ID(value.to_string());
-    if id.0.is_empty() {
-        return None;
-    }
-    if id.inferred().is_some() {
-        return None;
-    }
-    if id.synthetic().is_some() {
+    let id: &str = value.as_str();
+    if id.is_empty() || id == inferredProjectName || parse_synthetic_project_id(id).is_some() {
         return None;
     }
     Some(ConfiguredProjectID(value.clone()))
@@ -209,7 +203,7 @@ pub struct Project {
     // Only set before actually loading config file to get actual project references
     pub(crate) potential_project_references: Option<Arc<Set<Path>>>,
 
-    pub(crate) program_files_watch: Option<Arc<WatchedFiles<Option<Arc<SyncSet<Path>>>>>>,
+    pub(crate) program_files_watch: Option<Arc<WatchedFiles<Option<Arc<SyncMap<Path, String>>>>>>,
     pub(crate) typings_watch: Option<Arc<WatchedFiles<PatternsAndIgnored>>>,
     pub(crate) content_mapper_watch: Option<Arc<WatchedFiles<Vec<String>>>>,
     pub(crate) content_mapper_watched_files: Option<Arc<Set<Path>>>,
@@ -723,7 +717,9 @@ impl Project {
     }
 
     // project.go:589
-    pub(crate) fn clone_watchers(&self) -> Option<Arc<WatchedFiles<Option<Arc<SyncSet<Path>>>>>> {
+    pub(crate) fn clone_watchers(
+        &self,
+    ) -> Option<Arc<WatchedFiles<Option<Arc<SyncMap<Path, String>>>>>> {
         let seen_files = self.host.as_ref().unwrap().source_fs.seen_files();
         self.program_files_watch.as_ref().map(|w| w.clone_with(seen_files))
     }

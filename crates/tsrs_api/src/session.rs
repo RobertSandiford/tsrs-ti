@@ -14,9 +14,10 @@ use std::sync::Weak;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
+use tsrs_api_transport::strictjson::DecodeError;
 use tsrs_compiler::{CheckerHandle, Program};
 use tsrs_core::context::{CheckerLifetime, Context, with_checker_lifetime};
-use tsrs_core::json::{self, Value};
+use tsrs_core::json::{self, JsonMap, Value};
 use tsrs_project::{ID as ProjectID, Snapshot, SnapshotHost};
 use tsrs_vfs::FS;
 
@@ -334,13 +335,20 @@ impl Session {
         // Go `unmarshalPayload`: `noParams` methods ignore the payload; the others decode with Go's strict
         // JSON (unpaired surrogates and duplicate members are errors), reported as
         // `failed to unmarshal *api.<Type>: <jsontext error>`.
-        let params = match crate::methods::params_type(method) {
-            None => Value::Null,
+        let (params, lexemes) = match crate::methods::params_type(method) {
+            None => (Value::Null, rustc_hash::FxHashMap::default()),
             Some(go_type) => {
-                tsrs_api_transport::strictjson::validate(params).map_err(|e| {
-                    ApiError::invalid_request(format!("failed to unmarshal *api.{go_type}: {e}"))
+                let decoded = tsrs_api_transport::strictjson::decode_with_names(
+                    params,
+                    crate::predecode::known_member_name,
+                )
+                .map_err(|e| match e {
+                    DecodeError::Invalid(e) => ApiError::invalid_request(format!(
+                        "failed to unmarshal *api.{go_type}: {e}"
+                    )),
+                    DecodeError::OutOfRange(e) => ApiError::invalid_request(e),
                 })?;
-                let value = parse_params(params)?;
+                let value = decoded.value;
                 // encoding/json/v2 into a struct: `null` leaves the zero value; any other non-object is an error.
                 let kind = match &value {
                     Value::Null | Value::Object(_) => None,
@@ -355,17 +363,16 @@ impl Session {
                     )));
                 }
                 // `null` decodes to the zero-value struct: handlers see `{}`.
-                if matches!(value, Value::Null) {
-                    Value::Object(tsrs_core::collections::OrderedMap::default())
+                let value = if matches!(value, Value::Null) {
+                    Value::Object(JsonMap::new())
                 } else {
                     value
-                }
+                };
+                // Go decodes the whole params struct before any lookup (see predecode.rs).
+                let lexemes =
+                    crate::predecode::predecode(method, go_type, &value, decoded.lexemes)?;
+                (value, lexemes)
             }
-        };
-        // Go decodes the whole params struct before any lookup (see predecode.rs).
-        let lexemes = match crate::methods::params_type(method) {
-            Some(t) => crate::predecode::predecode(method, t, &params, raw_params)?,
-            None => rustc_hash::FxHashMap::default(),
         };
         let go_type = crate::methods::params_type(method);
         let typed = |e: ApiError| match (e.kind.clone(), go_type) {
@@ -392,17 +399,16 @@ impl Session {
         raw: &[u8],
         lexemes: rustc_hash::FxHashMap<String, String>,
     ) -> ApiResult<Response> {
-        let params = params.clone();
         // Raw payload and exact number literals of this request, for the objects of this params tree (by address).
-        let _request = crate::predecode::enter_request(raw, lexemes, &params);
+        let _request = crate::predecode::enter_request(raw, lexemes, params);
         if *self.closed.lock().unwrap() {
             return Err(ApiError::client("session is closed"));
         }
         if owner == Owner::Checker {
-            return checker::handle(self, method, &params)
+            return checker::handle(self, method, params)
                 .unwrap_or_else(|| Err(ApiError::unsupported(method)));
         }
-        let p = Params(&params);
+        let p = Params(params);
         if method == "batchRequests" {
             if !matches!(params, Value::Null) {
                 p.object()?;
@@ -417,11 +423,15 @@ impl Session {
             "retainSourceFile" => return self.handle_retain_source_file(p),
             "releaseSourceFile" => return self.handle_release_source_file(p),
             "getCachedSourceFile" => return self.handle_get_cached_source_file(p),
+            "getSymbolOfDeclaration" => return self.handle_get_symbol_of_declaration(p),
             _ => {}
         }
         let result = match method {
             "initialize" => Obj::new()
-                .set("useCaseSensitiveFileNames", Value::Bool(self.use_case_sensitive_file_names()))
+                .set(
+                    "caseSensitivity",
+                    Value::Number(f64::from(u8::from(self.use_case_sensitive_file_names()))),
+                )
                 .set("currentDirectory", Value::String(self.current_directory().to_string()))
                 .build(),
             // Config requests allocate their parsed command lines in a scratch region freed once the response
@@ -451,6 +461,7 @@ impl Session {
             }
             "getConfigFileNames" => self.handle_get_config_file_names(p)?,
             "getSourceFileMetadata" => self.handle_get_source_file_metadata(p)?,
+            "formatNodeForInsertion" => self.handle_format_node_for_insertion(p)?,
             "getSyntacticDiagnostics" => {
                 self.handle_get_diagnostics(p, DiagnosticKind::Syntactic)?
             }
@@ -469,7 +480,18 @@ impl Session {
             }
             "createModuleResolver" => self.handle_create_module_resolver(p)?,
             "releaseModuleResolver" => self.handle_release_module_resolver(p)?,
-            "resolveModuleName" => self.handle_resolve_module_name(p)?,
+            // Standalone resolveModuleName creates a fresh resolver and resolution caches on every call.
+            // Go reclaims them via GC; tsrs allocates them in the API server's leak arena unless each
+            // request is routed through a scratch region that is freed once the JSON response is built.
+            // The inProgressSnapshot path is excluded because resolvers cached in a ProgramResolutionContext
+            // outlive the request.
+            "resolveModuleName" => {
+                if p.u64("inProgressSnapshot")? == 0 {
+                    scratch(|| self.handle_resolve_module_name(p))?
+                } else {
+                    self.handle_resolve_module_name(p)?
+                }
+            }
             "createBuildOrchestrator" => self.handle_create_build_orchestrator(p)?,
             "disposeBuildOrchestrator" => self.handle_dispose_build_orchestrator(p)?,
             "build" => self.handle_build(p, false, false)?,
@@ -483,7 +505,6 @@ impl Session {
                 ));
             }
             "printNode" => self.handle_print_node(p)?,
-            "formatNodeForInsertion" => self.handle_format_node_for_insertion(p)?,
             "transpileModule" => self.handle_transpile(p, false)?,
             "transpileDeclaration" => self.handle_transpile(p, true)?,
             "transpileModuleFromFile" => self.handle_transpile_from_file(p, false)?,
@@ -545,15 +566,7 @@ pub(crate) fn scratch<T>(f: impl FnOnce() -> T) -> T {
 }
 
 /// Parses request params (raw JSON bytes; empty means absent, Go `UnmarshalParams` returns nil).
-pub fn parse_params(params: &[u8]) -> ApiResult<Value> {
-    if params.is_empty() {
-        return Ok(Value::Null);
-    }
-    let text = tsrs_core::utf8::compat::from_utf8(params)
-        .map_err(|e| ApiError::invalid_request(format!("params are not UTF-8: {e}")))?;
-    json::unmarshal(text).map_err(ApiError::invalid_request)
-}
-
 pub fn json_response(value: &Value) -> ApiResult<Response> {
-    json::marshal(value).map(Response::Json).map_err(ApiError::internal)
+    // Most results are small objects: start with room for one instead of growing to it.
+    json::marshal_with_capacity(value, 256).map(Response::Json).map_err(ApiError::internal)
 }

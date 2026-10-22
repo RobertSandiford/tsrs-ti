@@ -112,6 +112,20 @@ impl Checker {
             return self.get_simplified_indexed_access_type(t, writing);
         } else if t.flags().intersects(TypeFlags::Conditional) {
             return self.get_simplified_conditional_type(t, writing);
+        } else if t.flags().intersects(TypeFlags::Index) {
+            return self.get_simplified_index_type(t);
+        }
+        t
+    }
+
+    // checker.go:28446
+    pub(crate) fn get_simplified_index_type(&mut self, t: P<Type>) -> P<Type> {
+        let target = t.as_index_type().target().unwrap();
+        if self.is_generic_mapped_type(target)
+            && self.get_name_type_from_mapped_type(target).is_some()
+            && !Self::is_mapped_type_with_keyof_constraint_declaration(target)
+        {
+            return self.get_index_type_for_mapped_type(target, IndexFlags::None);
         }
         t
     }
@@ -275,6 +289,27 @@ impl Checker {
 
     // checker.go:28476
     pub(crate) fn get_simplified_conditional_type(&mut self, t: P<Type>, writing: bool) -> P<Type> {
+        let key = CachedTypeKey {
+            kind: if_else(
+                writing,
+                CachedTypeKind::SimplifiedConditionalTypeForWriting,
+                CachedTypeKind::SimplifiedConditionalTypeForReading,
+            ),
+            type_id: t.id,
+        };
+        if let Some(&cached) = self.cached_types.get(&key) {
+            return cached;
+        }
+        let result = self.get_simplified_conditional_type_worker(t, writing);
+        self.cached_types.insert(key, result);
+        result
+    }
+
+    pub(crate) fn get_simplified_conditional_type_worker(
+        &mut self,
+        t: P<Type>,
+        writing: bool,
+    ) -> P<Type> {
         let check_type = t.as_conditional_type().check_type.get().unwrap();
         let extends_type = t.as_conditional_type().extends_type.get().unwrap();
         let true_type = self.get_true_type_from_conditional_type(t);
@@ -687,13 +722,7 @@ impl Checker {
                             return;
                         }
                     }
-                    // Computed property names on enum members are a grammar error and are never checked
-                    // (checkEnumMember only checks the member initializer, not the name), so resolving
-                    // identifiers in them here would report a spurious "Cannot find name" diagnostic.
                     if let Some(computed_name) = computed_name {
-                        if is_enum_member(computed_name.parent().unwrap()) {
-                            return;
-                        }
                         if is_invalid_computed_property_name(computed_name) {
                             return;
                         }
@@ -746,7 +775,11 @@ impl Checker {
                 if is_property_access_or_qualified_name(location) {
                     let mut top_prop = location;
                     while is_property_access_or_qualified_name(top_prop) {
-                        if is_part_of_type_node(top_prop) {
+                        // Names in an import type's qualifier (`ns.y` in `typeof import("./b").ns.y`)
+                        // are exports of the imported module, not references to this file's imports.
+                        if is_part_of_type_node(top_prop)
+                            || is_import_type_qualifier_part(top_prop).is_some()
+                        {
                             return;
                         }
                         top_prop = top_prop.parent().unwrap();
@@ -1152,6 +1185,16 @@ impl Checker {
                                     if !self.has_signature_with_arity_greater_than(symbol, 4) {
                                         self.error(Some(location), &diagnostics::This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, &[&externalHelpersModuleNameText, &name, &5]);
                                     }
+                                } else if helper
+                                    .intersects(ExternalEmitHelpers::RewriteRelativeImportExtension)
+                                    && !self
+                                        .program
+                                        .as_module_specifier_generation_host()
+                                        .content_mapper_extension_rewrites()
+                                        .is_empty()
+                                    && !self.has_signature_with_arity_greater_than(symbol, 3)
+                                {
+                                    self.error(Some(location), &diagnostics::This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, &[&externalHelpersModuleNameText, &name, &4]);
                                 }
                             }
                         }
@@ -2646,6 +2689,8 @@ impl Checker {
     }
 
     // checker.go:30101
+    // Keep the static-property path out of its caller (notes/typescript-623-ports.md, entry 5).
+    #[inline(never)]
     pub(crate) fn get_contextual_type_for_static_property_declaration(
         &mut self,
         declaration: P<Node>,
@@ -2653,7 +2698,10 @@ impl Checker {
     ) -> Option<P<Type>> {
         let decl_parent = declaration.parent().unwrap();
         if is_expression(decl_parent) {
-            if let Some(parent_type) = self.get_contextual_type(decl_parent, context_flags) {
+            // Don't contextually type a static property by its own class, its type might still be in-progress and that would cause spurious circularities
+            if let Some(parent_type) = self.get_contextual_type(decl_parent, context_flags)
+                && parent_type.symbol() != self.get_symbol_of_declaration(decl_parent)
+            {
                 let name = self.get_symbol_of_declaration(declaration).unwrap().name();
                 return self.get_type_of_property_of_contextual_type(parent_type, name);
             }

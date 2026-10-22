@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Generates crates/tsrs_lsproto/src/lsp_generated.rs from the LSP meta model (docs/LSP.md, "Protocol types
-// and JSON"). Port of ts-ref/tsc/internal/lsp/lsproto/_generate/generate.mts: the model processing (custom
+// and JSON"). Port of ts-ref/tools/scripts/lsp/generate.mts: the model processing (custom
 // structures, enumerations, requests and notifications, model patches, inheritance flattening, notebook
 // removal, type resolution, union naming, discriminator and presence dispatch selection) is Go's, verbatim;
 // only the Go emitter is replaced by a Rust emitter.
@@ -409,7 +409,7 @@ const customStructures: Structure[] = [
                 name: "pipe",
                 type: { kind: "base", name: "string" },
                 optional: true,
-                documentation: "Optional path to use for the named pipe or Unix domain socket. If not provided, a unique path will be generated.",
+                documentation: "Optional named pipe path on Windows. On Unix, the path must not exist and will be created as a private directory containing a socket named 'socket'. If not provided, a unique path will be generated.",
             },
         ],
         documentation: "Parameters for the initializeAPISession request.",
@@ -461,6 +461,7 @@ const customStructures: Structure[] = [
             { name: "cwd", type: { kind: "base", name: "string" }, optional: true, documentation: "Absolute working directory for the mapper process." },
             { name: "compilerOptions", type: { kind: "array", element: { kind: "base", name: "string" } }, optional: true, documentation: "Compiler option names forwarded to the mapper." },
             { name: "dynamicConfig", type: { kind: "base", name: "boolean" }, optional: true, documentation: "Whether the mapper uses project-scoped dynamic configuration." },
+            { name: "outputExtensions", type: { kind: "map", key: { kind: "base", name: "string" }, value: { kind: "base", name: "string" } }, optional: true, documentation: "Default source-to-runtime output extension mappings." },
         ],
         documentation: "Inline content mapper manifest supplied by a contributing extension.",
     },
@@ -2566,7 +2567,7 @@ function generateCode() {
             writeLine("        for (k, v) in members {");
             const singleField = fields.length === 1;
             if (!singleField) {
-                writeLine("            match k.as_str() {");
+                writeLine("            match k {");
             }
             for (const f of fields) {
                 const prop = f.prop!;
@@ -2586,7 +2587,7 @@ function generateCode() {
                     expr = "field(k, v)?";
                 }
                 if (singleField) {
-                    writeLine(`            if k.as_str() == ${rustStr(prop.name)} {`);
+                    writeLine(`            if k == ${rustStr(prop.name)} {`);
                     if (bit >= 0) {
                         writeLine(`                seen |= 1 << ${bit};`);
                     }
@@ -2682,7 +2683,7 @@ function generateCode() {
         writeLine(`        let mut raw_register_options: Option<&Value> = None;`);
         writeLine("");
         writeLine(`        for (k, v) in members {`);
-        writeLine(`            match k.as_str() {`);
+        writeLine(`            match k {`);
         writeLine(`                "id" => {`);
         writeLine(`                    missing &= !MISSING_ID;`);
         writeLine(`                    s.${idField.rust} = field(k, v)?;`);

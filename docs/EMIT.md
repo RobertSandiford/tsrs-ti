@@ -9,7 +9,7 @@ incremental `--noEmit` run can still write `.tsbuildinfo`, as in Go. The former 
 has no effect; `crates/tsrs_cli/tests/default_emit.rs` covers that behavior.
 
 The [original port plan](history/EMIT.md) is kept separately. The rules for maintaining the port are in
-[PORTING.md](PORTING.md); the reference commit and npm nightly are pinned in `Cargo.toml`.
+[PORTING.md](PORTING.md); the reference commit and matching npm package are pinned in `Cargo.toml`.
 
 ## Emit pipeline
 
@@ -117,7 +117,11 @@ The rest of factory.go is `tsrs_printer/src/factory_2.rs` (`PrivateIdentifierKin
 
 Content mappers work in `tsc` and `tsc -b` ([content-mapper note](../notes/contentmappers.md)): a content-mapped file is not
 emitted unless declarations are, and declaration maps point into the original text through the span map. The
-conformance runner still skips the `runExternalCode` cases.
+`outputExtensions` map from a mapper manifest or project configuration sets the expected path of a mapper-produced
+file, changes its declaration path, and rewrites matching import specifiers in JavaScript and declarations. The
+compiler diagnoses rewrites that cannot be
+made safely and output paths that collide with another input. The conformance runner still skips the
+`runExternalCode` cases; source-79 behavior is covered by direct compiler and incremental/build tests.
 
 ### Checker history
 
@@ -155,10 +159,11 @@ and API formats retain their reference behavior; see
 ### Version
 
 The tsbuildinfo `version` is `core::version()` as in Go. Go's release builds stamp it with ldflags
-(the npm nightly built from the pinned commit: `7.1.0-dev.20260930.4`); tsrs reads `TSRS_TS_VERSION` at build time for
-the same purpose (source default `7.1.0-dev`), so a tsrs built with the tsgo version reads and writes
+(the matching npm package built from the pinned commit: `7.1.0-beta`); tsrs reads `TSRS_TS_VERSION` at build time for
+the same purpose (source default `7.1.0-beta`), so a tsrs built with the tsgo version reads and writes
 tsbuildinfo files that tsgo accepts, and vice versa. Different versions simply rebuild from scratch, as in Go. Release
-builds stamp `[workspace.metadata.typescript] nightly` (Cargo.toml); release.yml checks that the nightly was built from
+builds stamp `[workspace.metadata.typescript] nightly` (Cargo.toml), which now names the matching prerelease package;
+release.yml checks that it was built from
 the pinned commit (or a later one that changes nothing under tsc/) and that the binaries report it.
 
 ### Default library path

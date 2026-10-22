@@ -276,6 +276,16 @@ impl Checker {
     }
 
     // relater.go:205
+    /// tsrs: two enum members of one literal kind, and two structured types, answered inline before the worker's
+    /// chain of flag tests. Narrowing `kind === SyntaxKind.X` asks the comparable relation about a member against
+    /// every other member of the enum (three quarters of the calls on the Compiler-Unions benchmark); of the
+    /// worker's tests only the enum-literal one can answer such a pair, with the values equal and the enums
+    /// related, since neither type is a union, a base primitive, `any`, `unknown`, `never`, null or undefined.
+    #[expect(
+        clippy::inline_always,
+        reason = "The profiled enum-member fast path otherwise retains an out-of-line register-save frame."
+    )]
+    #[inline(always)]
     pub(crate) fn is_simple_type_related_to(
         &mut self,
         source: P<Type>,
@@ -283,11 +293,21 @@ impl Checker {
         relation: P<Relation>,
         error_reporter: Option<ErrorReporter<'_>>,
     ) -> bool {
-        let mut error_reporter = error_reporter;
         let s = source.flags();
         let t = target.flags();
-        // Two structured or instantiable types (most calls, from is_type_related_to and is_related_to_ex) pass none
-        // of the flag tests below; only the last one, a target union of undefined, null and {}, can answer true.
+        const NUMBER_MEMBER: TypeFlags = TypeFlags::NumberLiteral.union(TypeFlags::EnumLiteral);
+        const STRING_MEMBER: TypeFlags = TypeFlags::StringLiteral.union(TypeFlags::EnumLiteral);
+        if s == t && (s == NUMBER_MEMBER || s == STRING_MEMBER) {
+            return source.as_literal_type().value_equals(target.as_literal_type())
+                && self.is_enum_type_related_to(
+                    source.symbol().unwrap(),
+                    target.symbol().unwrap(),
+                    error_reporter,
+                );
+        }
+        // Two structured or instantiable types (most of the other calls, from is_type_related_to and
+        // is_related_to_ex) pass none of the worker's flag tests; only the last one, a target union of undefined,
+        // null and {}, can answer true.
         const STRUCTURED: TypeFlags = TypeFlags::Object
             .union(TypeFlags::Union)
             .union(TypeFlags::Intersection)
@@ -301,6 +321,20 @@ impl Checker {
                 && (relation == self.assignable_relation || relation == self.comparable_relation)
                 && self.is_unknown_like_union_type(target);
         }
+        self.is_simple_type_related_to_worker(source, target, relation, error_reporter)
+    }
+
+    #[inline(never)]
+    fn is_simple_type_related_to_worker(
+        &mut self,
+        source: P<Type>,
+        target: P<Type>,
+        relation: P<Relation>,
+        error_reporter: Option<ErrorReporter<'_>>,
+    ) -> bool {
+        let mut error_reporter = error_reporter;
+        let s = source.flags();
+        let t = target.flags();
         if t.intersects(TypeFlags::Any)
             || s.intersects(TypeFlags::Never)
             || source == self.wildcard_type
@@ -1739,6 +1773,11 @@ fn intersection_recursion_keys(c: &mut Checker, target: P<Type>) -> &'static [u6
     if let Some(&keys) = c.intersection_recursion_ids.get(&target) {
         return keys;
     }
+    create_intersection_recursion_keys(c, target)
+}
+
+#[inline(never)]
+fn create_intersection_recursion_keys(c: &mut Checker, target: P<Type>) -> &'static [u64] {
     let mut keys = Vec::new();
     collect_intersection_recursion_keys(c, target, &mut keys);
     let keys = alloc_slice(&keys);
@@ -2762,19 +2801,19 @@ impl Checker {
             || t.flags().intersects(TypeFlags::StringMapping)
     }
     // relater.go:1317
-    pub(crate) fn get_variances(&mut self, t: P<Type>) -> Vec<VarianceFlags> {
+    pub(crate) fn get_variances(&mut self, t: P<Type>) -> &'static [VarianceFlags] {
         // Arrays and tuples are known to be covariant, no need to spend time computing this.
         if t == self.global_array_type
             || t == self.global_readonly_array_type
             || t.object_flags().intersects(ObjectFlags::Tuple)
         {
-            return self.array_variances.to_vec();
+            return self.array_variances;
         }
         self.get_variances_worker(t.symbol().unwrap(), t.as_interface_type().type_parameters())
     }
 
     // relater.go:1325
-    pub(crate) fn get_alias_variances(&mut self, symbol: P<Symbol>) -> Vec<VarianceFlags> {
+    pub(crate) fn get_alias_variances(&mut self, symbol: P<Symbol>) -> &'static [VarianceFlags] {
         let type_parameters = self.type_alias_links.get(symbol).type_parameters.get();
         self.get_variances_worker(symbol, type_parameters)
     }
@@ -2789,7 +2828,7 @@ impl Checker {
         &mut self,
         symbol: P<Symbol>,
         type_parameters: &'static [P<Type>],
-    ) -> Vec<VarianceFlags> {
+    ) -> &'static [VarianceFlags] {
         let links = self.variance_links.get(symbol);
         let variances_len = |links: P<VarianceLinks>| {
             links.variances.get().map_or(0, <[types::VarianceFlags]>::len)
@@ -2903,7 +2942,8 @@ impl Checker {
                 }
             }
         }
-        links.variances.get().unwrap().to_vec()
+        // The immutable arena slice remains valid if a later resolution replaces the link descriptor.
+        links.variances.get().unwrap()
     }
 
     // relater.go:1437

@@ -54,12 +54,12 @@ An upgrade is a pull request of its own:
 3. Run the full Clippy command above on macOS and Linux and fix every new finding.
 4. Measure the instruction and peak-memory change per project before and after the upgrade and put it in the pull
    request. The published benchmark workflow is disabled (`bench/README.md`, "CI"); use the local tools or restore the saved
-   workflow to collect the measurements (`bench/regressions.py` sees the rustc change and flags nothing).
+   workflow to collect the measurements (`node bench/bench.mjs regressions` sees the rustc change and flags nothing).
 5. Release builds use the same version; run the `Release` workflow by hand (`dry_run` on) to check them.
 
 ## Source checks
 
-`tools/lint/source.py` (CI: the `lint` job; after Bun's `test/internal/source-lints/`) checks three things
+`tools/lint/source.py` (CI: the `lint` job; after Bun's `test/internal/source-lints/`) checks four things
 clippy cannot express:
 
 - **`unsafe impl Send` / `Sync`.** `tools/lint/send_sync.tsv` lists all of them (31 on 2026-10-10). Adding or removing
@@ -76,6 +76,13 @@ clippy cannot express:
   behaviour; LLVM deleted that write in `panic = "abort"` builds and every such build crashed
   (`notes/fix-arena-recycle-uaf.md`). Take the block as a `P<T>`, an address or a raw slice (`*const [T]`). No
   baseline. The arena tests in `.github/workflows/miri.yml` use Miri for the forms a source check cannot see.
+- **Every `unsafe` site and lifetime escape.** `tools/lint/unsafe_sites.tsv` lists each `unsafe` block, `unsafe fn`,
+  `unsafe impl`, `unsafe extern`, `Box::leak`, `Box::from_raw`, `mem::forget`, `transmute` and `assume_static`
+  (498 on 2026-10-21), keyed by file, enclosing item, kind and the first line of its `SAFETY` comment (not by line
+  number), with a class (`boundary`, `core-allocator`, `ownership`, `logic`, `test`), a verdict (`keep`,
+  `safe-api-possible`, `defect-risk`, `unknown`) and a note that `--update` preserves. A site that appears or
+  disappears fails until `--update` records it; a new row starts with the verdict `unknown` and the check names it
+  until someone classifies it. The classification and its findings are in `notes/unsafe-audit.md` (issue #646).
 
 Source checks cover `crates/*/src` and `tasks/*/src`. Test files and generated files are not scanned.
 
@@ -92,7 +99,7 @@ Source checks cover `crates/*/src` and `tasks/*/src`. Test files and generated f
 | Branches | `single_match`, `single_match_else`, `redundant_else`, `collapsible_match`, `if_same_then_else`, `return_and_then` | Simplify branches while preserving the Go source's evaluation order and side effects; propagate absent optional results with `?` at return sites. |
 | Hashing | `disallowed_types` (`std::collections::HashMap` / `HashSet`), `set_contains_or_insert`, `zero_sized_map_values`, `iter_over_hash_type` | PORTING.md already requires `FxHashMap`; std's maps use SipHash. `iter_over_hash_type` flags iterating a hash map or set: the order must never reach a diagnostic or emitted text (sort, or use `OrderedMap`). oxc, Rolldown, rust-analyzer, Bun ban the std maps; Ruff uses `iter_over_hash_type`. |
 | Locks and threads | `mutex_atomic`, `mutex_integer`, `rc_mutex`, `significant_drop_in_scrutinee`, `non_send_fields_in_send_ty` | A mutex around a flag or counter, a lock guard held across a whole `match`, and every new `unsafe impl Send` over non-`Send` fields (the "by decree" impls in PORTING.md "Threading") becomes a reviewed line. |
-| `unsafe` | `undocumented_unsafe_blocks`, `missing_safety_doc`, `unsafe_op_in_unsafe_fn`, `ptr_as_ptr`, `ptr_cast_constness`, `ref_as_ptr`, `borrow_as_ptr`, `cast_ptr_alignment`, `as_ptr_cast_mut`, `transmute_ptr_to_ptr`, `mem_forget`, `disallowed_methods` | Every `unsafe` block states its invariant in a `// SAFETY:` comment. Pointer casts use the forms that cannot change mutability or type by accident. `clippy.toml` lists the unchecked operations (`get_unchecked`, `unwrap_unchecked`, `unreachable_unchecked`, `from_utf8_unchecked`): each needs a reason that cites a measurement. Bun, oxc, rust-analyzer. |
+| `unsafe` | `undocumented_unsafe_blocks`, `missing_safety_doc`, `unsafe_op_in_unsafe_fn`, `ptr_as_ptr`, `ptr_cast_constness`, `ref_as_ptr`, `borrow_as_ptr`, `cast_ptr_alignment`, `as_ptr_cast_mut`, `transmute_ptr_to_ptr`, `mem_forget`, `disallowed_methods` | Every `unsafe` block states its invariant in a `// SAFETY:` comment. Pointer casts use the forms that cannot change mutability or type by accident. `clippy.toml` lists the unchecked operations (`get_unchecked`, `unwrap_unchecked`, `unreachable_unchecked`, `from_utf8_unchecked`): each needs a reason that cites a measurement. `tools/lint/unsafe_sites.tsv` lists every site with a class and a verdict ("Source checks"). Bun, oxc, rust-analyzer. |
 | Leftovers | `dbg_macro`, `todo`, `unimplemented`, `disallowed_macros`, `allow_attributes`, `allow_attributes_without_reason` | Debugging output and placeholders do not land; suppressions are `#[expect]` with a reason. Bun, oxc and Rolldown have all of the first three; rust-analyzer, Ruff and Biome have `dbg_macro`. |
 | Unused code | `dead_code`, `unused_imports`, `unused_variables`, `unused_mut` (rustc) | Clippy denies unused code in its scope; ordinary compiler warnings are denied in every CI build. Unused variables were not prefixed with `_` in bulk: in a port an unused parameter can mean the Rust code dropped something the Go code uses, so each was checked against Go. Bun denies `dead_code`. |
 
@@ -152,7 +159,7 @@ In place:
 | Fx hashing everywhere | `notes/perf-checker-cpu2.md` | oxc, Rolldown, Ruff, rust-analyzer |
 | Lazy members, line maps and rare-field tails | `notes/lazy-members.md`, `notes/mem-lazy.md` | |
 | `#[cold]` slow-path splits | `notes/perf-parse.md` changes 6 to 8: parse instructions 16.66 G -> 15.07 G | oxc, Bun |
-| Instruction counts and peak memory, with regression reporting (automation disabled) | `bench/README.md` "Regression flag": single-threaded tsrs repeats to about 0.001% (instructions) and under 0.4% (peak RSS); the local tools remain available, but the saved `.yml.bak` workflows do not measure commits or comment on PRs | CodSpeed in oxc, Rolldown, Ruff, Biome, swc (simulated counts); Ruff's PR memory report |
+| Instruction counts and peak memory, with advisory CodSpeed reports | `bench/README.md` "Regression flag": single-threaded tsrs repeats to about 0.001% (instructions) and under 0.4% (peak RSS); local tools remain available, while `.github/workflows/codspeed.yml` profiles CPU simulation and default-checker peak memory on commits and PRs. Its Graviton walltime jobs are disabled by default after exhausting the included monthly Macro Runner minutes; set the repository variable `CODSPEED_WALLTIME_ENABLED=true` to re-enable them. The saved `.yml.bak` regression workflows remain disabled | CodSpeed in oxc, Rolldown, Ruff, Biome, swc (simulated counts); Ruff's PR memory report |
 | Generated-code freshness check | `tools/gen-check.sh` (run locally) re-runs the eight generators and fails on a diff; it found two hand edits the generators no longer reproduced | oxc, Ruff, rust-analyzer |
 | Unused-dependency checks in CI | `.github/workflows/autofix.yml` runs cargo-shear, updates the lock file after fixes, and rejects pending fixes in merge groups | oxc, Rolldown, Ruff, rust-analyzer |
 | Differential parser fuzzing | `tools/fuzz/parser.py` mutates conformance files and compares the AST hashes of the Go and Rust oracles (`tools/oracle/ast`); the nightly 200,000-mutant workflow is disabled as [fuzz.yml.bak](../.github/workflows/fuzz.yml.bak), while the local tool remains available. First 320,000 mutants: no divergence, no crash (inputs kept valid UTF-8; invalid UTF-8 is read lossily on purpose) | Ruff (`cargo fuzz` on its parser) |

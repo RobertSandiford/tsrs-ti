@@ -18,7 +18,7 @@ Try checking and emitting code in the [browser playground](https://tsrs-playgrou
 
 ## Conformance
 
-`tsrs` currently targets the main branch of [microsoft/TypeScript](https://github.com/microsoft/typescript).
+The 0.19.0 source upgrade targets [microsoft/TypeScript `v7.1-beta` at `3e9236361fa9`](https://github.com/microsoft/TypeScript/tree/3e9236361fa97a9e6c685f4833ac457ae2d8c50a).
 We aim to release a stable version against TypeScript 7.1 with 100% conformance. In our testing on existing projects,
 we have yet to find a correctness bug in `tsrs`.
 
@@ -29,12 +29,25 @@ between runs.
 
 `--init` and `--showConfig` are not supported. See [compatibility and evidence](https://github.com/oxc-project/tsrs/blob/main/docs/COMPATIBILITY.md)
 for supported features and known gaps.
+The seven watch-tuning flags removed by TypeScript 7 are rejected by tsrs as well.
+The [#623 source upgrade](https://github.com/oxc-project/tsrs/issues/623) ports all 112 upstream commits and supports
+source-phase `import source` and `import.source()` syntax. The last published release, 0.18.0, uses the earlier pin;
+the 0.19.0 candidate pins the final commit. Its Node API exposes the project checker's merged, declaration, node,
+and parent symbol lookups.
+The source-31 SDK adds typed paths; source 58 promotes the SDK exports to `tsrs/path`, `tsrs/sync`,
+`tsrs/async`, `tsrs/ast`, and `tsrs/vscode` for an explicitly selected API package.
+The source-51 compiler reports TS18117 for deferred imports without a namespace binding, including in JavaScript.
+Source 62 adds the ESNext iterator typings for `chunks`, `join`, `includes`, `zip`, and `zipKeyed`.
+Source 101 creates private Unix API socket directories and restricts Windows API named pipes to the current user.
+Source 102 makes sync SDK generator instances single-use across batch calls, matching upstream TypeScript.
+Source 104 rejects network filesystem paths before OS access and reports TS5116 for affected config and source references.
+Source 109 lets sync and async Node API clients write a timing snapshot on close when `TS_API_TIMING_DIR` is set.
 
 <a href="https://github.com/oxc-project/tsrs/blob/main/bench/RESULTS.md">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/oxc-project/tsrs/main/bench/large-projects-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/oxc-project/tsrs/main/bench/large-projects.svg">
-    <img alt="tsrs vs the TypeScript nightly: times faster against times less peak memory on seven projects at 1, 2, 4 and 8 parallel checker threads" src="https://raw.githubusercontent.com/oxc-project/tsrs/main/bench/large-projects.svg">
+    <img alt="tsrs vs the TypeScript nightly: relative type-checking speed and peak memory by project" src="https://raw.githubusercontent.com/oxc-project/tsrs/main/bench/large-projects.svg">
   </picture>
 </a>
 
@@ -47,7 +60,7 @@ targeting `wasm32-wasip1` (WASI Preview 1).
 
 - [CLI usage and memory tuning](https://github.com/oxc-project/tsrs/blob/main/docs/USAGE.md)
 - [Editor setup](https://github.com/oxc-project/tsrs/blob/main/docs/LSP.md#editor-setup)
-- [Node API (unstable)](https://github.com/oxc-project/tsrs/blob/main/docs/NODE_API.md)
+- [Node API](https://github.com/oxc-project/tsrs/blob/main/docs/NODE_API.md)
 - [WebAssembly for Node and browsers](https://github.com/oxc-project/tsrs/blob/main/npm/tsrs-wasm/README.md)
 - [Benchmarks and methodology](https://github.com/oxc-project/tsrs/blob/main/bench/README.md)
 - [Release notes](https://github.com/oxc-project/tsrs/blob/main/docs/STATUS.md)

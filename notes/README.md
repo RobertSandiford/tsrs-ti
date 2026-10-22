@@ -25,6 +25,8 @@ starting another experiment.
 - [Serial work and added complexity](perf-serial-steps.md): why small gains may not justify a cache, thread or
   overlap between phases.
 - [Checker instruction-count round 4](perf-icount-round4.md): the later checker measurements and validation.
+- [Enum members in isSimpleTypeRelatedTo](perf-simple-relation-enum-members.md): the one flag pair behind three
+  quarters of the calls on Compiler-Unions, answered inline.
 - [Memory round 4](mem-round4.md): the latest numbered memory round against Bun.
 - [Benchmark workflow](../bench/README.md) and [published results](../bench/RESULTS.md): reproduce measurements
   and compare the released build configuration.
@@ -47,6 +49,8 @@ starting another experiment.
   history affects diagnostics.
 - [Incremental diagnostic history](fix-history-dependent-diagnostics.md): cache reuse and diagnostic stability.
 - [Arena recycling and protected borrows](fix-arena-recycle-uaf.md): the lifetime bug and its regression guards.
+- [Unsafe audit](unsafe-audit.md): every unsafe site and lifetime escape classified, with the sites where safe code
+  can break an invariant (issue #646).
 - [Protocol quoting styles](shared-go-compat.md): shared helpers retain each caller's escaping behavior.
 - [Language-server memory ownership](lsp-mem.md) and [lifetime corrections](lsp-memfix.md): regions, snapshots
   and checker disposal.

@@ -10,8 +10,9 @@ use crate::pathcompare::pathComparer;
 use crate::pathkey::PathComparer;
 use crate::testutil_test::*;
 use crate::watcher::{
-    ErrUnavailable, ErrWatchTerminated, Error, WatchCallback, all_watchers, default, dirWatch,
-    is_in_directory_or_self, join_path_suffix, physical_dir_for, rebase_path,
+    ErrUnavailable, ErrWatchTerminated, Error, WatchCallback, WatchDirectoryRequest, all_watchers,
+    default, dirWatch, errNetworkPath, is_in_directory_or_self, join_path_suffix, physical_dir_for,
+    rebase_path,
 };
 
 const maxWaitTime: Duration = defaultMaxWaitTime;
@@ -434,6 +435,42 @@ fn subscribe_rejects_relative_path() {
         }
         if w.watch_file("relative/path/file.txt", noop_callback()).is_ok() {
             fatalf!("WatchFile with relative path should return an error");
+        }
+        Ok(())
+    });
+}
+
+#[test]
+fn watch_rejects_network_paths() {
+    run_for_each_watcher("TestWatchRejectsNetworkPaths", |t, w| {
+        let dir = new_tmp_dir(t);
+        let mut network_paths =
+            vec![r"\\server\share".to_string(), r"\??\UNC\server\share".to_string()];
+        if !cfg!(windows) {
+            // This spells an existing local directory on POSIX; reject it
+            // before filepath cleaning can erase its network prefix.
+            network_paths.push(format!("/{dir}"));
+        }
+        for network_path in network_paths {
+            let err = w
+                .watch_directories(vec![
+                    WatchDirectoryRequest {
+                        dir: dir.clone(),
+                        callback: Some(noop_callback()),
+                        options: vec![],
+                    },
+                    WatchDirectoryRequest {
+                        dir: network_path.clone(),
+                        callback: Some(noop_callback()),
+                        options: vec![],
+                    },
+                ])
+                .err()
+                .expect("network watch must fail");
+            assert!(err.is(errNetworkPath), "WatchDirectories({network_path:?}): {err}");
+            let file = format!("{network_path}/file.ts");
+            let err = w.watch_file(&file, noop_callback()).err().expect("network watch must fail");
+            assert!(err.is(errNetworkPath), "WatchFile({file:?}): {err}");
         }
         Ok(())
     });
