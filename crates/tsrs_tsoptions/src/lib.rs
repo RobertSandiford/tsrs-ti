@@ -13,6 +13,7 @@ mod parsedbuildcommandline;
 mod parsedcommandline;
 mod parsedoptions;
 mod parsinghelpers;
+mod showconfig;
 mod tsconfigparsing;
 mod wildcarddirectories;
 
@@ -29,6 +30,8 @@ mod contentmappers_test;
 mod decls_test;
 #[cfg(test)]
 mod parsinghelpers_test;
+#[cfg(test)]
+mod showconfig_test;
 #[cfg(test)]
 mod testutil;
 #[cfg(test)]
@@ -50,4 +53,5 @@ pub use parsedbuildcommandline::*;
 pub use parsedcommandline::*;
 pub use parsedoptions::*;
 pub use parsinghelpers::*;
+pub use showconfig::*;
 pub use tsconfigparsing::*;

@@ -1,5 +1,5 @@
-// Port of Go's execute/tsc.go (no --init, --showConfig or --generateTrace; --help prints a short usage instead of
-// tsc's option list).
+// Port of Go's execute/tsc.go (no --init or --generateTrace; --help prints a short usage instead of tsc's option
+// list).
 
 use std::sync::Arc;
 
@@ -34,6 +34,13 @@ impl ParseConfigHost for sysParseConfigHost {
 
     fn get_current_directory(&self) -> &str {
         self.sys.get_current_directory()
+    }
+}
+
+fn show_config(sys: &dyn System, config: &ParsedCommandLine, config_file_name: &str) {
+    let ts_config = tsoptions::convert_to_tsconfig(config, config_file_name);
+    if let Ok(text) = tsrs_core::json::marshal_indent(&ts_config, "", "    ") {
+        sys.write(&text);
     }
 }
 
@@ -313,7 +320,8 @@ fn tsc_compilation(
     let config_options = config_for_compilation.compiler_options().unwrap();
     let report_error_summary = create_report_error_summary(sys, &config_options);
     if compiler_options_from_command_line.show_config.is_true() {
-        return not_supported(sys, "--showConfig");
+        show_config(sys, &config_for_compilation, &config_file_name);
+        return CommandLineResult { watcher: None, status: ExitStatus::Success };
     }
     if config_options.watch.is_true() {
         if testing.is_none() && !tsrs_fswatch::default().available() {

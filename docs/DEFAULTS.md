@@ -33,7 +33,6 @@ four spaces and `"\n"`; the limits below apply to explicit client settings.
 | tsbuildinfo contents | tsgo's fields | Adds `tsrsCanonicalCheckSignature`. In `go` history mode or API mode, tsrs won't reuse a tsbuildinfo that has this field |
 | `--version` | `Version <TypeScript version>` | Appends `(tsrs <release>, microsoft/TypeScript@<commit>)`. Unstamped source builds use `7.1.0-dev`; npm builds use the pinned nightly version on both sides |
 | `--init` | Writes a tsconfig.json | `error: --init is not supported by tsrs.`, exit status 5, no file written |
-| `--showConfig` | Prints the resolved config as JSON | Not supported, exit status 5 |
 | `--help`, `--all`, `-b --help` | Full option help | A version line and short usage, exit status 0 |
 | No tsconfig.json and no files | Version and full help, exit status 1 | Version and one usage line, exit status 1 |
 | `--locale` | Translates messages | Accepted; messages stay in English |
