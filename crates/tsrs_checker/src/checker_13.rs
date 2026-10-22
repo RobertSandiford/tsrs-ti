@@ -1412,17 +1412,22 @@ impl Checker {
 
     #[inline(never)]
     fn is_empty_anonymous_object_type_worker(&mut self, t: P<Type>) -> bool {
-        if t.object_flags_lazy().intersects(ObjectFlags::MembersResolved)
-            && self.is_empty_resolved_type(t.as_structured_type())
-        {
-            return true;
-        }
-        match t.symbol() {
-            Some(symbol) if symbol.flags().intersects(SymbolFlags::TypeLiteral) => {
-                self.get_members_of_symbol(symbol).map_or(0, |m| m.len()) == 0
+        if t.object_flags_lazy().intersects(ObjectFlags::MembersResolved) {
+            if self.is_empty_resolved_type(t.as_structured_type()) {
+                return true;
             }
-            _ => false,
+        } else {
+            // Resolving members can change this answer on a later flow walk. Do not memoize
+            // narrowing that depends on the unresolved member state.
+            self.flow_memo.taint(0);
         }
+        let Some(symbol) = t.symbol() else {
+            return false;
+        };
+        if symbol.flags().intersects(SymbolFlags::TypeLiteral) {
+            return self.get_members_of_symbol(symbol).map_or(0, |m| m.len()) == 0;
+        }
+        false
     }
 
     // isEmptyResolvedType(resolveStructuredTypeMembers(t)); notes/mem-lazy.md L11: a type with a lazy member table
