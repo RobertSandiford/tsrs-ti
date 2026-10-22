@@ -271,7 +271,9 @@ retains the translated runner's historical results and verify-family breakdown.
   this verifies Rust LSP behavior with the resulting files, not Rust emit or build.
 - The Linux fanotify backend is not ported. Linux uses inotify, Go's fallback; the server enables builtin watching
   only with a fast-recursive backend, so Linux needs client watch support. The Windows backend (ReadDirectoryChangesW)
-  is ported and tested through `tsrs_fswatch`; the language server's builtin watching has not been run on Windows.
+  is ported and tested through `tsrs_fswatch`. The language server's builtin watching passes its 15 `lspwatcher` tests
+  on Windows, and a client without watch registration saw a closed imported file's on-disk edits change the open
+  importer's pull diagnostics (checked by hand on one project, not in CI).
 
 ## Deviations from Go
 
