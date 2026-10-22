@@ -104,7 +104,12 @@ impl transport::Handler for SessionHandler {
     ) -> Result<transport::Response, transport::ApiError> {
         // Go: errors are CodeInternalError with err.Error().
         match self.0.handle_nested_request(method, params, cx.depth) {
-            Ok(tsrs_api::Response::Json(s)) => Ok(transport::Response::Json(s.into_bytes())),
+            // `echo` returns the client's bytes and `batchRequests` can embed an `echo` result: the transport
+            // validates those as Go's json.Marshal does. Every other JSON result is `json::marshal` output.
+            Ok(tsrs_api::Response::Json(s)) if matches!(method, "echo" | "batchRequests") => {
+                Ok(transport::Response::Json(s.into_bytes()))
+            }
+            Ok(tsrs_api::Response::Json(s)) => Ok(transport::Response::ValidJson(s.into_bytes())),
             Ok(tsrs_api::Response::Binary(b)) => Ok(transport::Response::Binary(b)),
             Err(e) => Err(transport::ApiError::internal(e.to_string())),
         }
@@ -380,7 +385,7 @@ mod tests {
         let Value::Object(options) = config_object.get_mut("compilerOptions").unwrap() else {
             unreachable!()
         };
-        options.insert("incremental".into(), Value::Bool(true));
+        options.insert("incremental", Value::Bool(true));
         std::fs::write(dir.join("tsconfig.json"), json::marshal(&config).unwrap()).unwrap();
         let exe = std::env::current_exe().unwrap().parent().unwrap().parent().unwrap().join("tsrs");
         let cli = || {

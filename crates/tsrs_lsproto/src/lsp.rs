@@ -4,6 +4,7 @@ use std::ops::Deref;
 use std::sync::{Mutex, OnceLock};
 
 use rustc_hash::FxHashSet;
+use tsrs_core::json::JsonMap;
 use tsrs_core::tspath;
 
 use crate::error::Error;
@@ -631,7 +632,7 @@ pub(crate) fn json_object_has_key(data: &Value, keys: &[&str]) -> Option<usize> 
     let Value::Object(members) = data else {
         return None;
     };
-    if let Some(i) = members.keys().find_map(|name| keys.iter().position(|key| name == key)) {
+    if let Some(i) = members.keys().find_map(|name| keys.iter().position(|key| name == *key)) {
         return Some(i);
     }
     None
@@ -784,7 +785,7 @@ impl Json for NoParams {
     const IS_NO_PARAMS: bool = true;
 
     fn to_json(&self) -> Value {
-        Value::Object(tsrs_core::collections::OrderedMap::default())
+        Value::Object(JsonMap::new())
     }
 
     fn from_json(v: &Value) -> Result<Self, JsonError> {
@@ -828,7 +829,7 @@ impl Json for EmptyObject {
     const GO_TYPE: &'static str = "struct {}";
 
     fn to_json(&self) -> Value {
-        Value::Object(tsrs_core::collections::OrderedMap::default())
+        Value::Object(JsonMap::new())
     }
 
     fn from_json(v: &Value) -> Result<Self, JsonError> {

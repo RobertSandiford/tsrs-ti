@@ -4,9 +4,7 @@
 
 use std::fmt::Write;
 
-use indexmap::map::Entry;
-
-use crate::collections::OrderedMap;
+use super::{Entry, JsonMap};
 
 #[derive(Clone, Debug, PartialEq, Default)]
 pub enum Value {
@@ -19,7 +17,7 @@ pub enum Value {
     Integer(i64),
     String(String),
     Array(Vec<Value>),
-    Object(OrderedMap<String, Value>),
+    Object(JsonMap),
 }
 
 pub fn marshal(v: &Value) -> Result<String, String> {
@@ -202,10 +200,7 @@ fn write_string(out: &mut String, s: &str) {
     let mut i = 0;
     while i < bytes.len() {
         // Copy the run of bytes that need no escaping in one go.
-        let run = bytes[i..]
-            .iter()
-            .position(|&b| !(0x20..0x80).contains(&b) || b == b'"' || b == b'\\')
-            .unwrap_or(bytes.len() - i);
+        let run = super::plain_ascii_len(&bytes[i..]);
         if run > 0 {
             out.push_str(&s[i..i + run]);
             i += run;
@@ -324,7 +319,7 @@ impl JsonParser<'_> {
             }
             Some(b'{') => {
                 self.pos += 1;
-                let mut members = OrderedMap::default();
+                let mut members = JsonMap::default();
                 self.skip_ws();
                 if self.s.get(self.pos) == Some(&b'}') {
                     self.pos += 1;

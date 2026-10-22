@@ -36,6 +36,17 @@ impl Id {
     }
 }
 
+impl Id {
+    /// The `Display` text, borrowed when the id is a non-empty string (the msgpack protocol's ids are method
+    /// names, written on every response).
+    pub fn text(&self) -> std::borrow::Cow<'_, str> {
+        match self {
+            Id::Str(s) if !s.is_empty() => std::borrow::Cow::Borrowed(s),
+            _ => std::borrow::Cow::Owned(self.to_string()),
+        }
+    }
+}
+
 impl fmt::Display for Id {
     // jsonrpc.go ID.String.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -96,12 +107,14 @@ impl Message {
 
 /// A handler result.
 ///
-/// `Json` must hold one complete JSON value (validated before it is written); `Binary` is api.RawBinary:
-/// written verbatim as the `MessagePack` tuple payload, and (like Go's json.Marshal of a byte slice) as a
-/// base64 JSON string under JSON-RPC.
+/// `Json` must hold one complete JSON value (validated before it is written, as Go's json.Marshal of a
+/// json.Value does). `ValidJson` is JSON its producer guarantees valid (a JSON encoder's output), written
+/// without that check. `Binary` is api.RawBinary: written verbatim as the `MessagePack` tuple payload, and
+/// (like Go's json.Marshal of a byte slice) as a base64 JSON string under JSON-RPC.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Response {
     Json(Vec<u8>),
+    ValidJson(Vec<u8>),
     Binary(Vec<u8>),
 }
 

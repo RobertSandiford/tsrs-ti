@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use tsrs_api_transport::strictjson::DecodeError;
 use tsrs_compiler::{CheckerHandle, Program};
 use tsrs_core::context::{CheckerLifetime, Context, with_checker_lifetime};
-use tsrs_core::json::{self, Value};
+use tsrs_core::json::{self, JsonMap, Value};
 use tsrs_project::{ID as ProjectID, Snapshot, SnapshotHost};
 use tsrs_vfs::FS;
 
@@ -338,13 +338,16 @@ impl Session {
         let (params, lexemes) = match crate::methods::params_type(method) {
             None => (Value::Null, rustc_hash::FxHashMap::default()),
             Some(go_type) => {
-                let decoded =
-                    tsrs_api_transport::strictjson::decode(params).map_err(|e| match e {
-                        DecodeError::Invalid(e) => ApiError::invalid_request(format!(
-                            "failed to unmarshal *api.{go_type}: {e}"
-                        )),
-                        DecodeError::OutOfRange(e) => ApiError::invalid_request(e),
-                    })?;
+                let decoded = tsrs_api_transport::strictjson::decode_with_names(
+                    params,
+                    crate::predecode::known_member_name,
+                )
+                .map_err(|e| match e {
+                    DecodeError::Invalid(e) => ApiError::invalid_request(format!(
+                        "failed to unmarshal *api.{go_type}: {e}"
+                    )),
+                    DecodeError::OutOfRange(e) => ApiError::invalid_request(e),
+                })?;
                 let value = decoded.value;
                 // encoding/json/v2 into a struct: `null` leaves the zero value; any other non-object is an error.
                 let kind = match &value {
@@ -361,7 +364,7 @@ impl Session {
                 }
                 // `null` decodes to the zero-value struct: handlers see `{}`.
                 let value = if matches!(value, Value::Null) {
-                    Value::Object(tsrs_core::collections::OrderedMap::default())
+                    Value::Object(JsonMap::new())
                 } else {
                     value
                 };
@@ -553,5 +556,6 @@ pub(crate) fn scratch<T>(f: impl FnOnce() -> T) -> T {
 
 /// Parses request params (raw JSON bytes; empty means absent, Go `UnmarshalParams` returns nil).
 pub fn json_response(value: &Value) -> ApiResult<Response> {
-    json::marshal(value).map(Response::Json).map_err(ApiError::internal)
+    // Most results are small objects: start with room for one instead of growing to it.
+    json::marshal_with_capacity(value, 256).map(Response::Json).map_err(ApiError::internal)
 }

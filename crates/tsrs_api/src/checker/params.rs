@@ -4,18 +4,14 @@
 // zero value, a field of the wrong JSON type is an `ErrInvalidRequest`. The helpers below follow the
 // same rules and keep every number bounded (no silent truncation of ids or positions).
 
-use tsrs_core::json::Value;
+use tsrs_core::json::{JsonMap, Value};
 use tsrs_lsproto::DocumentUri;
 
 use super::host::{CheckerError, CheckerResult};
 
-static EMPTY_OBJECT: std::sync::LazyLock<tsrs_core::collections::OrderedMap<String, Value>> =
-    std::sync::LazyLock::new(Default::default);
+static EMPTY_OBJECT: std::sync::LazyLock<JsonMap> = std::sync::LazyLock::new(Default::default);
 
-pub(crate) fn object<'a>(
-    params: &'a Value,
-    method: &str,
-) -> CheckerResult<&'a tsrs_core::collections::OrderedMap<String, Value>> {
+pub(crate) fn object<'a>(params: &'a Value, method: &str) -> CheckerResult<&'a JsonMap> {
     match params {
         Value::Object(map) => Ok(map),
         // encoding/json v2 decodes `null` into a struct as its zero value.
@@ -24,10 +20,7 @@ pub(crate) fn object<'a>(
     }
 }
 
-fn get<'a>(
-    obj: &'a tsrs_core::collections::OrderedMap<String, Value>,
-    name: &str,
-) -> Option<&'a Value> {
+fn get<'a>(obj: &'a JsonMap, name: &str) -> Option<&'a Value> {
     match obj.get(name) {
         None | Some(Value::Null) => None,
         Some(v) => Some(v),
@@ -63,11 +56,12 @@ fn json_kind(v: &Value) -> &'static str {
 /// own exact value, at any depth (symbol references, import-adder actions). Range and integer-syntax errors
 /// are reported by core's pre-decode before dispatch, nested api structs included; this only rejects what
 /// cannot be a uint64 at all. A value outside the dispatched tree falls back to the parsed f64.
+/// `pointer` builds the field's JSON pointer, for errors only.
 fn unsigned64(
     v: &Value,
     object: &Value,
     key: &str,
-    pointer: &str,
+    pointer: impl FnOnce() -> String,
     go_type: &str,
 ) -> CheckerResult<u64> {
     match v {
@@ -75,11 +69,13 @@ fn unsigned64(
             Ok(crate::predecode::exact_u64(object, key).unwrap_or(*n as u64))
         }
         Value::Number(_) => Err(CheckerError::invalid(format!(
-            "cannot unmarshal JSON number into Go {go_type} within \"{pointer}\""
+            "cannot unmarshal JSON number into Go {go_type} within \"{}\"",
+            pointer()
         ))),
         other => Err(CheckerError::invalid(format!(
-            "cannot unmarshal JSON {} into Go {go_type} within \"{pointer}\"",
-            json_kind(other)
+            "cannot unmarshal JSON {} into Go {go_type} within \"{}\"",
+            json_kind(other),
+            pointer()
         ))),
     }
 }
@@ -95,7 +91,7 @@ fn signed32(v: &Value, name: &str) -> CheckerResult<i32> {
 
 /// A typed view over one request's params object.
 pub(crate) struct Params<'a> {
-    obj: &'a tsrs_core::collections::OrderedMap<String, Value>,
+    obj: &'a JsonMap,
     /// JSON pointer of this object within the request params ("" at the top level).
     pointer: String,
     /// This object's value within the params tree dispatched by core (its identity selects exact literals).
@@ -122,7 +118,7 @@ impl<'a> Params<'a> {
 
     pub(crate) fn u64_typed(&self, name: &str, go_type: &str) -> CheckerResult<u64> {
         self.raw(name).map_or(Ok(0), |v| {
-            unsigned64(v, self.value, name, &format!("{}/{name}", self.pointer), go_type)
+            unsigned64(v, self.value, name, || format!("{}/{name}", self.pointer), go_type)
         })
     }
 
@@ -210,7 +206,7 @@ impl<'a> Params<'a> {
             .collect()
     }
 
-    pub(crate) fn symbol_ref(&self, name: &str) -> CheckerResult<SymbolReference> {
+    pub(crate) fn symbol_ref(&self, name: &str) -> CheckerResult<SymbolReference<'a>> {
         match self.raw(name) {
             None => Ok(SymbolReference::default()),
             Some(v) => SymbolReference::decode(v, format!("{}/{name}", self.pointer)),
@@ -218,7 +214,7 @@ impl<'a> Params<'a> {
     }
 
     /// Go `[]SymbolReference`: a `null` element is the zero reference (Go structs decode `null` as zero).
-    pub(crate) fn symbol_refs(&self, name: &str) -> CheckerResult<Vec<SymbolReference>> {
+    pub(crate) fn symbol_refs(&self, name: &str) -> CheckerResult<Vec<SymbolReference<'a>>> {
         self.array(name)?
             .iter()
             .enumerate()
@@ -297,18 +293,18 @@ pub(crate) const SYMBOL_OWNER_KIND_SNAPSHOT: u32 = 1;
 
 /// Go `SymbolReference` (`SymbolOwner` embedded + `id`).
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct SymbolReference {
+pub(crate) struct SymbolReference<'a> {
     pub(crate) kind: u32,
-    pub(crate) file: Option<Value>,
+    pub(crate) file: Option<&'a Value>,
     pub(crate) snapshot: u64,
-    pub(crate) project: String,
+    pub(crate) project: &'a str,
     pub(crate) id: u64,
 }
 
-impl SymbolReference {
+impl<'a> SymbolReference<'a> {
     /// `pointer`: JSON pointer of the reference in the request (`/symbol`, `/symbols/0`), used for exact
     /// integer literals and Go-style error locations.
-    fn decode(v: &Value, pointer: String) -> CheckerResult<SymbolReference> {
+    fn decode(v: &'a Value, pointer: String) -> CheckerResult<SymbolReference<'a>> {
         let Value::Object(_) = v else {
             return Err(CheckerError::invalid(format!(
                 "cannot unmarshal JSON {} into Go api.SymbolReference within \"{pointer}\"",
@@ -318,21 +314,21 @@ impl SymbolReference {
         let p = Params::nested(v, pointer)?;
         let file = match p.raw("file") {
             None => None,
-            Some(f @ Value::Object(_)) => Some(f.clone()),
+            Some(f @ Value::Object(_)) => Some(f),
             Some(_) => return Err(wrong_type("file", "a source file descriptor object")),
         };
         Ok(SymbolReference {
             kind: p.u32("kind")?,
             file,
             snapshot: p.u64_typed("snapshot", "api.SnapshotID")?,
-            project: p.string("project")?.to_string(),
+            project: p.string("project")?,
             id: p.u64_typed("id", "api.SymbolID")?,
         })
     }
 
     /// The `path` of a file reference's descriptor.
-    pub(crate) fn file_path(&self) -> Option<&str> {
-        match self.file.as_ref()? {
+    pub(crate) fn file_path(&self) -> Option<&'a str> {
+        match self.file? {
             Value::Object(map) => match map.get("path") {
                 Some(Value::String(s)) => Some(s),
                 _ => None,

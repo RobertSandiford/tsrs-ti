@@ -5,8 +5,7 @@
 
 use std::sync::Arc;
 
-use tsrs_core::collections::OrderedMap;
-use tsrs_core::json::{self, Value};
+use tsrs_core::json::{self, JsonMap, Value};
 use tsrs_core::{CompilerOptions, ModuleKind, P, Tristate};
 use tsrs_modulespecifiers as modulespecifiers;
 use tsrs_tsoptions::{self as tsoptions, ParseConfigHost};
@@ -43,7 +42,7 @@ fn str_field(v: &Value, name: &str) -> String {
 }
 
 fn object(entries: Vec<(&str, Value)>) -> Value {
-    let mut m = OrderedMap::default();
+    let mut m = JsonMap::new();
     m.extend(entries.into_iter().map(|(k, v)| (k.to_string(), v)));
     Value::Object(m)
 }
@@ -59,13 +58,13 @@ fn run(s: &Value) -> Value {
     if let Value::Object(m) = field(s, "files") {
         files.extend(m.into_iter().map(|(k, v)| {
             let Value::String(text) = v else { unreachable!() };
-            (k.clone(), vfstest::MapFile::from(text.as_str()))
+            (k.to_string(), vfstest::MapFile::from(text.as_str()))
         }));
     }
     if let Value::Object(m) = field(s, "symlinks") {
         files.extend(m.into_iter().map(|(k, v)| {
             let Value::String(target) = v else { unreachable!() };
-            (k.clone(), vfstest::symlink(target))
+            (k.to_string(), vfstest::symlink(target))
         }));
     }
     let fs: Arc<dyn FS> = Arc::new(bundled::wrap_fs(vfstest::from_map(files, case_sensitive)));

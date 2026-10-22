@@ -2,8 +2,7 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use tsrs_ast::{Kind, Node, SourceFile, SourceFileParseOptions};
-use tsrs_core::collections::OrderedMap;
-use tsrs_core::json::{self, Value};
+use tsrs_core::json::{self, JsonMap, Value};
 use tsrs_core::{P, ScriptKind, TextRange, position_to_line_and_byte_offset};
 
 use super::*;
@@ -131,12 +130,12 @@ fn baseline_go_tokens_json(
         let values: Vec<Value> = runs
             .iter()
             .map(|r| {
-                let mut m: OrderedMap<String, Value> = OrderedMap::default();
-                m.insert("startPos".into(), Value::Number(r.start_pos as f64));
-                m.insert("endPos".into(), Value::Number(r.end_pos as f64));
-                m.insert("kind".into(), Value::String(r.kind.clone()));
-                m.insert("nodePos".into(), Value::Number(r.node_pos as f64));
-                m.insert("nodeEnd".into(), Value::Number(r.node_end as f64));
+                let mut m: JsonMap = JsonMap::new();
+                m.insert("startPos", Value::Number(r.start_pos as f64));
+                m.insert("endPos", Value::Number(r.end_pos as f64));
+                m.insert("kind", Value::String(r.kind.clone()));
+                m.insert("nodePos", Value::Number(r.node_pos as f64));
+                m.insert("nodeEnd", Value::Number(r.node_end as f64));
                 Value::Object(m)
             })
             .collect();
