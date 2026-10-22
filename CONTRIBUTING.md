@@ -61,20 +61,25 @@ git -C ts-ref sparse-checkout set tsc packages/typescript/src \
   packages/typescript/lib packages/typescript/vendor tools/scripts/tsc
 git -C ts-ref checkout "$commit"
 
-./target/debug/tsrs-test run --suite all                          # summary table; lists in target/test-results/
+./target/debug/tsrs-test run --suite all --baselines all          # every supported baseline; lists in target/test-results/
 ./target/debug/tsrs-test run --filter <substring>                 # one test or a cluster
 ./target/debug/tsrs-test show <suite/name>                        # expected vs actual
 ./target/debug/tsrs-test run --suite all --baselines types,symbols # type and symbol baselines
 PYTHON=python3.12 .github/scripts/go-fourslash-gate.sh             # language-server suite (Go assertions, Rust LSP)
-TSRS_TEST=target/debug/tsrs-test .github/scripts/conformance-gate.sh # what CI enforces: errors, .types, .symbols
+TSRS_TEST=target/debug/tsrs-test .github/scripts/conformance-gate.sh # errors, types, symbols, emit and source maps
 tools/regressions.sh target/debug/tsrs                            # testdata/regressions (CI runs it too)
 tools/ci/determinism.sh --self-test && tools/ci/determinism.sh target/debug/tsrs # checker assignment gate
 cargo test --locked                                             # all workspace unit and integration tests (CI)
 ```
 
-CI runs the gate twice: in tsgo's check history, which the baselines need, and in the default mode
-(`TS_TEST_PROGRAM_SINGLE_THREADED=false TSRS_HISTORY=canonical`, where `conformance/objectLiteralNormalization`'s
-`.types` / `.symbols` differ by design).
+CI and release BOLT gates compare every supported compiler baseline in both tsgo's checker history and the default
+mode (`TS_TEST_PROGRAM_SINGLE_THREADED=false TSRS_HISTORY=canonical`). `--baselines all` includes errors, types,
+symbols, JavaScript/declaration emit, JavaScript maps and source-map records. The runner exits unsuccessfully on any
+baseline difference, crash, timeout or empty selection. The gate also rejects a testdata checkout at a different
+TypeScript source pin. Unsupported cases remain reported as skips.
+
+The Node API job verifies generated compiler sources and the vendored SDK, then runs all existing upstream client
+and local parity cases against both the Go oracle and tsrs.
 
 A change must not lose passing tests: compare `target/test-results/pass.txt` before and after
 (`comm -23 <(sort before.txt) <(sort target/test-results/pass.txt)` must print nothing). `docs/DEBUGGING.md`
