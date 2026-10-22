@@ -1412,17 +1412,22 @@ impl Checker {
 
     #[inline(never)]
     fn is_empty_anonymous_object_type_worker(&mut self, t: P<Type>) -> bool {
-        if t.object_flags_lazy().intersects(ObjectFlags::MembersResolved)
-            && self.is_empty_resolved_type(t.as_structured_type())
-        {
-            return true;
-        }
-        match t.symbol() {
-            Some(symbol) if symbol.flags().intersects(SymbolFlags::TypeLiteral) => {
-                self.get_members_of_symbol(symbol).map_or(0, |m| m.len()) == 0
+        if t.object_flags_lazy().intersects(ObjectFlags::MembersResolved) {
+            if self.is_empty_resolved_type(t.as_structured_type()) {
+                return true;
             }
-            _ => false,
+        } else {
+            // Resolving members can change this answer on a later flow walk. Do not memoize
+            // narrowing that depends on the unresolved member state.
+            self.flow_memo.taint(0);
         }
+        let Some(symbol) = t.symbol() else {
+            return false;
+        };
+        if symbol.flags().intersects(SymbolFlags::TypeLiteral) {
+            return self.get_members_of_symbol(symbol).map_or(0, |m| m.len()) == 0;
+        }
+        false
     }
 
     // isEmptyResolvedType(resolveStructuredTypeMembers(t)); notes/mem-lazy.md L11: a type with a lazy member table
@@ -3975,22 +3980,38 @@ pub(crate) fn get_name_from_index_info(info: P<IndexInfo>) -> String {
 
 impl Checker {
     // checker.go:28273
+    #[expect(
+        clippy::inline_always,
+        reason = "measured: plain #[inline] leaves one hot call out of line (notes/perf-checker-inline-cold.md)"
+    )]
+    #[inline(always)]
     pub(crate) fn is_unknown_like_union_type(&mut self, t: P<Type>) -> bool {
-        if self.strict_null_checks && t.flags().intersects(TypeFlags::Union) {
-            if !t.object_flags_lazy().intersects(ObjectFlags::IsUnknownLikeUnionComputed) {
-                t.object_flags.set(t.object_flags_lazy() | ObjectFlags::IsUnknownLikeUnionComputed);
-                let types = t.types();
-                if types.len() >= 3
-                    && types[0].flags().intersects(TypeFlags::Undefined)
-                    && types[1].flags().intersects(TypeFlags::Null)
-                    && types.iter().any(|&t| self.is_empty_anonymous_object_type(t))
-                {
-                    t.object_flags.set(t.object_flags_lazy() | ObjectFlags::IsUnknownLikeUnion);
-                }
-            }
-            return t.object_flags_lazy().intersects(ObjectFlags::IsUnknownLikeUnion);
+        if !self.strict_null_checks || !t.flags().intersects(TypeFlags::Union) {
+            return false;
         }
-        false
+        let flags = t.object_flags_lazy();
+        if flags.intersects(ObjectFlags::IsUnknownLikeUnionComputed) {
+            return flags.intersects(ObjectFlags::IsUnknownLikeUnion);
+        }
+        self.compute_is_unknown_like_union_type(t)
+    }
+
+    /// Computes the memoized answer once; repeated relation checks take the inline flag-only path above.
+    #[cold]
+    #[inline(never)]
+    fn compute_is_unknown_like_union_type(&mut self, t: P<Type>) -> bool {
+        debug_assert!(self.strict_null_checks && t.flags().intersects(TypeFlags::Union));
+        debug_assert!(!t.object_flags_lazy().intersects(ObjectFlags::IsUnknownLikeUnionComputed));
+        t.object_flags.set(t.object_flags_lazy() | ObjectFlags::IsUnknownLikeUnionComputed);
+        let types = t.types();
+        if types.len() >= 3
+            && types[0].flags().intersects(TypeFlags::Undefined)
+            && types[1].flags().intersects(TypeFlags::Null)
+            && types.iter().any(|&t| self.is_empty_anonymous_object_type(t))
+        {
+            t.object_flags.set(t.object_flags_lazy() | ObjectFlags::IsUnknownLikeUnion);
+        }
+        t.object_flags_lazy().intersects(ObjectFlags::IsUnknownLikeUnion)
     }
 
     // Return true the given type is a primitive union type where no two literal type constituents are

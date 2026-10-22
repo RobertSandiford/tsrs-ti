@@ -41,8 +41,8 @@ impl Checker {
             let base_types = self.get_base_types(class_type);
             if !base_types.is_empty() {
                 let base_type = base_types[0];
-                self.check_jsdoc_augments_tag_matches_extends(node, base_type_node, base_type);
                 let base_constructor_type = self.get_base_constructor_type_of_class(class_type);
+                self.check_jsdoc_augments_tag_matches_extends(node, base_type_node, base_type);
                 let static_base_type = self.get_apparent_type(base_constructor_type);
                 self.check_base_type_accessibility(static_base_type, base_type_node);
                 self.check_source_element(base_type_node.expression());
@@ -170,47 +170,6 @@ impl Checker {
         self.check_index_constraints(static_type, symbol, true /*isStaticIndex*/);
         self.check_class_or_interface_for_duplicate_index_signatures(node);
         self.check_property_initialization(node);
-    }
-
-    // checker.go:4424
-    pub(crate) fn check_jsdoc_augments_tag_matches_extends(
-        &mut self,
-        node: P<Node>,
-        base_type_node: P<Node>,
-        base_type: P<Type>,
-    ) {
-        if !is_in_js_file(node) {
-            return;
-        }
-        let file = get_source_file_of_node(node);
-        for &j in node.eager_jsdoc(file.map(tsrs_core::P::get)) {
-            let Some(tags) = j.as_jsdoc().tags else {
-                continue;
-            };
-            for &tag in tags.nodes() {
-                if tag.kind() != Kind::JSDocAugmentsTag {
-                    continue;
-                }
-                let source_type_node = tag.class_name();
-                let source_type = self.get_type_from_type_node(source_type_node);
-                if self.is_type_identical_to(source_type, base_type) {
-                    continue;
-                }
-                let target_name = get_identifier_from_entity_name_expression(
-                    base_type_node.expression().unwrap(),
-                );
-                let source_name = get_identifier_from_entity_name_expression(
-                    source_type_node.expression().unwrap(),
-                );
-                if let (Some(target_name), Some(source_name)) = (target_name, source_name) {
-                    self.error(
-                        Some(source_name),
-                        &diagnostics::JSDoc_0_1_does_not_match_the_extends_2_clause,
-                        &[&tag.tag_name().text(), &source_name.text(), &target_name.text()],
-                    );
-                }
-            }
-        }
     }
 
     // checker.go:4450
@@ -1334,15 +1293,14 @@ impl Checker {
         self.check_exports_on_merged_declarations(node);
         let symbol = self.get_symbol_of_declaration(node).unwrap();
         self.check_type_parameter_lists_identical(symbol);
-        // Only check this symbol once
+        // Check once per checker, but report on the first interface declaration,
+        // independently of which declaration is checked first.
         if self.is_interface_check_site(symbol, node) {
+            let first_interface_declaration =
+                get_declaration_of_kind(symbol, Kind::InterfaceDeclaration).unwrap();
             let t = self.get_declared_type_of_symbol(symbol);
             let type_with_this = self.get_type_with_this_argument(t, None, false);
-            let error_node = if self.reports_interface_check_errors(symbol, node, t) {
-                node.name()
-            } else {
-                None
-            };
+            let error_node = first_interface_declaration.name();
             // run subsequent checks only if first set succeeded
             if self.check_inherited_properties_are_identical(t, error_node) {
                 for &base_type in self.get_base_types(t) {
@@ -1377,11 +1335,11 @@ impl Checker {
     }
 
     // Whether `node` runs the checks of its merged interface (TS2320, TS2430, index constraints). Go runs them once per
-    // checker, at whichever declaration that checker visits first (`interfaceChecked`), so with declarations in several
-    // files the errors depend on which files share a checker and in what order it visits them
-    // (notes/fix-history-dependent-diagnostics.md). By default they run at the first interface declaration of the symbol
-    // in each file, so each file gets the index-constraint errors at its own declarations whatever checked it before;
-    // `reports_interface_check_errors` decides where TS2320 and TS2430 go. `go_compatible_history()` keeps Go's flag.
+    // checker, at whichever declaration that checker visits first (`interfaceChecked`). With declarations in several
+    // files, index-constraint checks can depend on checker assignment (notes/fix-history-dependent-diagnostics.md).
+    // By default they run at the first interface declaration of the symbol
+    // in each file, so each file gets the index-constraint errors at its own declarations whatever checked it before.
+    // TS2320 and TS2430 are anchored to the first interface declaration in both modes.
     fn is_interface_check_site(&mut self, symbol: P<Symbol>, node: P<Node>) -> bool {
         if tsrs_core::compat::go_compatible_history() {
             let links = self.declared_type_links.get(symbol);
@@ -1400,43 +1358,7 @@ impl Checker {
             == Some(node)
     }
 
-    // Whether the checks running at `node` report TS2320 and TS2430, which go to the declaration being checked. Under
-    // Go's flag, always. By default, where tsgo's compiler at its default checker count reports them: at `node` only if
-    // no earlier file of the program that tsgo type checks on the same checker declares the interface
-    // (`Program::tsgo_default_check_slot`). That depends on the program alone, not on tsrs's checkers.
-    fn reports_interface_check_errors(
-        &mut self,
-        symbol: P<Symbol>,
-        node: P<Node>,
-        t: P<Type>,
-    ) -> bool {
-        if tsrs_core::compat::go_compatible_history() || self.get_base_types(t).is_empty() {
-            return true;
-        }
-        let file = get_source_file_of_node(node).unwrap();
-        let mut other_files = symbol
-            .declarations()
-            .iter()
-            .filter(|&&d| is_interface_declaration(d))
-            .map(|&d| get_source_file_of_node(d).unwrap())
-            .filter(|&f| f != file)
-            .peekable();
-        // Declared in this file only: avoid building the program-wide slot map.
-        if other_files.peek().is_none() {
-            return true;
-        }
-        let Some((checker, index)) = self.program.tsgo_default_check_slot(file) else {
-            return true;
-        };
-        !other_files.any(|other| {
-            self.program
-                .tsgo_default_check_slot(other)
-                .is_some_and(|(c, i)| c == checker && i < index)
-        })
-    }
-
     // checker.go:5127
-    // `type_node` is None where the checks run without reporting (`reports_interface_check_errors`).
     pub(crate) fn check_inherited_properties_are_identical(
         &mut self,
         t: P<Type>,
@@ -1536,7 +1458,9 @@ impl Checker {
             links.enum_checked.set(true);
             let declarations = enum_symbol.declarations();
             if declarations.len() > 1 {
-                let enum_is_const = is_enum_const(node);
+                let first_enum_declaration =
+                    get_declaration_of_kind(enum_symbol, Kind::EnumDeclaration).unwrap();
+                let enum_is_const = is_enum_const(first_enum_declaration);
                 // check that const is placed\omitted on all enum declarations
                 for &decl in declarations {
                     if is_enum_declaration(decl) && is_enum_const(decl) != enum_is_const {
@@ -1578,6 +1502,9 @@ impl Checker {
                 &diagnostics::An_enum_member_cannot_be_named_with_a_private_identifier,
                 &[],
             );
+        }
+        if is_computed_property_name(node.name().unwrap()) {
+            self.check_expression(node.name().unwrap().expression().unwrap());
         }
         if let Some(initializer) = node.initializer() {
             self.check_expression(initializer);
@@ -2965,7 +2892,35 @@ impl Checker {
                             node,
                             false,
                         );
-                        self.check_type_assignable_to(widened, optional_disposable_type, Some(initializer), Some(&diagnostics::The_initializer_of_a_using_declaration_must_be_either_an_object_with_a_Symbol_dispose_method_or_be_null_or_undefined));
+                        let mut diags = Vec::new();
+                        if !self.check_type_assignable_to_ex(
+                            widened,
+                            optional_disposable_type,
+                            Some(initializer),
+                            Some(&diagnostics::The_initializer_of_a_using_declaration_must_be_either_an_object_with_a_Symbol_dispose_method_or_be_null_or_undefined),
+                            &mut diags,
+                        ) {
+                            let global_async_disposable_type =
+                                self.get_global_async_disposable_type();
+                            let optional_async_disposable_type = self.get_union_type(&[
+                                global_async_disposable_type,
+                                self.null_type,
+                                self.undefined_type,
+                            ]);
+                            if global_async_disposable_type != self.empty_object_type
+                                && self.is_type_assignable_to(
+                                    widened,
+                                    optional_async_disposable_type,
+                                )
+                            {
+                                diags[0].add_message_chain(ast::new_diagnostic_chain(
+                                    None,
+                                    &diagnostics::This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using,
+                                    &[],
+                                ));
+                            }
+                            self.add_diagnostic(diags[0]);
+                        }
                     }
                 }
             }

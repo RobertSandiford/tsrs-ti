@@ -1010,8 +1010,7 @@ impl Checker {
             }
             symbol
         };
-        // Run the check only for the first declaration in the list.
-        if get_declaration_of_kind(symbol, node.kind()) != Some(node) {
+        if symbol.declarations().len() < 2 || !self.merged_exports_checked.add_if_absent(symbol) {
             return;
         }
         let mut exported_declaration_spaces = DeclarationSpaces::None;
@@ -3065,17 +3064,10 @@ impl Checker {
         // Check if the index type is assignable to 'keyof T' for the object type.
         let object_type = t.as_indexed_access_type().object_type.get().unwrap();
         let index_type = t.as_indexed_access_type().index_type.get().unwrap();
-        // skip index type deferral on remapping mapped types
-        let object_index_type = if self.is_generic_mapped_type(object_type)
-            && self.get_mapped_type_name_type_kind(object_type) == MappedTypeNameTypeKind::Remapping
-        {
-            self.get_index_type_for_mapped_type(object_type, IndexFlags::None)
-        } else {
-            self.get_index_type_ex(object_type, IndexFlags::None)
-        };
         let number_type = self.number_type;
         let has_number_index_info = self.get_index_info_of_type(object_type, number_type).is_some();
         if every_type(self, index_type, |c, t| {
+            let object_index_type = c.get_index_type_ex(object_type, IndexFlags::None);
             c.is_type_assignable_to(t, object_index_type)
                 || has_number_index_info && c.is_applicable_index_type(t, number_type)
         }) {
@@ -3149,6 +3141,14 @@ impl Checker {
             return self.create_promise_return_type(node, any_type);
         }
         let specifier = args[0];
+        if self.compiler_options.rewrite_relative_import_extensions.is_true()
+            && !is_string_literal_like(specifier)
+        {
+            self.check_external_emit_helpers(
+                node,
+                ExternalEmitHelpers::RewriteRelativeImportExtension,
+            );
+        }
         let specifier_type = self.check_expression_cached(specifier);
         let mut options_type: Option<P<Type>> = None;
         if args.len() > 1 {
@@ -3196,6 +3196,10 @@ impl Checker {
             }
             import_attributes_type = self.get_type_of_property_of_type(options_type, "with");
         }
+        if tsrs_ast::is_source_phase_import_call(node) {
+            let source_type = self.get_global_abstract_module_source_type();
+            return self.create_promise_return_type(node, source_type);
+        }
         // resolveExternalModuleName will return undefined if the moduleReferenceExpression is not a string literal
         let module_symbol = self.resolve_external_module_name(
             node,
@@ -3241,6 +3245,16 @@ impl Checker {
         node: P<Node>,
         check_mode: CheckMode,
     ) -> P<Type> {
+        if self.compiler_options.rewrite_relative_import_extensions.is_true()
+            && is_in_js_file(node)
+            && is_require_call(node, false /*requireStringLiteralLikeArgument*/)
+            && !is_string_literal_like(node.arguments()[0])
+        {
+            self.check_external_emit_helpers(
+                node,
+                ExternalEmitHelpers::RewriteRelativeImportExtension,
+            );
+        }
         self.check_grammar_type_arguments(node, node.type_argument_list());
         let signature =
             self.get_resolved_signature(node, None /*candidatesOutArray*/, check_mode);

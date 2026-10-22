@@ -90,6 +90,22 @@ pub fn params_fields(method: &str) -> &'static [FieldSpec] {
             nullable: false,
             elem: None,
         }],
+        "getSymbolOfDeclaration" => &[
+            FieldSpec {
+                name: "file",
+                go_type: "SourceFileDescriptor",
+                kind: FieldKind::Object,
+                nullable: false,
+                elem: None,
+            },
+            FieldSpec {
+                name: "index",
+                go_type: "uint32",
+                kind: FieldKind::U32,
+                nullable: false,
+                elem: None,
+            },
+        ],
         "createSnapshot" => &[
             FieldSpec {
                 name: "openProjects",
@@ -3998,6 +4014,20 @@ pub fn struct_fields(name: &str) -> &'static [FieldSpec] {
                 name: "ensurePrograms",
                 go_type: "EnsurePrograms",
                 kind: FieldKind::Any,
+                nullable: true,
+                elem: None,
+            },
+            FieldSpec {
+                name: "userPreferences",
+                go_type: "*lsutil.UserPreferences",
+                kind: FieldKind::Object,
+                nullable: true,
+                elem: None,
+            },
+            FieldSpec {
+                name: "prepareAutoImports",
+                go_type: "*DocumentIdentifier",
+                kind: FieldKind::Doc,
                 nullable: true,
                 elem: None,
             },

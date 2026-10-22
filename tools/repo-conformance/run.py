@@ -118,10 +118,17 @@ def discover(count: int, shards: int, out: Path) -> dict:
     repos = {}
     for page in range(1, 11):
         query = urlencode(dict(q=QUERY, sort="stars", order="desc", per_page=100, page=page))
-        with urlopen(Request("https://api.github.com/search/repositories?" + query, headers=headers), timeout=60) as response:
-            data = json.load(response)
-        if data.get("incomplete_results"):
-            raise RuntimeError("GitHub returned an incomplete repository search; retry discovery")
+        for attempt in range(1, 6):
+            with urlopen(Request("https://api.github.com/search/repositories?" + query, headers=headers), timeout=60) as response:
+                data = json.load(response)
+            if not data.get("incomplete_results"):
+                break
+            if attempt == 5:
+                raise RuntimeError(f"GitHub returned an incomplete repository search for page {page} after {attempt} attempts")
+            delay = 5 * 2 ** (attempt - 1)
+            print(f"GitHub returned an incomplete repository search for page {page} (attempt {attempt}/5); "
+                  f"retrying in {delay}s", file=sys.stderr, flush=True)
+            time.sleep(delay)
         for repo in data["items"]:
             name = repo["full_name"]
             if not NAME.fullmatch(name):
@@ -596,8 +603,10 @@ def replace_shards(reports: dict[int, dict], earlier: dict[int, dict], manifest:
                               f"{', '.join(differences(result))}; a rerun does not clear it")
 
 
-def summarize(manifest: dict, directory: Path, out: Path, previous: Path | None = None) -> bool:
-    """Write the report. Shards missing from directory are taken from previous, a run with the same manifest."""
+def summarize(manifest: dict, directory: Path, out: Path, previous: Path | None = None) -> int:
+    """Write the report. Return 2 for incomplete results, 3 for parity differences, or 0 for a match.
+
+    Shards missing from directory are taken from previous, a run with the same manifest."""
     pinned = {r["repository"]: r.get("commit") for r in manifest["repositories"]}
     errors: list[str] = []
     reports = load_shards(directory, manifest, errors)
@@ -640,7 +649,7 @@ def summarize(manifest: dict, directory: Path, out: Path, previous: Path | None 
     if "strict" in modes:
         strict_lines = [
             f"tsgo `{command(modes['strict']['tsgo'])}` vs tsrs `{command(modes['strict']['tsrs'])}`, both run again "
-            "after all default comparisons, in the time they leave. A difference here fails the report too, and "
+            "after all default comparisons, in the time they leave. A difference here is reported too, and "
             "strict-mode identity does not excuse a default-mode difference.", "",
             f"Of the {len(eligible)} projects where tsgo completed in default mode: {strict['match']} identical, "
             f"{strict['mismatch']} different, {strict['tsrs_failed']} tsrs failures in strict mode; strict tsgo failed "
@@ -668,7 +677,7 @@ def summarize(manifest: dict, directory: Path, out: Path, previous: Path | None 
              "failures). `references`: a solution config with no files of its own; its referenced projects were "
              "compared instead. `no_inputs`: neither compiler loaded a file.", "",
              "A difference lists what differs: exit code, loaded files, diagnostics, or other output (lines that are "
-             "not diagnostics, such as `traceResolution` traces). Any of these fails the report.", "",
+             "not diagnostics, such as `traceResolution` traces). Any of these is reported as a difference.", "",
              "## Strict mode", "", *strict_lines, "",
              "## Repositories", "",
              "Checks use `--noEmit`. Artifacts contain logs, diffs, and repository commits. Projects include configs "
@@ -686,7 +695,11 @@ def summarize(manifest: dict, directory: Path, out: Path, previous: Path | None 
         lines.extend(["", "## Incomplete run", "", *("- " + e for e in errors)])
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n")
-    return not errors and not any(counter[s] for counter in (projects, strict) for s in ("mismatch", "tsrs_failed"))
+    if errors:
+        return 2
+    if any(counter[s] for counter in (projects, strict) for s in ("mismatch", "tsrs_failed")):
+        return 3
+    return 0
 
 
 def parse_shards(text: str, count: int) -> list[int]:
@@ -755,8 +768,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     plan = commands.add_parser("plan")
-    plan.add_argument("--count", type=positive, default=400)
-    plan.add_argument("--shards", type=positive, default=20)
+    plan.add_argument("--count", type=positive, default=1000)
+    plan.add_argument("--shards", type=positive, default=10)
     plan.add_argument("--out", type=Path, required=True)
     run = commands.add_parser("run")
     run.add_argument("--manifest", type=Path, required=True)
@@ -784,8 +797,8 @@ def main() -> int:
     commands.add_parser("_repo", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.command == "plan":
-        if args.count > 400 or args.shards > MAX_SHARDS:
-            parser.error("At most 400 repositories and 20 shards")
+        if args.count > 1000 or args.shards > MAX_SHARDS:
+            parser.error("At most 1000 repositories and 20 shards")
         manifest = discover(args.count, args.shards, args.out)
         write_matrix(list(range(manifest["shards"])))
     elif args.command == "dispatch":
@@ -811,7 +824,7 @@ def main() -> int:
                             request["max_configs"], Path("/source") if request.get("source") else None)
         write_json(Path("/work/result.json"), result)
     else:
-        return 0 if summarize(json.loads(args.manifest.read_text()), args.results, args.out, args.previous) else 1
+        return summarize(json.loads(args.manifest.read_text()), args.results, args.out, args.previous)
     return 0
 
 

@@ -110,3 +110,59 @@ pub(crate) fn get_all_jsdoc_tags(node: P<Node>) -> Vec<P<Node>> {
     }
     Vec::new()
 }
+
+impl Checker {
+    // jsdoc.go:102
+    pub(crate) fn check_jsdoc_augments_tag_matches_extends(
+        &mut self,
+        node: P<Node>,
+        base_type_node: P<Node>,
+        base_type: P<Type>,
+    ) {
+        if !ast::is_in_js_file(node) {
+            return;
+        }
+        let file = ast::get_source_file_of_node(node);
+        for &j in node.eager_jsdoc(file.map(tsrs_core::P::get)) {
+            let Some(tags) = j.as_jsdoc().tags else {
+                continue;
+            };
+            for &tag in tags.nodes() {
+                if tag.kind() != Kind::JSDocAugmentsTag {
+                    continue;
+                }
+                let source_type_node = tag.class_name();
+                let source_type = self.get_type_from_type_node(source_type_node);
+                let source_name = get_identifier_from_entity_name_expression(
+                    source_type_node.expression().unwrap(),
+                );
+                let base_expression = base_type_node.expression().unwrap();
+                if ast::is_entity_name_expression(base_expression) {
+                    if self.is_type_identical_to(source_type, base_type) {
+                        continue;
+                    }
+                    let target_name = get_identifier_from_entity_name_expression(base_expression);
+                    if let (Some(target_name), Some(source_name)) = (target_name, source_name) {
+                        self.error(
+                            Some(source_name),
+                            &diagnostics::JSDoc_0_1_does_not_match_the_extends_2_clause,
+                            &[&tag.tag_name().text(), &source_name.text(), &target_name.text()],
+                        );
+                    }
+                } else if let Some(source_name) = source_name
+                    && !self.is_type_assignable_to(base_type, source_type)
+                {
+                    self.error(
+                        Some(source_name),
+                        &diagnostics::JSDoc_0_1_does_not_match_the_extends_2_clause,
+                        &[
+                            &tag.tag_name().text(),
+                            &source_name.text(),
+                            &tsrs_scanner::get_text_of_node(base_expression),
+                        ],
+                    );
+                }
+            }
+        }
+    }
+}

@@ -386,9 +386,16 @@ impl NodeBuilderImpl {
         parent: P<Node>,
         lit: P<Node>,
     ) -> P<Node> {
-        let new_name = self.get_module_specifier_override(c, parent, lit);
+        let mut new_name = self.get_module_specifier_override(c, parent, lit);
         if new_name.is_empty() {
-            return lit;
+            let Some(rewritten) = self.rewrite_content_mapped_module_specifier(c, lit.text())
+            else {
+                return lit;
+            };
+            if rewritten == lit.text() {
+                return lit;
+            }
+            new_name = rewritten;
         }
         let res = self.f.new_string_literal(self.f.alloc_text(&new_name), TokenFlags::None);
         self.e.set_original(res, lit);
@@ -1279,7 +1286,7 @@ impl ExistingNodeTree {
             if ast::is_function_like(node) {
                 let sig = c.get_signature_from_declaration(node);
                 params = sig.parameters.get();
-                type_params = sig.type_parameters.get().to_vec();
+                type_params = sig.type_parameters().to_vec();
             } else if ast::is_conditional_type_node(node) {
                 // !!! TODO: impossible in combination with the scope start check???
                 type_params = c.get_infer_type_parameters(node);

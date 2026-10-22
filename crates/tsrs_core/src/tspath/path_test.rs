@@ -2,6 +2,55 @@ use super::*;
 use crate::tspath::*;
 
 #[test]
+fn test_is_network_path() {
+    for path in [
+        "//server",
+        "//server/share/file.ts",
+        "\\\\server\\share\\file.ts",
+        "/\\server/share",
+        "\\/server/share",
+        "//?/UNC/server/share",
+        "\\\\?\\UNC\\server\\share",
+        "//./UNC/server/share",
+        "\\\\.\\GLOBALROOT\\Device\\Mup\\server\\share",
+        "\\\\?\\c:\\file.ts",
+        "\\\\wsl$\\Ubuntu\\home",
+        "//wsl.localhost/Ubuntu/home",
+        "/??",
+        "/??/UNC/server/share",
+        "\\??\\UNC\\server\\share",
+        "\\??\\GLOBALROOT\\Device\\Mup\\server\\share",
+    ] {
+        assert!(is_network_path(path), "{path:?}");
+    }
+    for path in [
+        "",
+        "/",
+        "\\",
+        "a",
+        "a//b",
+        "./a",
+        "../a",
+        "/a",
+        "/a//b",
+        "/?",
+        "/???",
+        "/??a",
+        "/a/??/b",
+        "c:",
+        "c:/",
+        "c:\\file.ts",
+        "c:file.ts",
+        "file:///c:/file.ts",
+        "file://server/share",
+        "^/untitled/ts-nul-authority/Untitled-1",
+        "bundled:///libs/lib.d.ts",
+    ] {
+        assert!(!is_network_path(path), "{path:?}");
+    }
+}
+
+#[test]
 fn test_normalize_slashes() {
     assert_eq!(normalize_slashes("a"), "a");
     assert_eq!(normalize_slashes("a/b"), "a/b");
@@ -45,6 +94,8 @@ fn test_get_root_length() {
     assert_eq!(get_root_length("file://localhost/c%3A"), 21);
     assert_eq!(get_root_length("file://localhost/c%3Ad"), 17);
     assert_eq!(get_root_length("file://localhost/c%3A/path"), 22);
+    assert_eq!(get_root_length("FILE:///C:/path"), 11);
+    assert_eq!(get_root_length("file://LOCALHOST/C%3A/path"), 22);
     assert_eq!(get_root_length("file://server"), 13);
     assert_eq!(get_root_length("file://server/"), 14);
     assert_eq!(get_root_length("file://server/path"), 14);
@@ -666,6 +717,10 @@ fn test_to_path() {
     assert_eq!(to_path("file.ext", "path/to", false).as_str(), "path/to/file.ext");
     assert_eq!(to_path("file.ext", "/path/to", true).as_str(), "/path/to/file.ext");
     assert_eq!(to_path("/path/to/../file.ext", "path/to", true).as_str(), "/path/file.ext");
+    assert_eq!(
+        to_path("^/~ts-uri~/custom/ts-nul-authority/CaseSensitive.ts", "/", false).as_str(),
+        "^/~ts-uri~/custom/ts-nul-authority/CaseSensitive.ts"
+    );
 }
 
 #[test]
@@ -862,6 +917,20 @@ fn test_untitled_path_edge_cases() {
         );
         assert_eq!(is_rooted_disk_path(path), is_rooted, "{path}");
     }
+}
+
+#[test]
+fn test_dynamic_uri_root_classification() {
+    let root = "^/~ts-uri~/custom/authority";
+    assert_eq!(get_encoded_root_length(root), EncodedRootLength::Url(root.len()));
+    assert!(is_url(root));
+    assert!(!is_rooted_disk_path(root));
+    assert!(path_is_absolute(root));
+    assert_eq!(get_root_length(root), root.len());
+    assert_eq!(
+        get_encoded_root_length(&format!("{root}/Foo.ts")),
+        EncodedRootLength::Disk(root.len() + 1)
+    );
 }
 
 #[test]

@@ -854,27 +854,19 @@ impl Parser {
                                     extends_clause.as_heritage_clause().types().nodes()[0];
                                 let target = target_node.as_expression_with_type_arguments();
                                 let source = tag.class_name().as_expression_with_type_arguments();
-                                if ast::has_same_property_access_name(
-                                    target.expression,
-                                    source.expression,
-                                ) {
-                                    if let (None, Some(source_type_arguments)) =
-                                        (target.type_arguments.get(), source.type_arguments.get())
-                                    {
-                                        let mut new_arguments: Vec<P<Node>> =
-                                            Vec::with_capacity(source_type_arguments.nodes().len());
-                                        new_arguments.extend(
-                                            source_type_arguments.nodes().iter().map(|&arg| {
-                                                self.add_deep_clone_reparse(Some(arg)).unwrap()
-                                            }),
-                                        );
-                                        let list = self.new_node_list(
-                                            source_type_arguments.loc.get(),
-                                            &new_arguments,
-                                        );
-                                        target.type_arguments.set(Some(list));
-                                        self.finish_mutated_node(target_node);
-                                    }
+                                if target.type_arguments.get().is_none()
+                                    && let Some(source_type_arguments) = source.type_arguments.get()
+                                    && target.expression.kind() != Kind::NullKeyword
+                                    && (!ast::is_entity_name_expression(target.expression)
+                                        || ast::has_same_property_access_name(
+                                            target.expression,
+                                            source.expression,
+                                        ))
+                                {
+                                    self.set_reparsed_type_arguments(
+                                        target_node,
+                                        source_type_arguments,
+                                    );
                                 }
                             }
                         }
@@ -883,6 +875,17 @@ impl Parser {
             }
             _ => {}
         }
+    }
+
+    fn set_reparsed_type_arguments(&mut self, target: P<Node>, source: P<NodeList>) {
+        let type_arguments: Vec<P<Node>> = source
+            .nodes()
+            .iter()
+            .map(|&argument| self.add_deep_clone_reparse(Some(argument)).unwrap())
+            .collect();
+        let list = self.new_node_list(source.loc.get(), &type_arguments);
+        target.as_expression_with_type_arguments().type_arguments.set(Some(list));
+        self.finish_mutated_node(target);
     }
 
     pub(crate) fn make_question_if_optional(&self, parameter: P<Node>) -> Option<P<Node>> {

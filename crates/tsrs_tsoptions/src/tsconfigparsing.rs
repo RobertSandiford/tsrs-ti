@@ -21,7 +21,10 @@ use crate::commandlineoption::{
     CommandLineOption, CommandLineOptionKind, CompilerOptionsValue, ExtraValidation,
 };
 use crate::commandlineparser::{convert_json_option_of_enum_type, try_read_file};
-use crate::contentmappers::{Mapper, OptionPathSegment, resolve_content_mapper_manifest};
+use crate::contentmappers::{
+    Mapper, OptionPathSegment, has_reserved_source_extension, is_valid_extension,
+    resolve_content_mapper_manifest,
+};
 use crate::declscompiler::{OPTIONS_DECLARATIONS, OPTIONS_FOR_COMPILER};
 use crate::declstypeacquisition::TYPE_ACQUISITION_DECLARATION;
 use crate::errors::{
@@ -31,6 +34,7 @@ use crate::errors::{
     get_compiler_option_value_type_string,
 };
 use crate::parsedcommandline::ParsedCommandLine;
+use crate::parsedcommandline::get_content_mapper_output_extension;
 use crate::parsedoptions::ParsedOptions;
 use crate::parsinghelpers::{
     CompilerOptionsParser, OptionParser, TypeAcquisitionParser, merge_compiler_options,
@@ -537,16 +541,6 @@ pub(crate) fn validate_json_option_value(
     let mut errors: Vec<P<Diagnostic>> = Vec::new();
 
     match opt.extra_validation {
-        ExtraValidation::Spec => {
-            if let Some(diag) = spec_to_diagnostic(val.as_str().unwrap(), false) {
-                errors.push(create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
-                    source_file,
-                    value_expression,
-                    diag,
-                    &[],
-                ));
-            }
-        }
         ExtraValidation::Locale => {
             if !locale_parse(val.as_str().unwrap()) {
                 errors.push(create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
@@ -635,6 +629,12 @@ fn normalize_non_list_option_value(
     value
 }
 
+// Match the path that the file system will receive after resolving it against
+// the config's base directory; normalization can add or remove an /??/ prefix.
+pub(crate) fn is_network_path_value(value: &str, base_path: &str) -> bool {
+    tspath::is_network_path(&tspath::get_normalized_absolute_path(value, base_path))
+}
+
 pub(crate) fn convert_json_option(
     opt: &'static CommandLineOption,
     value: CompilerOptionsValue,
@@ -715,6 +715,19 @@ pub(crate) fn convert_json_option(
             validate_json_option_value(opt, value, value_expression, source_file);
         if !errors.is_empty() || validated_value.is_null() {
             (validated_value, errors)
+        } else if let CompilerOptionsValue::String(path) = &validated_value
+            && opt.is_file_path
+            && is_network_path_value(path, base_path)
+        {
+            (
+                CompilerOptionsValue::Null,
+                vec![create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
+                    source_file,
+                    value_expression,
+                    &diagnostics::Network_path_0_is_not_supported,
+                    &[path],
+                )],
+            )
         } else {
             (normalize_non_list_option_value(opt, base_path, validated_value), errors)
         }
@@ -821,6 +834,15 @@ fn get_extends_config_path(
     let extended_config = tspath::normalize_slashes(extended_config);
     let mut errors: Vec<P<Diagnostic>> = Vec::new();
     let error_file = source_file;
+    if is_network_path_value(&extended_config, base_path) {
+        errors.push(create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
+            error_file,
+            value_expression,
+            &diagnostics::Network_path_0_is_not_supported,
+            &[&extended_config],
+        ));
+        return (String::new(), errors);
+    }
     if tspath::is_rooted_disk_path(&extended_config)
         || extended_config.starts_with("./")
         || extended_config.starts_with("../")
@@ -1674,7 +1696,7 @@ fn parse_config(
     if let Some(extended_config_paths) = own_config.extended_config_path.clone() {
         // copy the resolution stack so it is never reused between branches in potential diamond-problem scenarios.
         let mut resolution_stack = resolution_stack.to_vec();
-        resolution_stack.push(resolved_path);
+        resolution_stack.push(resolved_path.clone());
         let mut result = ExtendsResult {
             options: tsrs_core::CompilerOptions::default(),
             include: None,
@@ -1725,6 +1747,14 @@ fn parse_config(
                 reason = "each file is inserted at its sorted position"
             )]
             for extended_source_file in result.extended_source_files {
+                if tspath::to_path(
+                    &extended_source_file,
+                    &base_path,
+                    host.fs().use_case_sensitive_file_names(),
+                ) == resolved_path
+                {
+                    continue;
+                }
                 let i = extended_source_files
                     .binary_search(&extended_source_file)
                     .unwrap_or_else(|i| i);
@@ -2020,6 +2050,7 @@ fn parse_json_config_file_content_worker(
         (validated_include_specs_before_substitution, err) = validate_specs(
             include_specs,
             true, /*disallowTrailingRecursion*/
+            &base_path_for_file_names,
             tsconfig_to_source_file(source_file),
             "include",
         );
@@ -2037,6 +2068,7 @@ fn parse_json_config_file_content_worker(
         (validated_exclude_specs, err) = validate_specs(
             exclude_specs,
             false, /*disallowTrailingRecursion*/
+            &base_path_for_file_names,
             tsconfig_to_source_file(source_file),
             "exclude",
         );
@@ -2051,15 +2083,21 @@ fn parse_json_config_file_content_worker(
         }
     }
     if let Some(file_specs) = &file_specs.slice_value {
-        validated_files_spec_before_substitution.extend(
-            file_specs.iter().filter(|v| is_string_value(v)).filter_map(|spec| {
-                if let CompilerOptionsValue::String(spec) = spec {
-                    Some(spec.clone())
-                } else {
-                    None
-                }
-            }),
-        );
+        for value in file_specs {
+            let CompilerOptionsValue::String(spec) = value else {
+                continue;
+            };
+            if is_network_path_value(spec, &base_path_for_file_names) {
+                errors.push(create_diagnostic_for_spec(
+                    tsconfig_to_source_file(source_file),
+                    "files",
+                    &diagnostics::Network_path_0_is_not_supported,
+                    spec,
+                ));
+                continue;
+            }
+            validated_files_spec_before_substitution.push(spec.clone());
+        }
         validated_files_spec = match get_substituted_string_array_with_config_dir_template(
             &validated_files_spec_before_substitution,
             &base_path_for_file_names,
@@ -2110,8 +2148,6 @@ fn parse_json_config_file_content_worker(
     );
     let mut content_mapper_extensions: Vec<String> =
         Vec::with_capacity(total_content_mapper_extensions);
-    let native_extensions: Vec<&str> =
-        tspath::ALL_SUPPORTED_EXTENSIONS_WITH_JSON.iter().flat_map(|g| g.iter().copied()).collect();
     let canonical_extension = |extension: &str| {
         tspath::get_canonical_file_name(extension, host.fs().use_case_sensitive_file_names())
     };
@@ -2134,10 +2170,16 @@ fn parse_json_config_file_content_worker(
                     content_mapper_source_file,
                     ext_node,
                 ));
-            } else if native_extensions
-                .iter()
-                .any(|native_extension| tsrs_core::stringutil::equal_fold(native_extension, ext))
-            {
+            } else if ext.contains('/') || ext.contains('\\') {
+                errors.push(set_content_mapper_diagnostic_location(
+                    new_compiler_diagnostic(
+                        &diagnostics::Content_mapper_extension_0_must_not_contain_path_separators,
+                        &[ext],
+                    ),
+                    content_mapper_source_file,
+                    ext_node,
+                ));
+            } else if has_reserved_source_extension(ext) {
                 errors.push(set_content_mapper_diagnostic_location(
                     new_compiler_diagnostic(
                         &diagnostics::Content_mapper_file_extension_0_is_a_built_in_extension_and_cannot_be_registered_by_a_content_mapper,
@@ -2161,6 +2203,49 @@ fn parse_json_config_file_content_worker(
             }
         }
         mapper.definition.extensions = valid_extensions;
+        let mut output_extensions: Vec<_> = mapper.definition.output_extensions.iter().collect();
+        output_extensions.sort_unstable_by(|a, b| a.0.cmp(b.0));
+        for (source_extension, output_extension) in output_extensions {
+            let output_extensions_node = get_content_mapper_syntax(
+                content_mapper_source_file,
+                Some(content_mapper_indices[j]),
+                "outputExtensions",
+            );
+            for extension in [source_extension, output_extension] {
+                let diagnostic = if extension.contains('/') || extension.contains('\\') {
+                    Some(new_compiler_diagnostic(
+                        &diagnostics::Content_mapper_extension_0_must_not_contain_path_separators,
+                        &[extension],
+                    ))
+                } else if !is_valid_extension(extension) {
+                    Some(new_compiler_diagnostic(
+                        &diagnostics::Content_mapper_output_extension_0_must_be_non_empty_and_begin_with_a,
+                        &[extension],
+                    ))
+                } else {
+                    None
+                };
+                if let Some(diagnostic) = diagnostic {
+                    errors.push(set_content_mapper_diagnostic_location(
+                        diagnostic,
+                        content_mapper_source_file,
+                        output_extensions_node,
+                    ));
+                }
+            }
+            if !mapper.definition.extensions.iter().any(|extension| {
+                canonical_extension(extension) == canonical_extension(source_extension)
+            }) {
+                errors.push(set_content_mapper_diagnostic_location(
+                    new_compiler_diagnostic(
+                        &diagnostics::Content_mapper_output_extension_mapping_source_0_is_not_registered_by_this_content_mapper,
+                        &[source_extension],
+                    ),
+                    content_mapper_source_file,
+                    output_extensions_node,
+                ));
+            }
+        }
     }
     if !content_mappers.is_empty()
         && !parsed_config.options.as_ref().is_some_and(|o| o.run_external_code.is_true())
@@ -2200,6 +2285,51 @@ fn parse_json_config_file_content_worker(
                 continue;
             }
             mapper.manifest = manifest;
+            let has_explicit_output_extensions = content_mappers_of_raw
+                .slice_value
+                .as_ref()
+                .and_then(|values| values.get(content_mapper_indices[j]))
+                .and_then(CompilerOptionsValue::as_object)
+                .is_some_and(|raw_mapper| raw_mapper.contains_key("outputExtensions"));
+            if !has_explicit_output_extensions {
+                mapper
+                    .definition
+                    .output_extensions
+                    .clone_from(&mapper.manifest.default_output_extensions);
+                mapper.definition.output_extensions_present =
+                    mapper.manifest.default_output_extensions_present;
+            }
+            for source_extension in &mapper.definition.extensions {
+                let Some(output_extension) = get_content_mapper_output_extension(
+                    &mapper.definition.output_extensions,
+                    source_extension,
+                    !host.fs().use_case_sensitive_file_names(),
+                ) else {
+                    continue;
+                };
+                let identity = source_extension == output_extension
+                    || !host.fs().use_case_sensitive_file_names()
+                        && tsrs_core::stringutil::equal_fold(source_extension, output_extension);
+                if !identity
+                    && !parsed_config
+                        .options
+                        .as_ref()
+                        .is_some_and(|options| options.rewrite_relative_import_extensions.is_true())
+                {
+                    errors.push(set_content_mapper_diagnostic_location(
+                        new_compiler_diagnostic(
+                            &diagnostics::Content_mapper_output_extension_mapping_from_0_to_1_requires_rewriteRelativeImportExtensions_to_be_enabled,
+                            &[source_extension, output_extension],
+                        ),
+                        content_mapper_source_file,
+                        get_content_mapper_syntax(
+                            content_mapper_source_file,
+                            Some(content_mapper_indices[j]),
+                            "",
+                        ),
+                    ));
+                }
+            }
             resolved_content_mappers.push(mapper);
         }
         content_mappers = resolved_content_mappers;
@@ -2268,6 +2398,16 @@ fn parse_json_config_file_content_worker(
                     ));
                     continue;
                 }
+                if is_network_path_value(&ref_.reference.path, base_path) {
+                    errors.push(create_diagnostic_at_project_reference_property(
+                        source_file,
+                        index,
+                        "path",
+                        &diagnostics::Network_path_0_is_not_supported,
+                        &[&ref_.reference.path],
+                    ));
+                    continue;
+                }
                 if ref_.has_circular && !ref_.circular_valid {
                     errors.push(create_diagnostic_at_project_reference_property(
                         source_file,
@@ -2304,7 +2444,6 @@ fn parse_json_config_file_content_worker(
             project_references_is_nil: project_references.is_none(),
             project_references: project_references.unwrap_or_default(),
             content_mappers: content_mappers.into(),
-            watch_options: None,
         },
         config_file: source_file,
         raw: parsed_config.raw,
@@ -2337,27 +2476,19 @@ fn should_report_no_input_files(
 fn validate_specs(
     specs: &[CompilerOptionsValue],
     disallow_trailing_recursion: bool,
+    base_path: &str,
     json_source_file: Option<P<SourceFile>>,
     spec_key: &str,
 ) -> (Vec<String>, Vec<P<Diagnostic>>) {
-    let create_diagnostic = |message: &'static Message, spec: &str| -> P<Diagnostic> {
-        let element = get_ts_config_prop_array_element_value(json_source_file, spec_key, spec);
-        create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
-            json_source_file,
-            element,
-            message,
-            &[&spec],
-        )
-    };
     let mut errors: Vec<P<Diagnostic>> = Vec::new();
     let mut final_specs: Vec<String> = Vec::new();
     for value in specs {
         let CompilerOptionsValue::String(spec) = value else {
             continue;
         };
-        let diag = spec_to_diagnostic(spec, disallow_trailing_recursion);
+        let diag = spec_to_diagnostic(spec, disallow_trailing_recursion, base_path);
         if let Some(diag) = diag {
-            errors.push(create_diagnostic(diag, spec));
+            errors.push(create_diagnostic_for_spec(json_source_file, spec_key, diag, spec));
         } else {
             final_specs.push(spec.clone());
         }
@@ -2365,10 +2496,31 @@ fn validate_specs(
     (final_specs, errors)
 }
 
+fn create_diagnostic_for_spec(
+    json_source_file: Option<P<SourceFile>>,
+    spec_key: &str,
+    message: &'static Message,
+    spec: &str,
+) -> P<Diagnostic> {
+    let element = get_ts_config_prop_array_element_value(json_source_file, spec_key, spec);
+    create_diagnostic_for_node_in_source_file_or_compiler_diagnostic(
+        json_source_file,
+        element,
+        message,
+        &[&spec],
+    )
+}
+
 pub(crate) fn spec_to_diagnostic(
     spec: &str,
     disallow_trailing_recursion: bool,
+    base_path: &str,
 ) -> Option<&'static Message> {
+    // A '?' in a file spec is a wildcard, so an /??/ spec can match local
+    // directories. Only a normalized UNC/device root is unambiguously remote.
+    if tspath::get_normalized_absolute_path(spec, base_path).starts_with("//") {
+        return Some(&diagnostics::Network_path_0_is_not_supported);
+    }
     if disallow_trailing_recursion && invalid_trailing_recursion(spec) {
         return Some(&diagnostics::File_specification_cannot_end_in_a_recursive_directory_wildcard_Asterisk_Asterisk_Colon_0);
     }
@@ -2432,8 +2584,8 @@ pub fn create_diagnostic_at_reference_syntax(
     message: &'static Message,
     args: &[&dyn Display],
 ) -> Option<P<Diagnostic>> {
-    // Programs created through the API have references but no config file: the caller reports the diagnostic
-    // without a location (Go dereferences nil here).
+    // API-created programs can have references without a config file. Return no located diagnostic so the
+    // caller reports a compiler diagnostic without a location, as in Go.
     let source_file = config.config_file?.source_file;
     for_each_ts_config_prop_array(Some(source_file), "references", |property| {
         let initializer = property.initializer().unwrap();
@@ -3222,9 +3374,6 @@ fn write_json(out: &mut String, value: &CompilerOptionsValue) {
         CompilerOptionsValue::ScriptTarget(v) => out.push_str(&v.value().to_string()),
         CompilerOptionsValue::JsxEmit(v) => out.push_str(&v.value().to_string()),
         CompilerOptionsValue::NewLineKind(v) => out.push_str(&v.value().to_string()),
-        CompilerOptionsValue::WatchFileKind(v) => out.push_str(&(*v as i32).to_string()),
-        CompilerOptionsValue::WatchDirectoryKind(v) => out.push_str(&(*v as i32).to_string()),
-        CompilerOptionsValue::PollingKind(v) => out.push_str(&(*v as i32).to_string()),
     }
 }
 

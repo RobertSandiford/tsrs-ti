@@ -226,9 +226,8 @@ impl DeclarationTransformer {
                 self.preserve_js_doc(statement, input);
                 self.remove_all_comments(assignment);
                 return Some(f.new_syntax_list(alloc_vec(vec![statement, assignment])));
-            } else if self.host.get_emit_resolver().get_referenced_value_declaration(name)
-                == Some(input)
-                || self.host.get_emit_resolver().get_referenced_value_declaration(name).is_none()
+            } else if self.resolver.get_referenced_value_declaration(name) == Some(input)
+                || self.resolver.get_referenced_value_declaration(name).is_none()
             {
                 // only inline to a export var if the `name` lookup points at this assignment or nothing - if it points at something else, we must use a temp name
                 // export var name: Type
@@ -385,6 +384,30 @@ impl DeclarationTransformer {
             self.result_has_external_module_indicator.get()
                 || (parent.kind() != Kind::ModuleDeclaration && parent.kind() != Kind::ImportType),
         );
+        if ast::is_string_literal(input)
+            && self.compiler_options.rewrite_relative_import_extensions.is_true()
+        {
+            let rewrites = self.host.content_mapper_extension_rewrites();
+            let use_case_sensitive_file_names = self.host.use_case_sensitive_file_names();
+            if !tspath::should_rewrite_extension(
+                input.text(),
+                &rewrites,
+                use_case_sensitive_file_names,
+            ) {
+                return Some(input);
+            }
+            let (rewritten, changed) =
+                tspath::rewrite_extension(input.text(), &rewrites, use_case_sensitive_file_names);
+            if changed {
+                let result = self.factory().new_string_literal(
+                    alloc_str(&rewritten),
+                    input.as_string_literal().token_flags(),
+                );
+                self.emit_context().set_original(result, input);
+                self.emit_context().assign_comment_and_source_map_ranges(result, input);
+                return Some(result);
+            }
+        }
         Some(input)
     }
 
@@ -429,7 +452,7 @@ impl DeclarationTransformer {
     // transform.go:1644
     pub(crate) fn ensure_type(&self, node: P<Node>, ignore_private: bool) -> Option<P<Node>> {
         if !ignore_private
-            && self.host.get_effective_declaration_flags(
+            && self.resolver.get_effective_declaration_flags(
                 self.emit_context().parse_node(Some(node)).unwrap(),
                 ModifierFlags::Private,
             ) != ModifierFlags::None
@@ -463,7 +486,6 @@ impl DeclarationTransformer {
                     js_flags &= !nodebuilder::Flags::WriteClassExpressionAsTypeLiteral;
                 }
                 let res = self.resolver.try_js_type_node_to_type_node(
-                    self.emit_context(),
                     node.type_node().unwrap(),
                     self.enclosing_declaration.get(),
                     js_flags,
@@ -496,7 +518,6 @@ impl DeclarationTransformer {
         }
         let type_node = if ast::has_inferred_type(node) {
             self.resolver.create_type_of_declaration(
-                self.emit_context(),
                 node,
                 self.enclosing_declaration.get(),
                 flags,
@@ -505,7 +526,6 @@ impl DeclarationTransformer {
             )
         } else if ast::is_function_like(node) {
             self.resolver.create_return_type_of_signature_declaration(
-                self.emit_context(),
                 node,
                 self.enclosing_declaration.get(),
                 flags,
@@ -528,7 +548,7 @@ impl DeclarationTransformer {
 
     // transform.go:1708
     pub(crate) fn should_print_with_initializer(&self, node: P<Node>) -> bool {
-        can_have_literal_initializer(self.host, node)
+        can_have_literal_initializer(self.resolver, node)
             && node.initializer().is_some()
             && self.resolver.is_literal_const_declaration(
                 self.emit_context().most_original(Some(node)).unwrap(),
@@ -632,12 +652,17 @@ impl DeclarationTransformer {
     // transform.go:1798
     pub(crate) fn transform_type_alias_declaration(&self, input: P<Node>) -> P<Node> {
         self.needs_declare.set(false);
+        let mut type_node = self.visit_fn(input.type_node());
+        if type_node.is_none() {
+            // stripInternal can elide an @internal type RHS; fall back like index signatures.
+            type_node = Some(self.factory().new_keyword_type_node(Kind::AnyKeyword));
+        }
         self.factory().update_type_alias_declaration(
             input,
             self.ensure_modifiers(input),
             input.name().unwrap(),
             self.visitor().visit_nodes(input.type_parameter_list()),
-            self.visit_fn(input.type_node()),
+            type_node,
         )
     }
 
@@ -760,7 +785,7 @@ impl DeclarationTransformer {
         let parse_node = self.emit_context().parse_node(Some(statement));
         if ast::is_import_equals_declaration(statement)
             || parse_node.is_some_and(|parse_node| {
-                self.host.get_effective_declaration_flags(parse_node, ModifierFlags::Default)
+                self.resolver.get_effective_declaration_flags(parse_node, ModifierFlags::Default)
                     != ModifierFlags::None
             })
             || !ast::can_have_modifiers(statement)
@@ -845,7 +870,6 @@ impl DeclarationTransformer {
         }
 
         let late_indexes = self.resolver.create_late_bound_index_signatures(
-            self.emit_context(),
             class_node,
             self.enclosing_declaration.get(),
             declarationEmitNodeBuilderFlags,
@@ -889,7 +913,7 @@ impl DeclarationTransformer {
 
             let members = self.build_class_members(input, &extra_members);
 
-            let extends_clause = get_effective_base_type_node(input);
+            let extends_clause = ast::get_class_extends_heritage_element(input);
 
             if let Some(extends_clause) = extends_clause {
                 let extends_expression =
@@ -923,7 +947,6 @@ impl DeclarationTransformer {
                         new_id,
                         None,
                         self.resolver.create_type_of_expression(
-                            self.emit_context(),
                             extends_clause.expression().unwrap(),
                             Some(input),
                             declarationEmitNodeBuilderFlags,
@@ -1038,10 +1061,18 @@ impl DeclarationTransformer {
                     }
                 }
 
-                let mut mods = None;
+                let mut modifier_flags = self.ensure_modifier_flags(node);
                 if is_static {
-                    mods = Some(f.new_modifier_list(vec![f.new_modifier(Kind::StaticKeyword)]));
+                    modifier_flags |= ModifierFlags::Static;
                 }
+                let mods = if modifier_flags != ModifierFlags::None {
+                    Some(f.new_modifier_list(ast::create_modifiers_from_modifier_flags(
+                        modifier_flags,
+                        |kind| f.new_modifier(kind),
+                    )))
+                } else {
+                    None
+                };
                 if ast::has_dynamic_name(node) {
                     if !is_simple_inlineable_expression(name) {
                         break 'case_block; // Member either becomes an index signature or is a reassignment

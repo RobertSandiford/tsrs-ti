@@ -2,8 +2,7 @@ use std::collections::hash_map::Entry;
 
 use rustc_hash::FxHashMap;
 use tsrs_core::UTF16Offset;
-use tsrs_core::collections::OrderedMap;
-use tsrs_core::json::{self, Value};
+use tsrs_core::json::{self, JsonMap, Value};
 use tsrs_core::tspath::{self, ComparePathsOptions};
 
 // generator.go:14
@@ -109,10 +108,12 @@ pub struct RawSourceMap {
 // same for its seven fields (field order, omitzero, case-sensitive names, unknown names ignored, null -> zero value).
 impl RawSourceMap {
     pub fn to_json(&self) -> Value {
-        let mut m = OrderedMap::default();
+        let mut m = JsonMap::new();
         m.insert("version".to_string(), Value::Number(self.version as f64));
         m.insert("file".to_string(), Value::String(self.file.clone()));
-        m.insert("sourceRoot".to_string(), Value::String(self.source_root.clone()));
+        if !self.source_root.is_empty() {
+            m.insert("sourceRoot".to_string(), Value::String(self.source_root.clone()));
+        }
         m.insert(
             "sources".to_string(),
             Value::Array(self.sources.iter().map(|s| Value::String(s.clone())).collect()),
@@ -169,7 +170,7 @@ impl RawSourceMap {
             }
         };
         for (name, v) in members {
-            match name.as_str() {
+            match name {
                 "version" => {
                     sm.version = match v {
                         Value::Null => 0,

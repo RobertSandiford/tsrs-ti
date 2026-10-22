@@ -15,7 +15,6 @@ use tsrs_module::{
     ResolvedTypeReferenceDirective, Resolver, ResolverOptions,
 };
 use tsrs_project::ModuleResolverFactory;
-use tsrs_tsoptions::gojson;
 use tsrs_vfs::FS;
 
 use crate::handler::{ApiError, ApiResult, ClientConn};
@@ -308,6 +307,7 @@ fn static_resolution_to_resolved_module(v: &Value, cwd: &str) -> ApiResult<P<Res
     r.extension = tspath::try_get_extension_from_path(&resolved_file_name);
     r.resolved_file_name = alloc_str(&resolved_file_name);
     r.original_path = alloc_str(&original_path);
+    r.is_custom_resolution = true;
     Ok(P::new(r))
 }
 
@@ -508,9 +508,10 @@ impl Session {
 
     pub(crate) fn handle_create_module_resolver(&self, p: Params) -> ApiResult<Value> {
         p.object()?;
-        let mut options = gojson::compiler_options_from_go_json(p.get("compilerOptions"))
-            .map_err(ApiError::invalid_request)?;
-        crate::predecode::exact_compiler_options_ints(p.get("compilerOptions"), &mut options);
+        let options = crate::raw_options::compiler_options_from_raw(
+            p.get("compilerOptions"),
+            self.current_directory(),
+        )?;
         let resolutions = self.compile_module_resolution_spec(p.get("moduleResolutions"))?;
         let id = self.module_resolvers.next_id.fetch_add(1, Ordering::SeqCst) + 1;
         let registration = Arc::new(ModuleResolverRegistration {

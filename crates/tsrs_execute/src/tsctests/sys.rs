@@ -511,7 +511,7 @@ impl outputSanitizer<'_> {
     fn add_output_line(&mut self, s: &str) {
         let s = s.replace(&format!("'{}'", tsrs_core::version()), &format!("'{FAKE_TS_VERSION}'"));
         let english_version = format!("Version {}", tsrs_core::version());
-        let s = s.replace(&english_version, &format!("Version {FAKE_TS_VERSION}"));
+        let s = sanitize_version(&s, &english_version, &format!("Version {FAKE_TS_VERSION}"));
         self.output_lines.push(sanitize_internal_symbol_name(&s));
     }
 
@@ -584,6 +584,61 @@ impl outputSanitizer<'_> {
             self.index += 1;
         }
         panic!("Expected lineEnd{line_end} not found after {line_start}");
+    }
+}
+
+fn sanitize_version(s: &str, version: &str, replacement: &str) -> String {
+    if let Some((before, after)) = s.split_once(version)
+        && after.starts_with("  ")
+    {
+        // Preserve the padded field width when replacing the version in the help header.
+        let suffix = after.trim_start_matches(' ');
+        let width = version.len() + after.len() - suffix.len();
+        return format!("{before}{replacement:<width$}{suffix}").replace(version, replacement);
+    }
+    s.replace(version, replacement)
+}
+
+#[test]
+fn output_sanitizer_version_padding() {
+    let version = format!("Version {}", tsrs_core::version());
+    let fake_version = format!("Version {FAKE_TS_VERSION}");
+    let header = "tsc: The TypeScript Compiler - ";
+    let header_with_version = format!("{header}{version}");
+    let header_with_fake_version = format!("{header}{fake_version}");
+    let cases = [
+        ("version", version.clone(), fake_version.clone()),
+        (
+            "version in prose",
+            format!("{version} is installed"),
+            format!("{fake_version} is installed"),
+        ),
+        (
+            "repeated versions",
+            format!("{version}, {version}"),
+            format!("{fake_version}, {fake_version}"),
+        ),
+        ("header without logo", header_with_version.clone(), header_with_fake_version.clone()),
+        (
+            "header with logo",
+            format!("{header_with_version:<115}\x1b[44m     \x1b[39;49m"),
+            format!("{header_with_fake_version:<115}\x1b[44m     \x1b[39;49m"),
+        ),
+        (
+            "narrow header with logo",
+            format!("{header_with_version:<75}\x1b[44m     \x1b[39;49m"),
+            format!("{header_with_fake_version:<75}\x1b[44m     \x1b[39;49m"),
+        ),
+    ];
+    for (name, input, expected) in cases {
+        let mut sanitizer = outputSanitizer {
+            for_comparing: false,
+            lines: Vec::new(),
+            index: 0,
+            output_lines: Vec::new(),
+        };
+        sanitizer.add_output_line(&input);
+        assert_eq!(sanitizer.output_lines.join("\n"), expected, "{name}");
     }
 }
 

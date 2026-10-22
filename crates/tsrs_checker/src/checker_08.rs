@@ -189,6 +189,9 @@ impl Checker {
     ) -> Option<P<Symbol>> {
         if let Some(module_reference_expression) = module_reference_expression {
             if ast::is_string_literal_like(module_reference_expression) {
+                if module_reference_expression.parent().is_some_and(ast::is_source_phase_import) {
+                    return None;
+                }
                 return self.resolve_external_module(
                     location,
                     module_reference_expression.text(),
@@ -366,7 +369,18 @@ impl Checker {
                 );
             }
 
-            if error_node.is_some() {
+            if error_node.is_some() && !resolved_module.is_custom_resolution {
+                let rewrites = self
+                    .program
+                    .as_module_specifier_generation_host()
+                    .content_mapper_extension_rewrites();
+                let case_sensitive = self.program.use_case_sensitive_file_names();
+                let (_, mapped_specifier) =
+                    tspath::rewrite_extension(module_reference, &rewrites, case_sensitive);
+                let check_declaration_rewrite = self.compiler_options.get_emit_declarations()
+                    && mapped_specifier
+                    && tspath::path_is_relative(module_reference)
+                    && !importing_source_file.is_declaration_file();
                 if resolved_module.resolved_using_ts_extension
                     && tspath::is_declaration_file_name(module_reference)
                 {
@@ -405,14 +419,31 @@ impl Checker {
                         self.error(error_node, &diagnostics::An_import_path_can_only_end_with_a_0_extension_when_allowImportingTsExtensions_is_enabled, &[&ts_extension]);
                     }
                 } else if self.compiler_options.rewrite_relative_import_extensions.is_true()
-                    && !location.flags().intersects(NodeFlags::Ambient)
+                    && (!location.flags().intersects(NodeFlags::Ambient)
+                        || check_declaration_rewrite)
                     && !tspath::is_declaration_file_name(module_reference)
-                    && !ast::is_literal_import_type_node(location)
-                    && !ast::is_part_of_type_only_import_or_export_declaration(location)
+                    && ((!ast::is_literal_import_type_node(location)
+                        && !ast::is_part_of_type_only_import_or_export_declaration(location))
+                        || check_declaration_rewrite)
                 {
-                    let should_rewrite =
-                        should_rewrite_module_specifier(module_reference, &self.compiler_options);
-                    if !resolved_module.resolved_using_ts_extension && should_rewrite {
+                    let should_rewrite = tspath::should_rewrite_extension(
+                        module_reference,
+                        &rewrites,
+                        case_sensitive,
+                    );
+                    let mapped_source = !source_file.content_mapper().is_empty()
+                        && tspath::rewrite_extension(
+                            source_file.file_name(),
+                            &rewrites,
+                            case_sensitive,
+                        )
+                        .1;
+                    let resolved_using_rewritable_extension = resolved_module
+                        .resolved_using_ts_extension
+                        || (resolved_module.resolved_using_extra_extensions
+                            && !source_file.content_mapper().is_empty()
+                            && mapped_source);
+                    if !resolved_using_rewritable_extension && should_rewrite {
                         let relative_to_source_file = tspath::get_relative_path_from_file(
                             &tspath::get_normalized_absolute_path(
                                 importing_source_file.file_name(),
@@ -427,13 +458,25 @@ impl Checker {
                             },
                         );
                         self.error(error_node, &diagnostics::This_relative_import_path_is_unsafe_to_rewrite_because_it_looks_like_a_file_name_but_actually_resolves_to_0, &[&relative_to_source_file]);
-                    } else if resolved_module.resolved_using_ts_extension
+                    } else if resolved_using_rewritable_extension
                         && !should_rewrite
-                        && self.program.source_file_may_be_emitted(source_file, false)
+                        && (mapped_source
+                            || self.program.source_file_may_be_emitted(source_file, false))
                     {
-                        let ext = tspath::get_any_extension_from_path(module_reference, &[], false);
+                        let ext = if mapped_source {
+                            tspath::get_extension_rewrite(
+                                source_file.file_name(),
+                                &rewrites,
+                                case_sensitive,
+                            )
+                            .expect("mapped source must have an extension rewrite")
+                            .source
+                            .clone()
+                        } else {
+                            tspath::get_any_extension_from_path(module_reference, &[], false)
+                        };
                         self.error(error_node, &diagnostics::This_import_uses_a_0_extension_to_resolve_to_an_input_TypeScript_file_but_will_not_be_rewritten_during_emit_because_it_is_not_a_relative_path, &[&ext]);
-                    } else if resolved_module.resolved_using_ts_extension && should_rewrite {
+                    } else if resolved_using_rewritable_extension && should_rewrite {
                         if let Some(redirect) =
                             self.program.get_redirect_for_resolution(source_file)
                         {
@@ -647,11 +690,16 @@ impl Checker {
                     && resolution_is_node16_or_next
                     && is_extensionless_relative_path_import
                 {
-                    let absolute_ref = tspath::get_normalized_absolute_path(
-                        module_reference,
-                        &tspath::get_directory_path(importing_source_file.file_name()),
-                    );
-                    let suggested_ext = self.get_suggested_import_extension(&absolute_ref);
+                    let suggested_ext =
+                        if tspath::has_trailing_directory_separator(module_reference) {
+                            String::new()
+                        } else {
+                            let absolute_ref = tspath::get_normalized_absolute_path(
+                                module_reference,
+                                &tspath::get_directory_path(importing_source_file.file_name()),
+                            );
+                            self.get_suggested_import_extension(&absolute_ref)
+                        };
                     if !suggested_ext.is_empty() {
                         let suggestion = format!("{module_reference}{suggested_ext}");
                         self.error(Some(error_node), &diagnostics::Relative_import_paths_need_explicit_file_extensions_in_ECMAScript_imports_when_moduleResolution_is_node16_or_nodenext_Did_you_mean_0, &[&suggestion]);
@@ -1951,13 +1999,15 @@ impl Checker {
         }
         // The ES6 spec permits export * declarations in a module to circularly reference the module itself. For example,
         // module 'a' can 'export * from "b"' and 'b' can 'export * from "a"' without error.
+        // Only the outermost table escapes this traversal. Own temporary tables so their buffers are dropped
+        // after merging, instead of retaining them in the arena.
         fn visit(
             c: &mut Checker,
             st: &mut VisitState,
             symbol: Option<P<Symbol>>,
             export_star: Option<P<Node>>,
             is_type_only: bool,
-        ) -> Option<P<SymbolTable>> {
+        ) -> Option<SymbolTable> {
             if !is_type_only {
                 if let Some(symbol) = symbol {
                     // Add non-type-only names before checking if we've visited this module,
@@ -1976,11 +2026,11 @@ impl Checker {
                 return None;
             }
             st.visited_symbols.push(symbol);
-            let symbols = symbol_exports.clone_table();
+            let symbols = symbol_exports.clone_value();
             // All export * declarations are collected in an __export symbol by the binder
             let export_stars = symbol_exports.lookup(InternalSymbolNameExportStar);
             if let Some(export_stars) = export_stars {
-                let nested_symbols = SymbolTable::new();
+                let nested_symbols = SymbolTable::default();
                 let mut lookup_table: ExportCollisionTable = FxHashMap::default();
                 let declarations = export_stars.declarations();
                 for &node in declarations {
@@ -2000,8 +2050,8 @@ impl Checker {
                         is_type_only || node.is_type_only(),
                     );
                     c.extend_export_symbols(
-                        nested_symbols,
-                        exported_symbols,
+                        &nested_symbols,
+                        exported_symbols.as_ref(),
                         Some(&mut lookup_table),
                         Some(node),
                     );
@@ -2022,7 +2072,7 @@ impl Checker {
                         c.add_diagnostic(create_diagnostic_for_node(Some(node), &diagnostics::Module_0_has_already_exported_a_member_named_1_Consider_explicitly_re_exporting_to_resolve_the_ambiguity, &[&s.specifier_text, id]));
                     }
                 }
-                c.extend_export_symbols(symbols, Some(nested_symbols), None, None);
+                c.extend_export_symbols(&symbols, Some(&nested_symbols), None, None);
             }
             if let Some(export_star) = export_star {
                 if export_star.is_type_only() {
@@ -2056,8 +2106,7 @@ impl Checker {
         // A module defined by an 'export=' consists of one export that needs to be resolved
         let module_symbol = module_symbol
             .map(|m| self.resolve_external_module_symbol(m, false /*dontResolveAlias*/));
-        let exports =
-            visit(self, &mut st, module_symbol, None, false).unwrap_or_else(SymbolTable::new);
+        let exports = visit(self, &mut st, module_symbol, None, false).unwrap_or_default();
         // A CommonJS module defined by an 'export=' might also export typedefs, stored on the original module
         if let Some(original_module) = original_module {
             let original_exports = original_module.exports().unwrap();
@@ -2083,7 +2132,7 @@ impl Checker {
         for name in st.non_type_only_names.keys() {
             type_only_export_star_map.remove(name);
         }
-        (exports, type_only_export_star_map)
+        (P::new(exports), type_only_export_star_map)
     }
 
     /**
@@ -2093,8 +2142,8 @@ impl Checker {
     // checker.go:16558
     pub(crate) fn extend_export_symbols(
         &mut self,
-        target: P<SymbolTable>,
-        source: Option<P<SymbolTable>>,
+        target: &SymbolTable,
+        source: Option<&SymbolTable>,
         lookup_table: Option<&mut ExportCollisionTable>,
         export_node: Option<P<Node>>,
     ) {
@@ -3268,7 +3317,7 @@ impl Checker {
         let signatures = self.get_signatures_of_type(t, SignatureKind::Construct);
         if signatures.len() == 1 {
             let s = signatures[0];
-            if s.type_parameters.get().is_empty()
+            if s.type_parameters().is_empty()
                 && s.parameters.get().len() == 1
                 && signature_has_rest_parameter(s)
             {

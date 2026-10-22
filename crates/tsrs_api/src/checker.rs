@@ -1,5 +1,5 @@
 // Node API checker lane (mfs-cx/node-api-checker): port of the checker / symbol / type / signature
-// request handlers of the pinned tsgo API (microsoft/TypeScript b85298b6, tsc/internal/api/session.go +
+// request handlers of the tsgo API (originally based on microsoft/TypeScript b85298b6, tsc/internal/api/session.go +
 // proto.go). See checker/README.md for the contract, id ownership and the per-method coverage inventory.
 //
 // Core hook (docs/NODE_API.md, "checker hook"): `handle(session, method, params)` and
@@ -26,7 +26,7 @@ pub mod coverage_types;
 
 use std::sync::Arc;
 
-use tsrs_ast::{Node, SourceFile};
+use tsrs_ast::{Node, SourceFile, Symbol};
 use tsrs_compiler::Program;
 use tsrs_core::P;
 use tsrs_core::context::Context;
@@ -75,6 +75,11 @@ pub(crate) fn handle(
             }
         }
     }))
+}
+
+/// Go `newFileSymbolResponse`, for core handlers that return a binder symbol from an ordinary cached AST.
+pub(crate) fn file_symbol_response(session: &Session, symbol: P<Symbol>) -> ApiResult<Value> {
+    setup::file_symbol_response(&SessionHost { session }, symbol).map_err(to_api_error)
 }
 
 fn to_api_error(e: CheckerError) -> ApiError {
@@ -127,6 +132,14 @@ impl CheckerHost for SessionHost<'_> {
 
     fn source_file_descriptor(&self, file: P<SourceFile>) -> CheckerResult<Value> {
         Ok(crate::sourcefiles::source_file_descriptor(file))
+    }
+
+    fn source_file_descriptor_matches(
+        &self,
+        file: P<SourceFile>,
+        descriptor: &Value,
+    ) -> CheckerResult<bool> {
+        Ok(crate::sourcefiles::source_file_descriptor_matches(file, descriptor))
     }
 
     fn source_file_node_id(&self, file: P<SourceFile>) -> CheckerResult<u64> {

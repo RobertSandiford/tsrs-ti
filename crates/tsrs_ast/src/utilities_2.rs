@@ -546,7 +546,7 @@ pub fn is_expression_node(mut node: P<Node>) -> bool {
         | Kind::YieldExpression
         | Kind::AwaitExpression => true,
         Kind::MetaProperty => {
-            // `import.defer` in `import.defer(...)` is not an expression
+            // `import.<phase>` in `import.<phase>(...)` is not an expression
             let parent = node.parent().unwrap();
             !is_import_call(parent) || parent.expression() != Some(node)
         }
@@ -633,6 +633,10 @@ pub fn is_in_expression_context(node: P<Node>) -> bool {
         }
         Kind::ShorthandPropertyAssignment => {
             parent.as_shorthand_property_assignment().object_assignment_initializer() == Some(node)
+        }
+        Kind::FunctionExpression | Kind::ClassExpression => {
+            // The name of a function or class expression is a declaration name, not an expression.
+            parent.name() != Some(node)
         }
         _ => is_expression_node(parent),
     }
@@ -744,10 +748,39 @@ pub fn is_import_call(node: P<Node>) -> bool {
         return false;
     }
     let e = node.expression().unwrap();
-    e.kind() == Kind::ImportKeyword
-        || is_meta_property(e)
-            && e.as_meta_property().keyword_token == Kind::ImportKeyword
-            && e.text() == "defer"
+    e.kind() == Kind::ImportKeyword || is_import_phase_meta_property(e)
+}
+
+pub fn is_import_phase_meta_property(node: P<Node>) -> bool {
+    is_import_defer_meta_property(node) || is_import_source_meta_property(node)
+}
+
+pub fn is_import_defer_meta_property(node: P<Node>) -> bool {
+    is_import_meta_property(node, "defer")
+}
+
+pub fn is_import_source_meta_property(node: P<Node>) -> bool {
+    is_import_meta_property(node, "source")
+}
+
+fn is_import_meta_property(node: P<Node>, name: &str) -> bool {
+    is_meta_property(node)
+        && node.as_meta_property().keyword_token == Kind::ImportKeyword
+        && node.as_meta_property().name().text() == name
+}
+
+pub fn is_source_phase_import(node: P<Node>) -> bool {
+    if is_import_declaration(node) {
+        let clause = node.as_import_declaration().import_clause();
+        return clause.is_some_and(|clause| {
+            clause.as_import_clause().phase_modifier() == Kind::SourceKeyword
+        });
+    }
+    is_source_phase_import_call(node)
+}
+
+pub fn is_source_phase_import_call(node: P<Node>) -> bool {
+    is_call_expression(node) && node.expression().is_some_and(is_import_source_meta_property)
 }
 
 pub fn is_computed_non_literal_name(name: P<Node>) -> bool {

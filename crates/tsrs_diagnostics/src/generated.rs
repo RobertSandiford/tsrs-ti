@@ -9813,6 +9813,16 @@ pub static Instantiations_of_the_following_types_appear_infinitely_circular_Colo
         reports_deprecated: false,
     };
 
+pub static Network_path_0_is_not_supported: Message = Message {
+    code: 5116,
+    category: Category::Error,
+    key: Key("Network_path_0_is_not_supported_5116"),
+    text: "Network path '{0}' is not supported.",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
+
 pub static Generates_a_sourcemap_for_each_corresponding_d_ts_file: Message = Message {
     code: 6000,
     category: Category::Message,
@@ -16004,18 +16014,18 @@ pub static Deferred_imports_are_only_supported_when_the_module_flag_is_set_to_es
     reports_deprecated: false,
 };
 
-pub static X_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_or_defer: Message =
-    Message {
-        code: 18061,
-        category: Category::Error,
-        key: Key(
-            "_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_or_defer_18061",
-        ),
-        text: "'{0}' is not a valid meta-property for keyword 'import'. Did you mean 'meta' or 'defer'?",
-        reports_unnecessary: false,
-        elided_in_compatibility_pyramid: false,
-        reports_deprecated: false,
-    };
+pub static X_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_defer_or_source:
+    Message = Message {
+    code: 18061,
+    category: Category::Error,
+    key: Key(
+        "_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_defer_or_source_18061",
+    ),
+    text: "'{0}' is not a valid meta-property for keyword 'import'. Did you mean 'meta', 'defer', or 'source'?",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
 
 pub static Regular_expression_pattern_modifiers_are_only_available_when_targeting_0_or_later:
     Message = Message {
@@ -16415,6 +16425,93 @@ pub static The_content_mapper_returned_diagnostic_directives_with_overlapping_vi
 pub static The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the_content_mapper: Message = Message { code: 18109, category: Category::Message, key: Key("The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the_content_mapper_18109"), text: "The invalid diagnostic directive is in supplemental output {0} returned by the content mapper.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
 
 pub static Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex: Message = Message { code: 18110, category: Category::Message, key: Key("Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex_18110"), text: "Diagnostic directive {0} returned by the content mapper has an invalid 'unusedExpectDirectiveIndex'.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
+
+pub static A_source_phase_import_must_specify_a_local_binding: Message = Message {
+    code: 18111,
+    category: Category::Error,
+    key: Key("A_source_phase_import_must_specify_a_local_binding_18111"),
+    text: "A source phase import must specify a local binding.",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
+
+pub static Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import: Message =
+    Message {
+        code: 18112,
+        category: Category::Error,
+        key: Key("Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import_18112"),
+        text: "Named and namespace imports are not allowed in a source phase import.",
+        reports_unnecessary: false,
+        elided_in_compatibility_pyramid: false,
+        reports_deprecated: false,
+    };
+
+pub static Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve: Message = Message { code: 18113, category: Category::Error, key: Key("Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve_18113"), text: "Source phase imports are only supported when the '--module' option is set to 'esnext', 'nodenext', or 'preserve'.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
+
+pub static Optional_chaining_cannot_be_used_with_import_source: Message = Message {
+    code: 18114,
+    category: Category::Error,
+    key: Key("Optional_chaining_cannot_be_used_with_import_source_18114"),
+    text: "Optional chaining cannot be used with 'import.source'.",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
+
+pub static Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls: Message = Message { code: 18115, category: Category::Error, key: Key("Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls_18115"), text: "Source phase imports are not allowed on statements that compile to CommonJS 'require' calls.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
+
+pub static This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using:
+    Message = Message {
+    code: 18116,
+    category: Category::Error,
+    key: Key(
+        "This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using_18116",
+    ),
+    text: "This initializer has a '[Symbol.asyncDispose]()' method. Did you mean to use 'await using'?",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
+
+pub static A_deferred_import_must_specify_a_namespace_binding: Message = Message {
+    code: 18117,
+    category: Category::Error,
+    key: Key("A_deferred_import_must_specify_a_namespace_binding_18117"),
+    text: "A deferred import must specify a namespace binding.",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
+
+pub static Content_mapper_output_extension_0_must_be_non_empty_and_begin_with_a: Message =
+    Message {
+        code: 18118,
+        category: Category::Error,
+        key: Key("Content_mapper_output_extension_0_must_be_non_empty_and_begin_with_a_18118"),
+        text: "Content mapper output extension '{0}' must be non-empty and begin with a '.'.",
+        reports_unnecessary: false,
+        elided_in_compatibility_pyramid: false,
+        reports_deprecated: false,
+    };
+
+pub static Content_mapper_output_extension_mapping_source_0_is_not_registered_by_this_content_mapper: Message = Message { code: 18119, category: Category::Error, key: Key("Content_mapper_output_extension_mapping_source_0_is_not_registered_by_this_content_mapper_18119"), text: "Content mapper output extension mapping source '{0}' is not registered by this content mapper.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
+
+pub static Content_mapper_output_extension_mapping_from_0_to_1_requires_rewriteRelativeImportExtensions_to_be_enabled: Message = Message { code: 18120, category: Category::Error, key: Key("Content_mapper_output_extension_mapping_from_0_to_1_requires_rewriteRelativeImportExtensions_to_be_e_18120"), text: "Content mapper output extension mapping from '{0}' to '{1}' requires 'rewriteRelativeImportExtensions' to be enabled.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
+
+pub static The_typescript_contentMapper_outputExtensions_of_the_content_mapper_package_0_contains_an_invalid_mapping_from_1_to_2_Extensions_must_be_non_empty_and_begin_with_a: Message = Message { code: 18121, category: Category::Error, key: Key("The_typescript_contentMapper_outputExtensions_of_the_content_mapper_package_0_contains_an_invalid_ma_18121"), text: "The 'typescript.contentMapper.outputExtensions' of the content mapper package '{0}' contains an invalid mapping from '{1}' to '{2}'. Extensions must be non-empty and begin with a '.'.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
+
+pub static The_typescript_contentMapper_outputExtensions_of_the_content_mapper_package_0_must_be_an_object_with_string_values: Message = Message { code: 18122, category: Category::Error, key: Key("The_typescript_contentMapper_outputExtensions_of_the_content_mapper_package_0_must_be_an_object_with_18122"), text: "The 'typescript.contentMapper.outputExtensions' of the content mapper package '{0}' must be an object with string values.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
+
+pub static Content_mapper_extension_0_must_not_contain_path_separators: Message = Message {
+    code: 18123,
+    category: Category::Error,
+    key: Key("Content_mapper_extension_0_must_not_contain_path_separators_18123"),
+    text: "Content mapper extension '{0}' must not contain path separators.",
+    reports_unnecessary: false,
+    elided_in_compatibility_pyramid: false,
+    reports_deprecated: false,
+};
 
 pub static X_nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler: Message = Message { code: 69010, category: Category::Message, key: Key("nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler_69010"), text: "`nodenext` if `module` is `nodenext`; `node16` if `module` is `node16` or `node18`; otherwise, `bundler`.", reports_unnecessary: false, elided_in_compatibility_pyramid: false, reports_deprecated: false };
 
@@ -19112,7 +19209,7 @@ pub static JSDoc_comment: Message = Message {
     reports_deprecated: false,
 };
 
-pub(crate) static ALL_MESSAGES: [&Message; 2215] = [
+pub(crate) static ALL_MESSAGES: [&Message; 2229] = [
     &Unterminated_string_literal,
     &Identifier_expected,
     &X_0_expected,
@@ -20308,6 +20405,7 @@ pub(crate) static ALL_MESSAGES: [&Message; 2215] = [
     &X_0_is_only_assignable_to_the_non_distributed_1_but_1_has_been_distributed_here,
     &Instantiations_of_type_0_appear_infinitely_circular,
     &Instantiations_of_the_following_types_appear_infinitely_circular_Colon_0,
+    &Network_path_0_is_not_supported,
     &Generates_a_sourcemap_for_each_corresponding_d_ts_file,
     &Concatenate_and_emit_output_to_single_file,
     &Generates_corresponding_d_ts_file,
@@ -21008,7 +21106,7 @@ pub(crate) static ALL_MESSAGES: [&Message; 2215] = [
     &Default_imports_are_not_allowed_in_a_deferred_import,
     &Named_imports_are_not_allowed_in_a_deferred_import,
     &Deferred_imports_are_only_supported_when_the_module_flag_is_set_to_esnext_or_preserve,
-    &X_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_or_defer,
+    &X_0_is_not_a_valid_meta_property_for_keyword_import_Did_you_mean_meta_defer_or_source,
     &Regular_expression_pattern_modifiers_are_only_available_when_targeting_0_or_later,
     &Duplicate_named_capturing_groups_are_only_available_when_targeting_0_or_later,
     &Private_identifiers_cannot_be_used_in_destructuring_patterns,
@@ -21058,6 +21156,19 @@ pub(crate) static ALL_MESSAGES: [&Message; 2215] = [
     &The_content_mapper_returned_diagnostic_directives_with_overlapping_virtual_ranges,
     &The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the_content_mapper,
     &Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex,
+    &A_source_phase_import_must_specify_a_local_binding,
+    &Named_and_namespace_imports_are_not_allowed_in_a_source_phase_import,
+    &Source_phase_imports_are_only_supported_when_the_module_option_is_set_to_esnext_nodenext_or_preserve,
+    &Optional_chaining_cannot_be_used_with_import_source,
+    &Source_phase_imports_are_not_allowed_on_statements_that_compile_to_CommonJS_require_calls,
+    &This_initializer_has_a_Symbol_asyncDispose_method_Did_you_mean_to_use_await_using,
+    &A_deferred_import_must_specify_a_namespace_binding,
+    &Content_mapper_output_extension_0_must_be_non_empty_and_begin_with_a,
+    &Content_mapper_output_extension_mapping_source_0_is_not_registered_by_this_content_mapper,
+    &Content_mapper_output_extension_mapping_from_0_to_1_requires_rewriteRelativeImportExtensions_to_be_enabled,
+    &The_typescript_contentMapper_outputExtensions_of_the_content_mapper_package_0_contains_an_invalid_mapping_from_1_to_2_Extensions_must_be_non_empty_and_begin_with_a,
+    &The_typescript_contentMapper_outputExtensions_of_the_content_mapper_package_0_must_be_an_object_with_string_values,
+    &Content_mapper_extension_0_must_not_contain_path_separators,
     &X_nodenext_if_module_is_nodenext_node16_if_module_is_node16_or_node18_otherwise_bundler,
     &File_is_a_CommonJS_module_it_may_be_converted_to_an_ES_module,
     &This_constructor_function_may_be_converted_to_a_class_declaration,

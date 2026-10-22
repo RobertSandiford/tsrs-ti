@@ -3,8 +3,7 @@ use std::sync::OnceLock;
 
 use rustc_hash::FxHashMap;
 use tsrs_core::Tristate;
-use tsrs_core::collections::OrderedMap;
-use tsrs_core::json::Value;
+use tsrs_core::json::{JsonMap, Value};
 use tsrs_modulespecifiers::{
     ImportModuleSpecifierEndingPreference, ImportModuleSpecifierPreference,
 };
@@ -189,7 +188,8 @@ pub struct UserPreferences {
 }
 
 // userpreferences.go:47 (the struct tags of UserPreferences and the structs it embeds, flattened in declaration order)
-// Go reads the tags by reflection; each entry carries the tag strings verbatim plus accessors for the field.
+// Source12's Go parser is generated from the preference schema. This Rust table retains the same raw/config
+// field names and accessors; decoding it matches the generated parser without Go's code generator.
 pub(crate) struct FieldTag {
     pub(crate) name: &'static str,
     pub(crate) raw: &'static str,
@@ -199,8 +199,7 @@ pub(crate) struct FieldTag {
     pub(crate) get_mut: for<'a> fn(&'a mut UserPreferences) -> FieldMut<'a>,
 }
 
-// The Go field types that the reflection code distinguishes (by reflect.Type for the typeParsers/typeSerializers
-// entries, by reflect.Kind otherwise).
+// Field types determine the parsers and serializers for each preference.
 #[derive(Clone, Copy)]
 pub(crate) enum FieldRef<'a> {
     Tristate(&'a Tristate),
@@ -669,7 +668,12 @@ pub(crate) static USER_PREFERENCES_FIELD_TAGS: &[FieldTag] = &[
         "excludeLibrarySymbolsInNavTo",
         "workspaceSymbols.excludeLibrarySymbols"
     ),
-    field_tag!(WorkspaceSymbolsScope, workspace_symbols_scope, "", "workspaceSymbols.scope"),
+    field_tag!(
+        WorkspaceSymbolsScope,
+        workspace_symbols_scope,
+        "workspaceSymbolsScope",
+        "workspaceSymbols.scope"
+    ),
     field_tag!(Tristate, enable_formatting, "formatEnabled", "format.enabled", "format.enable"),
     field_tag!(
         Tristate,
@@ -687,7 +691,7 @@ pub(crate) static USER_PREFERENCES_FIELD_TAGS: &[FieldTag] = &[
         "reportStyleChecksAsWarnings",
         "reportStyleChecksAsWarnings"
     ),
-    field_tag!(String, locale, "", "locale"),
+    field_tag!(String, locale, "locale", "locale"),
     field_tag!(
         Tristate,
         disable_automatic_type_acquisition,
@@ -763,7 +767,7 @@ impl QuotePreference {
 }
 
 // userpreferences.go:232
-// Go `type WorkspaceSymbolsScope string` with no parser: any configured string is stored as is.
+// Go `type WorkspaceSymbolsScope string`; source12's generated parser accepts the two protocol values.
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct WorkspaceSymbolsScope(pub Cow<'static, str>);
 
@@ -897,7 +901,7 @@ pub(crate) fn parse_include_inlay_parameter_name_hints(
     val: &Value,
 ) -> IncludeInlayParameterNameHints {
     if let Value::String(s) = val {
-        match s.as_str() {
+        match s.to_lowercase().as_str() {
             "all" => return IncludeInlayParameterNameHints::All,
             "literals" => return IncludeInlayParameterNameHints::Literals,
             _ => {}
@@ -930,7 +934,7 @@ pub(crate) fn parse_organize_imports_collation(val: &Value) -> OrganizeImportsCo
 
 pub(crate) fn parse_organize_imports_case_first(val: &Value) -> OrganizeImportsCaseFirst {
     if let Value::String(s) = val {
-        match s.as_str() {
+        match s.to_lowercase().as_str() {
             "lower" => return OrganizeImportsCaseFirst::Lower,
             "upper" => return OrganizeImportsCaseFirst::Upper,
             _ => {}
@@ -941,7 +945,7 @@ pub(crate) fn parse_organize_imports_case_first(val: &Value) -> OrganizeImportsC
 
 pub(crate) fn parse_organize_imports_type_order(val: &Value) -> OrganizeImportsTypeOrder {
     if let Value::String(s) = val {
-        match s.as_str() {
+        match s.to_lowercase().as_str() {
             "last" => return OrganizeImportsTypeOrder::Last,
             "inline" => return OrganizeImportsTypeOrder::Inline,
             "first" => return OrganizeImportsTypeOrder::First,
@@ -977,6 +981,17 @@ pub(crate) fn parse_import_module_specifier_ending_preference(
         }
     }
     ImportModuleSpecifierEndingPreference::Auto
+}
+
+pub(crate) fn parse_workspace_symbols_scope(val: &Value) -> WorkspaceSymbolsScope {
+    if let Value::String(s) = val {
+        match s.to_lowercase().as_str() {
+            "allopenprojects" => return WorkspaceSymbolsScope::AllOpenProjects,
+            "currentproject" => return WorkspaceSymbolsScope::CurrentProject,
+            _ => {}
+        }
+    }
+    WorkspaceSymbolsScope::default()
 }
 
 // userpreferences.go:426
@@ -1197,10 +1212,7 @@ pub(crate) fn parse_config_path_tag(tag: &'static str) -> ConfigPathInfo {
 }
 
 // userpreferences.go:639
-pub(crate) fn get_nested_value<'a>(
-    config: &'a OrderedMap<String, Value>,
-    path: &str,
-) -> Option<&'a Value> {
+pub(crate) fn get_nested_value<'a>(config: &'a JsonMap, path: &str) -> Option<&'a Value> {
     let mut parts = path.split('.');
     let mut current = config.get(parts.next().unwrap())?;
     current = parts.try_fold(current, |current, part| {
@@ -1213,14 +1225,14 @@ pub(crate) fn get_nested_value<'a>(
 }
 
 // userpreferences.go:655
-pub(crate) fn set_nested_value(config: &mut OrderedMap<String, Value>, path: &str, value: Value) {
+pub(crate) fn set_nested_value(config: &mut JsonMap, path: &str, value: Value) {
     let parts: Vec<&str> = path.split('.').collect();
     let mut current = config;
     current = parts[..parts.len() - 1].iter().fold(current, |mut current, part| {
-        if !matches!(current.get(*part), Some(Value::Object(_))) {
-            current.insert(part.to_string(), Value::Object(OrderedMap::default()));
+        if !matches!(current.get(part), Some(Value::Object(_))) {
+            current.insert(part.to_string(), Value::Object(JsonMap::new()));
         }
-        let Some(Value::Object(next)) = current.get_mut(*part) else { unreachable!() };
+        let Some(Value::Object(next)) = current.get_mut(part) else { unreachable!() };
         current = next;
 
         current
@@ -1232,11 +1244,11 @@ pub(crate) fn set_nested_value(config: &mut OrderedMap<String, Value>, path: &st
 pub(crate) fn set_raw_fields_from_config(
     p: &mut UserPreferences,
     infos: &[FieldInfo],
-    settings: &OrderedMap<String, Value>,
+    settings: &JsonMap,
 ) {
     let index = unstable_name_index();
     for (name, value) in settings {
-        if let Some(&idx) = index.get(name.as_str()) {
+        if let Some(&idx) = index.get(name) {
             let info = &infos[idx];
             let field = (info.field.get_mut)(p);
             let inverted;
@@ -1254,7 +1266,7 @@ pub(crate) fn set_raw_fields_from_config(
 
 impl UserPreferences {
     // userpreferences.go:685
-    pub(crate) fn with_config(mut self, config: &OrderedMap<String, Value>) -> UserPreferences {
+    pub(crate) fn with_config(mut self, config: &JsonMap) -> UserPreferences {
         let p = &mut self;
         let infos = field_info_cache();
 
@@ -1369,9 +1381,7 @@ pub(crate) fn set_field_from_value(field: FieldMut<'_>, val: &Value) {
             }
         }
         FieldMut::WorkspaceSymbolsScope(f) => {
-            if let Value::String(s) = val {
-                *f = WorkspaceSymbolsScope(Cow::Owned(s.clone()));
-            }
+            *f = parse_workspace_symbols_scope(val);
         }
         FieldMut::Slice(f) => {
             if let Value::Array(arr) = val {
@@ -1389,7 +1399,7 @@ impl UserPreferences {
     // userpreferences.go:793
     // Returns the JSON value Go's encoder writes (json.Deterministic(true): object keys sorted).
     pub fn marshal_json_to(&self) -> Value {
-        let mut config = OrderedMap::default();
+        let mut config = JsonMap::new();
 
         for info in field_info_cache() {
             let field = (info.field.get)(self);
@@ -1477,7 +1487,7 @@ fn serialize_string(s: &str) -> Option<Value> {
 impl UserPreferences {
     // userpreferences.go:865
     pub fn unmarshal_json_from(&mut self, value: &Value) -> Result<(), String> {
-        let empty = OrderedMap::default();
+        let empty = JsonMap::new();
         let config = match value {
             Value::Object(m) => m,
             // A JSON null leaves Go's map nil.
@@ -1530,7 +1540,7 @@ impl UserPreferences {
 }
 
 // userpreferences.go:893
-pub fn parse_user_preferences(items: &OrderedMap<String, Value>) -> UserPreferences {
+pub fn parse_user_preferences(items: &JsonMap) -> UserPreferences {
     let mut prefs = new_default_user_preferences();
     // Apply editor settings first (tabSize, indentSize, etc.) as raw-name defaults,
     // then overlay language-specific settings with increasing precedence:
@@ -1547,7 +1557,7 @@ pub fn parse_user_preferences(items: &OrderedMap<String, Value>) -> UserPreferen
                 normalized_settings.insert("convertTabsToSpaces".to_string(), insert_spaces);
             }
         }
-        let mut unstable = OrderedMap::default();
+        let mut unstable = JsonMap::new();
         unstable.insert("unstable".to_string(), Value::Object(normalized_settings));
         prefs = prefs.with_config(&unstable);
     }
@@ -1561,6 +1571,12 @@ pub fn parse_user_preferences(items: &OrderedMap<String, Value>) -> UserPreferen
             prefs
         });
     prefs
+}
+
+/// Decode the API's `userPreferences` object, starting from Go's default preferences.
+/// Unlike LSP configuration, the API value is itself a flat/raw preference object.
+pub fn parse_api_user_preferences(config: &JsonMap) -> UserPreferences {
+    new_default_user_preferences().with_config(config)
 }
 
 #[cfg(test)]

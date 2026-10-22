@@ -176,6 +176,8 @@ pub(crate) enum AliasQuery {
     Aliased,
     ImmediateAliased,
     Target,
+    Merged,
+    Parent,
     ExportSymbol,
 }
 
@@ -190,9 +192,26 @@ pub(crate) fn alias_query(
         AliasQuery::Aliased => Some(s.c().get_aliased_symbol(symbol)),
         AliasQuery::ImmediateAliased => s.c().get_immediate_aliased_symbol_exported(symbol),
         AliasQuery::Target => s.c().get_target_symbol_exported(symbol),
+        AliasQuery::Merged => Some(s.c().get_merged_symbol_exported(symbol)),
+        AliasQuery::Parent => s.c().get_parent_of_symbol_exported(symbol),
         AliasQuery::ExportSymbol => Some(s.c().get_export_symbol_of_symbol(symbol)),
     };
     s.opt_symbol_response(result)
+}
+
+pub(crate) fn get_symbol_of_node(
+    host: &dyn CheckerHost,
+    p: &Params,
+    declaration: bool,
+) -> CheckerResult<Value> {
+    let mut s = setup(host, p)?;
+    let node = s.resolve_node(p.string("location")?)?;
+    let symbol = if declaration {
+        s.c().get_symbol_of_declaration_exported(node)
+    } else {
+        s.c().get_symbol_of_node_exported(node)
+    };
+    s.opt_symbol_response(symbol)
 }
 
 pub(crate) fn get_fully_qualified_name(host: &dyn CheckerHost, p: &Params) -> CheckerResult<Value> {
@@ -329,7 +348,7 @@ fn resolve_symbol_reference<'h>(
             if r.file.is_some() || r.snapshot == 0 || r.project.is_empty() {
                 return Err(CheckerError::client("invalid snapshot symbol reference"));
             }
-            let sd = SnapshotCtx::new(host, r.snapshot, &r.project)?;
+            let sd = SnapshotCtx::new(host, r.snapshot, r.project)?;
             let symbol = sd.scope.registry.resolve_symbol(r.id)?;
             Ok((symbol, Owner::Snapshot(sd)))
         }
@@ -400,7 +419,7 @@ pub(crate) fn symbol_table_property(
         Owner::Snapshot(sd) => {
             drop(sd);
             // Tables of snapshot-owned symbols may contain symbols from several files: checker ordering.
-            let mut s = Setup::new(host, r.snapshot, &r.project)?;
+            let mut s = Setup::new(host, r.snapshot, r.project)?;
             sort_by_checker(&mut s, &mut symbols);
             s.symbols_response(&symbols)
         }

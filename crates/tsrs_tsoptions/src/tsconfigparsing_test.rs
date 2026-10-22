@@ -308,6 +308,53 @@ fn parse_json_config_file_tests() -> Vec<ParseJsonConfigTestCase> {
             ..Default::default()
         },
         ParseJsonConfigTestCase {
+            title: "reports errors for network paths",
+            include_compiler_options: true,
+            input: vec![TestConfig {
+                json_text: r#"{
+                "extends": ["//server/share/base.json", "\\\\?\\UNC\\server\\share\\base.json"],
+                "compilerOptions": {
+                    "outDir": "\\\\server\\share\\out",
+                    "rootDir": "./src",
+                    "typeRoots": ["./types", "\\??\\UNC\\server\\share\\types"],
+                    "mapRoot": "//server/share/maps",
+                    "declarationDir": "/x/../??/UNC/server/share/decl",
+                    "baseUrl": "/??/../apath"
+                },
+                "files": ["main.ts", "//server/share/a.ts", "../??/UNC/server/share/b.ts"],
+                "include": ["src", "\\\\.\\GLOBALROOT\\Device\\Mup\\server\\share"],
+                "exclude": ["//server/share/excluded", "../??/*.ts"],
+                "references": [{ "path": "//server/share/project" }]
+            }"#,
+                config_file_name: "/apath/tsconfig.json",
+                base_path: "/apath",
+                all_file_list: &[("/apath/main.ts", ""), ("/apath/src/index.ts", "")],
+                ..Default::default()
+            }],
+        },
+        ParseJsonConfigTestCase {
+            title: "reports errors for network path in string extends",
+            input: vec![TestConfig {
+                json_text: r#"{ "extends": "\\\\server\\share\\base.json" }"#,
+                config_file_name: "/apath/tsconfig.json",
+                base_path: "/apath",
+                all_file_list: &[("/apath/main.ts", "")],
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+        ParseJsonConfigTestCase {
+            title: "reports errors for normalized network path in string extends",
+            input: vec![TestConfig {
+                json_text: r#"{ "extends": "/x/../??/UNC/server/share/base.json" }"#,
+                config_file_name: "/apath/tsconfig.json",
+                base_path: "/apath",
+                all_file_list: &[("/apath/main.ts", "")],
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+        ParseJsonConfigTestCase {
             title: "parses tsconfig with compilerOptions, files, include, and exclude",
             include_compiler_options: true,
             input: vec![TestConfig {
@@ -1698,6 +1745,172 @@ fn test_unresolved_content_mapper_does_not_register_extensions() {
     }
 }
 
+#[test]
+fn test_content_mapper_output_extensions_reset() {
+    let cases = [
+        ("omitted", "", true, "/dist/Card.d.ts", Some(".js")),
+        ("null", r#", "outputExtensions": null"#, false, "/dist/Card.d.astro.ts", None),
+        ("empty object", r#", "outputExtensions": {}"#, false, "/dist/Card.d.astro.ts", None),
+        (
+            "replacement",
+            r#", "outputExtensions": {".astro": ".mjs"}"#,
+            true,
+            "/dist/Card.d.mts",
+            Some(".mjs"),
+        ),
+    ];
+    for (name, override_value, rewrite, expected_declaration, expected_output_extension) in cases {
+        let json_text: &'static str = format!(
+            r#"{{
+            "compilerOptions": {{ "declaration": true, "rootDir": "/src", "outDir": "/dist",
+                "rewriteRelativeImportExtensions": {rewrite} }},
+            "contentMappers": [{{ "package": "mapper", "extensions": [".astro"]{override_value} }}],
+            "files": ["/src/Card.astro"]
+        }}"#
+        )
+        .leak();
+        let files: &'static [(&'static str, &'static str)] = vec![
+            ("/tsconfig.json", json_text),
+            ("/src/Card.astro", "export {};"),
+            (
+                "/node_modules/mapper/package.json",
+                r#"{
+                "name": "mapper", "typescript": { "contentMapper": {
+                    "exec": ["mapper"], "outputExtensions": {".astro": ".js"}
+                } }
+            }"#,
+            ),
+        ]
+        .leak();
+        let config = TestConfig {
+            json_text,
+            config_file_name: "tsconfig.json",
+            base_path: "/",
+            all_file_list: files,
+            existing_options: Some(CompilerOptions {
+                run_external_code: Tristate::True,
+                ..Default::default()
+            }),
+        };
+        for (api_name, get_parsed) in [
+            ("json api", get_parsed_with_json_api as GetParsed),
+            ("jsonSourceFile api", get_parsed_with_json_source_file_api),
+        ] {
+            let host = new_vfs_parse_config_host(files, "/", true);
+            let parsed = get_parsed(&config, host, "/");
+            assert!(parsed.errors.is_empty(), "{name}/{api_name}: {:?}", parsed.errors);
+            assert_eq!(parsed.content_mappers().len(), 1, "{name}/{api_name}");
+            let mapper = &parsed.content_mappers()[0];
+            assert_eq!(
+                mapper.definition.output_extensions.get(".astro").map(String::as_str),
+                expected_output_extension,
+                "{name}/{api_name}"
+            );
+            assert_eq!(
+                mapper.definition.output_extensions_present,
+                name != "null",
+                "{name}/{api_name}"
+            );
+            assert_eq!(
+                parsed.content_mapper_extension_rewrites().is_empty(),
+                !rewrite,
+                "{name}/{api_name}"
+            );
+            assert_eq!(parsed.get_output_file_names(), [expected_declaration], "{name}/{api_name}");
+            let options = parsed.compiler_options().unwrap();
+            let expected_external = expected_output_extension
+                .map_or_else(String::new, |extension| format!("/dist/Card{extension}"));
+            assert_eq!(
+                crate::outputpaths::get_external_output_file_name(
+                    "/src/Card.astro",
+                    &options,
+                    &parsed
+                ),
+                expected_external,
+                "{name}/{api_name}"
+            );
+            assert_eq!(
+                mapper.manifest.default_output_extensions.get(".astro").map(String::as_str),
+                Some(".js")
+            );
+            assert!(mapper.manifest.default_output_extensions_present);
+        }
+    }
+}
+
+#[test]
+fn test_content_mapper_output_extension_validation() {
+    let cases = [
+        ("source slash", r#""extensions":[".astro/foo"]"#, 18123),
+        ("reserved compound source", r#""extensions":[".component.ts"]"#, 18066),
+        (
+            "output key slash",
+            r#""extensions":[".astro"],"outputExtensions":{".astro/foo":".js"}"#,
+            18123,
+        ),
+        (
+            "output value slash",
+            r#""extensions":[".astro"],"outputExtensions":{".astro":".js/foo"}"#,
+            18123,
+        ),
+        (
+            "output key invalid",
+            r#""extensions":[".astro"],"outputExtensions":{"astro":".js"}"#,
+            18118,
+        ),
+        (
+            "output value invalid",
+            r#""extensions":[".astro"],"outputExtensions":{".astro":"js"}"#,
+            18118,
+        ),
+        (
+            "output source unregistered",
+            r#""extensions":[".astro"],"outputExtensions":{".other":".js"}"#,
+            18119,
+        ),
+        (
+            "output mapping needs rewrite",
+            r#""extensions":[".astro"],"outputExtensions":{".astro":".mjs"}"#,
+            18120,
+        ),
+        ("invalid output object", r#""extensions":[".astro"],"outputExtensions":[".js"]"#, 5024),
+    ];
+    for (name, mapper_properties, expected_code) in cases {
+        let json_text: &'static str = format!(r#"{{"compilerOptions":{{"rewriteRelativeImportExtensions":false}},"contentMappers":[{{"package":"mapper",{mapper_properties}}}],"files":["/src/Card.astro"]}}"#).leak();
+        let files: &'static [(&'static str, &'static str)] = vec![
+            ("/tsconfig.json", json_text),
+            ("/src/Card.astro", "export {};"),
+            (
+                "/node_modules/mapper/package.json",
+                r#"{"name":"mapper","typescript":{"contentMapper":{"exec":["mapper"]}}}"#,
+            ),
+        ]
+        .leak();
+        let config = TestConfig {
+            json_text,
+            config_file_name: "tsconfig.json",
+            base_path: "/",
+            all_file_list: files,
+            existing_options: Some(CompilerOptions {
+                run_external_code: Tristate::True,
+                ..Default::default()
+            }),
+        };
+        for (api_name, get_parsed) in [
+            ("json api", get_parsed_with_json_api as GetParsed),
+            ("jsonSourceFile api", get_parsed_with_json_source_file_api),
+        ] {
+            let host = new_vfs_parse_config_host(files, "/", true);
+            let parsed = get_parsed(&config, host, "/");
+            assert!(
+                parsed.errors.iter().any(|diagnostic| diagnostic.code() == expected_code),
+                "{name}/{api_name}: {:?}",
+                parsed.errors
+            );
+        }
+    }
+}
+
 // tsconfigparsing_test.go:1306
 #[test]
 fn test_content_mappers_validation() {
@@ -2155,6 +2368,24 @@ fn test_extended_config_errors_appear_on_cache_hit() {
         !second.errors.is_empty(),
         "expected diagnostics for projB parse (cache hit on base), got 0"
     );
+}
+
+#[test]
+fn test_circular_extended_config_does_not_include_itself() {
+    let files: &[(&str, &str)] = &[
+        ("/home/projects/p1/tsconfig.json", r#"{ "extends": "../shared/base.json" }"#),
+        ("/home/projects/p2/tsconfig.json", r#"{ "extends": "../shared/base.json" }"#),
+        ("/home/projects/shared/base.json", r#"{ "extends": "../p2/tsconfig.json" }"#),
+        ("/home/projects/p1/a.ts", "export const a = 1;"),
+        ("/home/projects/p2/b.ts", "export const b = 1;"),
+    ];
+    let host = new_vfs_parse_config_host(files, "/home/projects", true);
+    let cache = MemoCache::default();
+    let first = parse_config_with_cache(host, "/home/projects/p1/tsconfig.json", &cache);
+    assert_eq!(first.errors.iter().map(|e| e.code()).collect::<Vec<_>>(), vec![18000]);
+    let second = parse_config_with_cache(host, "/home/projects/p2/tsconfig.json", &cache);
+    assert_eq!(second.errors.iter().map(|e| e.code()).collect::<Vec<_>>(), vec![18000]);
+    assert_eq!(second.extended_source_files(), vec!["/home/projects/shared/base.json".to_string()]);
 }
 
 #[test]

@@ -254,7 +254,11 @@ impl Checker {
                 min_type_argument_count,
                 ast::is_in_js_file(symbol.value_declaration()),
             );
-            let mapper = new_type_mapper(type_parameters, alloc_vec(filled));
+            let filled = match filled {
+                std::borrow::Cow::Borrowed(args) => alloc_slice(args),
+                std::borrow::Cow::Owned(args) => alloc_vec(args),
+            };
+            let mapper = new_type_mapper(type_parameters, filled);
             let result = self.instantiate_type_with_alias(t, Some(mapper), alias);
             // tsrs-only: not cached when the instantiation reported TS2590 (`too_complex_since`).
             if !self.too_complex_since(too_complex_before) {
@@ -497,6 +501,7 @@ impl Checker {
                 None
             }
         }));
+        tsrs_core::goslices::sort_func(&mut result, |&a, &b| compare_types(self, Some(a), Some(b)));
         result
     }
 
@@ -551,10 +556,14 @@ impl Checker {
     }
 
     // checker.go:24299
-    pub(crate) fn get_declared_type_of_type_parameter(&mut self, symbol: P<Symbol>) -> P<Type> {
+    pub(crate) fn get_declared_type_of_type_parameter(
+        &mut self,
+        symbol: impl Into<Option<P<Symbol>>>,
+    ) -> P<Type> {
+        let symbol = symbol.into();
         let links = self.declared_type_links.get(symbol);
         if links.declared_type.get().is_none() {
-            links.declared_type.set(Some(self.new_type_parameter(Some(symbol))));
+            links.declared_type.set(Some(self.new_type_parameter(symbol)));
         }
         links.declared_type.get().unwrap()
     }
@@ -2853,7 +2862,9 @@ impl Checker {
         sig.id.set(SignatureId(self.signature_count));
         sig.flags.set(flags);
         sig.declaration.set(declaration);
-        sig.type_parameters.set(alloc_slice(type_parameters));
+        sig.set_type_parameters(
+            (!type_parameters.is_empty()).then(|| alloc_slice(type_parameters)),
+        );
         sig.parameters.set(alloc_slice(parameters));
         sig.set_this_parameter(this_parameter);
         sig.resolved_return_type.set(resolved_return_type);

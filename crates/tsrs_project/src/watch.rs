@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Once, RwLock};
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use tsrs_core::collections::{Set, SyncSet};
+use tsrs_core::collections::{Set, SyncMap};
 use tsrs_core::tspath::{self, ComparePathsOptions, Path};
 use tsrs_ls::lsconv;
 use tsrs_lsproto as lsproto;
@@ -259,7 +259,15 @@ impl<T> WatchedFiles<T> {
         self.compute_watchers_once.call_once(|| {
             let mut st = self.mu.write().unwrap();
             let result = (self.compute_glob_patterns)(&self.input);
-            let globs = sorted_compact(result.patterns_inside_workspace);
+            // A network path can make Windows authenticate to an arbitrary host.
+            // Never ask the client to watch it, even when it is inside the workspace.
+            let globs = sorted_compact(
+                result
+                    .patterns_inside_workspace
+                    .into_iter()
+                    .filter(|path| !tspath::is_network_path(path))
+                    .collect(),
+            );
 
             // ignored is only used for logging and doesn't affect watcher identity
             st.ignored = result.ignored;
@@ -283,7 +291,13 @@ impl<T> WatchedFiles<T> {
                     .collect();
                 changed = true;
             }
-            let dirs_outside = sorted_compact(result.directories_outside_workspace);
+            let dirs_outside = sorted_compact(
+                result
+                    .directories_outside_workspace
+                    .into_iter()
+                    .filter(|path| !tspath::is_network_path(path))
+                    .collect(),
+            );
             let same_dirs = st.outside_workspace_watchers.len() == dirs_outside.len()
                 && st.outside_workspace_watchers.iter().zip(&dirs_outside).all(|(a, b)| {
                     file_system_watcher_glob_string(a)
@@ -377,7 +391,7 @@ pub(crate) fn create_resolution_lookup_glob_mapper(
     lib_directory: &str,
     current_directory: &str,
     use_case_sensitive_file_names: bool,
-) -> ComputeGlobPatterns<Option<Arc<SyncSet<Path>>>> {
+) -> ComputeGlobPatterns<Option<Arc<SyncMap<Path, String>>>> {
     let workspace_directory_path =
         tspath::to_path(workspace_directory, current_directory, use_case_sensitive_file_names);
     let current_directory_path =
@@ -385,15 +399,19 @@ pub(crate) fn create_resolution_lookup_glob_mapper(
     let lib_directory_path =
         tspath::to_path(lib_directory, current_directory, use_case_sensitive_file_names);
 
-    Arc::new(move |data: &Option<Arc<SyncSet<Path>>>| {
+    let workspace_directory = workspace_directory.to_string();
+    let current_directory = current_directory.to_string();
+    let lib_directory = lib_directory.to_string();
+
+    Arc::new(move |data: &Option<Arc<SyncMap<Path, String>>>| {
         let mut ignored = FxHashSet::default();
         let mut seen_dirs: Set<Path> = Set::default();
         let (mut include_workspace, mut include_root, mut include_lib) = (false, false, false);
-        let mut node_modules_directories: Set<Path> = Set::default();
-        let mut external_directories: Set<Path> = Set::default();
+        let mut node_modules_directories: FxHashMap<Path, String> = FxHashMap::default();
+        let mut external_directories: FxHashMap<Path, String> = FxHashMap::default();
 
         if let Some(data) = data {
-            data.range(|path| {
+            data.range(|path, file_name| {
                 if tspath::is_dynamic_file_name(path) {
                     return true;
                 }
@@ -410,10 +428,26 @@ pub(crate) fn create_resolution_lookup_glob_mapper(
                     include_root = true;
                 } else if lib_directory_path.contains_path(path) {
                     include_lib = true;
-                } else if let Some(idx) = path.find("/node_modules/") {
-                    node_modules_directories.add(Path::from(&path[..idx + "/node_modules".len()]));
                 } else {
-                    external_directories.add(path.get_directory_path());
+                    let canonical_components = tspath::get_path_components(path, "");
+                    let file_name_components = tspath::get_path_components(file_name, "");
+                    if canonical_components.len() == file_name_components.len() {
+                        if let Some(i) =
+                            canonical_components.iter().position(|c| c == "node_modules")
+                        {
+                            let directory =
+                                tspath::get_path_from_path_components(&file_name_components[..=i]);
+                            let key = tspath::to_path(
+                                &directory,
+                                &current_directory,
+                                use_case_sensitive_file_names,
+                            );
+                            node_modules_directories.insert(key, directory);
+                            return true;
+                        }
+                    }
+                    external_directories
+                        .insert(path.get_directory_path(), tspath::get_directory_path(file_name));
                 }
                 true
             });
@@ -421,18 +455,17 @@ pub(crate) fn create_resolution_lookup_glob_mapper(
 
         let mut globs = Vec::new();
         if include_workspace {
-            globs.push(get_recursive_glob_pattern(&workspace_directory_path));
+            globs.push(get_recursive_glob_pattern(&workspace_directory));
         }
         if include_root {
-            globs.push(get_recursive_glob_pattern(&current_directory_path));
+            globs.push(get_recursive_glob_pattern(&current_directory));
         }
         if include_lib {
-            globs.push(get_recursive_glob_pattern(&lib_directory_path));
+            globs.push(get_recursive_glob_pattern(&lib_directory));
         }
         if !node_modules_directories.is_empty() {
             let mut node_modules_globs: Vec<String> = node_modules_directories
-                .keys()
-                .iter()
+                .values()
                 .map(|dir| get_recursive_glob_pattern(dir))
                 .collect();
             node_modules_globs.sort();
@@ -440,16 +473,14 @@ pub(crate) fn create_resolution_lookup_glob_mapper(
         }
         let mut outside_dirs = Vec::new();
         if !external_directories.is_empty() {
-            let external_dir_strings: Vec<String> =
-                external_directories.keys().iter().map(std::string::ToString::to_string).collect();
+            let external_dir_strings: Vec<String> = external_directories.into_values().collect();
             let (mut external_directory_parents, ignored_external_dirs) =
                 tspath::get_common_parents(
                     &external_dir_strings,
                     minWatchLocationDepth,
                     get_path_components_for_watching,
-                    // Already using tspath.Path
                     &ComparePathsOptions {
-                        use_case_sensitive_file_names: true,
+                        use_case_sensitive_file_names,
                         current_directory: String::new(),
                     },
                 );
@@ -566,6 +597,10 @@ fn perceived_os_root_length_for_watching(path_components: &[String]) -> usize {
 pub(crate) fn get_recursive_glob_pattern(directory: &str) -> String {
     format!("{}/{}", tspath::remove_trailing_directory_separator(directory), "**/*")
 }
+
+#[cfg(test)]
+#[path = "watch_test.rs"]
+mod watch_test;
 
 // watch.go:464
 // recursiveDirectoryGlobPattern returns the string form of a recursive watcher

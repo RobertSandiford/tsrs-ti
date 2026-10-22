@@ -156,6 +156,8 @@ pub enum CachedTypeKind {
     DecoratorContextStatic,
     DecoratorContextPrivate,
     DecoratorContextPrivateStatic,
+    SimplifiedConditionalTypeForReading,
+    SimplifiedConditionalTypeForWriting,
 }
 
 // CachedTypeKey
@@ -630,20 +632,22 @@ pub struct InferenceInfo {
 }
 
 #[cfg(target_pointer_width = "64")]
+// Four pointer-sized fields plus eight bytes of priority, arity and flags.
 const _: () = assert!(
-    std::mem::size_of::<InferenceInfo>() == if tsrs_core::COMPRESSED_PTRS { 28 } else { 48 }
+    std::mem::size_of::<InferenceInfo>() == if tsrs_core::COMPRESSED_PTRS { 24 } else { 40 }
 );
 #[cfg(target_pointer_width = "32")]
-const _: () = assert!(std::mem::size_of::<InferenceInfo>() == 28);
+const _: () = assert!(std::mem::size_of::<InferenceInfo>() == 24);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum InferencePriorityRepr {
     Circularity,
-    // Store bits + 1 so zero remains the niche for `Circularity` and the wrapper stays four bytes.
-    Bits(std::num::NonZeroU32),
+    // Store (bits << 1) | 1 so zero remains the niche for `Circularity` and finite OR operates
+    // directly on the encoding. The constants and their OR combinations use only bits 0..=11.
+    Bits(std::num::NonZeroU16),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, Debug)]
 pub struct InferencePriority(InferencePriorityRepr);
 
 #[expect(non_upper_case_globals, reason = "names match the upstream inference priorities")]
@@ -665,27 +669,38 @@ impl InferencePriority {
     pub const AlwaysStrict: Self = Self::from_bits(1 << 10); // Always use strict rules for contravariant inferences
     pub const MaxValue: Self = Self::from_bits(1 << 11); // Seed for inference priority tracking
 
-    const fn from_bits(bits: u32) -> Self {
-        // SAFETY: every priority bit is below `MaxValue`, so adding one cannot overflow or produce zero.
-        Self(InferencePriorityRepr::Bits(unsafe { std::num::NonZeroU32::new_unchecked(bits + 1) }))
+    const fn from_bits(bits: u16) -> Self {
+        assert!(bits <= u16::MAX >> 1, "inference priority exceeds u16 storage");
+        Self(InferencePriorityRepr::Bits(
+            std::num::NonZeroU16::new((bits << 1) | 1)
+                .expect("encoded inference priority is nonzero"),
+        ))
     }
 
-    const fn bits(self) -> Option<u32> {
+    const fn bits(self) -> Option<u16> {
         match self.0 {
             InferencePriorityRepr::Circularity => None,
-            InferencePriorityRepr::Bits(bits) => Some(bits.get() - 1),
+            InferencePriorityRepr::Bits(bits) => Some(bits.get() >> 1),
+        }
+    }
+
+    // Circularity sorts first; each finite priority keeps its order in the odd encoding.
+    // This safe match also gives equality a single value to compare instead of separate variants.
+    #[inline]
+    const fn order_key(self) -> u16 {
+        match self.0 {
+            InferencePriorityRepr::Circularity => 0,
+            InferencePriorityRepr::Bits(bits) => bits.get(),
         }
     }
 
     pub fn intersects(self, other: Self) -> bool {
-        match (self.bits(), other.bits()) {
-            (Some(left), Some(right)) => left & right != 0,
-            _ => false,
-        }
+        // The low bit marks finite values, not a flag. Circularity's zero key intersects nothing.
+        self.order_key() & other.order_key() & !1 != 0
     }
 
     pub(crate) fn memo_bits(self) -> u32 {
-        self.bits().unwrap_or(u32::MAX)
+        self.bits().map_or(u32::MAX, u32::from)
     }
 }
 
@@ -695,16 +710,26 @@ impl Default for InferencePriority {
     }
 }
 
-const _: () = assert!(std::mem::size_of::<InferencePriority>() == 4);
+const _: () = assert!(std::mem::size_of::<InferencePriority>() == 2);
+
+impl PartialEq for InferencePriority {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.order_key() == other.order_key()
+    }
+}
+
+impl std::hash::Hash for InferencePriority {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.0, state);
+    }
+}
 
 impl Ord for InferencePriority {
+    #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self.bits(), other.bits()) {
-            (None, None) => std::cmp::Ordering::Equal,
-            (None, Some(_)) => std::cmp::Ordering::Less,
-            (Some(_), None) => std::cmp::Ordering::Greater,
-            (Some(left), Some(right)) => left.cmp(&right),
-        }
+        self.order_key().cmp(&other.order_key())
     }
 }
 
@@ -718,9 +743,54 @@ impl std::ops::BitOr for InferencePriority {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        match (self.bits(), rhs.bits()) {
-            (Some(left), Some(right)) => Self::from_bits(left | right),
+        match (self.0, rhs.0) {
+            (InferencePriorityRepr::Bits(left), InferencePriorityRepr::Bits(right)) => {
+                Self(InferencePriorityRepr::Bits(left | right))
+            }
             _ => Self::Circularity,
+        }
+    }
+}
+
+#[cfg(test)]
+mod inference_priority_tests {
+    use super::InferencePriority;
+
+    #[test]
+    fn reachable_priorities_match_integer_semantics() {
+        // Circularity keeps its sentinel behavior; finite flags follow the integer operations below.
+        let circularity = InferencePriority::Circularity;
+        assert_eq!(InferencePriority::default().memo_bits(), 0);
+        assert_eq!(circularity.memo_bits(), u32::MAX);
+        assert_eq!(circularity.cmp(&circularity), std::cmp::Ordering::Equal);
+        assert_eq!(circularity.min(circularity), circularity);
+        assert_eq!(circularity | circularity, circularity);
+        assert!(!circularity.intersects(circularity));
+        assert_eq!(InferencePriority::from_bits(0x7fff).memo_bits(), 0x7fff);
+        for bits in [0x8000, u16::MAX] {
+            assert!(std::panic::catch_unwind(|| InferencePriority::from_bits(bits)).is_err());
+        }
+        // All OR combinations of the twelve public flag bits, including MaxValue.
+        for left_bits in 0..4096u16 {
+            let left = InferencePriority::from_bits(left_bits);
+            assert_eq!(left.memo_bits(), u32::from(left_bits));
+            assert_eq!(circularity.cmp(&left), (-1i32).cmp(&i32::from(left_bits)));
+            assert_eq!(left.cmp(&circularity), i32::from(left_bits).cmp(&-1));
+            assert_ne!(left, circularity);
+            assert_eq!(left.min(circularity), circularity);
+            assert_eq!(circularity.min(left), circularity);
+            assert_eq!(left | circularity, circularity);
+            assert_eq!(circularity | left, circularity);
+            assert!(!left.intersects(circularity));
+            assert!(!circularity.intersects(left));
+            for right_bits in 0..4096u16 {
+                let right = InferencePriority::from_bits(right_bits);
+                assert_eq!((left | right).memo_bits(), u32::from(left_bits | right_bits));
+                assert_eq!(left.cmp(&right), i32::from(left_bits).cmp(&i32::from(right_bits)));
+                assert_eq!(left == right, left_bits == right_bits);
+                assert_eq!(left.min(right).memo_bits(), u32::from(left_bits.min(right_bits)));
+                assert_eq!(left.intersects(right), left_bits & right_bits != 0);
+            }
         }
     }
 }
@@ -1154,9 +1224,7 @@ pub struct Checker {
     pub subtype_reduction_cache: FxHashMap<CacheHashKey, &'static [P<Type>]>,
     pub cached_types: FxHashMap<CachedTypeKey, P<Type>>,
     pub cached_signatures: PackedMap<CachedSignatureKey, P<Signature>>,
-    pub undefined_properties: FxHashMap<String, P<Symbol>>,
-    // tsrs: the canonical (history-independent) form of `undefined_properties` (get_undefined_property).
-    pub undefined_properties_by_prop: FxHashMap<P<Symbol>, P<Symbol>>,
+    pub undefined_properties: FxHashMap<P<Symbol>, P<Symbol>>,
     pub narrowed_types: FxHashMap<NarrowedTypeKey, P<Type>>,
     pub assignment_reduced_types: FxHashMap<AssignmentReducedKey, P<Type>>,
     pub discriminated_contextual_types: FxHashMap<DiscriminatedContextualTypeKey, P<Type>>,
@@ -1167,6 +1235,7 @@ pub struct Checker {
     pub iteration_types_cache: FxHashMap<IterationTypesKey, IterationTypes>,
     pub marker_types: Set<P<Type>>,
     pub resolving_explicit_type_of_symbol: Set<P<Symbol>>,
+    pub constructor_or_function_checked: Set<P<Symbol>>,
     pub undefined_symbol: P<Symbol>,
     pub arguments_symbol: P<Symbol>,
     pub require_symbol: P<Symbol>,
@@ -1193,11 +1262,12 @@ pub struct Checker {
     pub diagnostics: ast::DiagnosticsCollection,
     pub suggestion_diagnostics: ast::DiagnosticsCollection,
     pub merged_symbols: crate::merged_symbols::MergedSymbols,
+    pub merged_exports_checked: Set<P<Symbol>>,
     pub factory: ast::NodeFactory,
     pub node_links: LinkStore<Node, NodeLinks>,
-    pub signature_links: KeyedLinkStore<Node, SignatureLinks>,
+    pub signature_links: NodeValueLinkStore<SignatureLinks>,
     pub symbol_node_links: NodeLinkStore<SymbolNodeLinks>,
-    pub type_node_links: KeyedLinkStore<Node, TypeNodeLinks>,
+    pub type_node_links: NodeValueLinkStore<TypeNodeLinks>,
     pub enum_member_links: LinkStore<Node, EnumMemberLinks>,
     pub assertion_links: LinkStore<Node, AssertionLinks>,
     pub array_literal_links: LinkStore<Node, ArrayLiteralLinks>,
@@ -1241,6 +1311,9 @@ pub struct Checker {
     /// `tsrs_core::lazymembers::enabled()` (default on; `--noLazyMembers` / `TSRS_LAZY_MEMBERS=0`): no lazy
     /// table is created when false.
     pub lazy_members: bool,
+    /// Counter for mapped types whose members are being resolved (see `resolve_mapped_type_members`).
+    /// Used to avoid shortcuts that would bypass the empty-members guard on recursive resolution.
+    pub(crate) mapped_types_resolving: u32,
     /// `TSRS_DEEP_NESTED=shadow`: every deeply-nested test on a relater stack is also made without the
     /// stack's kept recursion identities, and the kept identities are recomputed; any difference panics
     /// (`relater_1.rs`).
@@ -1481,6 +1554,7 @@ pub struct Checker {
     pub get_global_promise_type_cache: Option<P<Type>>,
     pub get_global_promise_type_checked_cache: Option<P<Type>>,
     pub get_global_promise_like_type_cache: Option<P<Type>>,
+    pub get_global_abstract_module_source_type_cache: Option<P<Type>>,
     #[expect(
         clippy::option_option,
         reason = "The outer option records whether a result is available; the inner option records an absent value."
@@ -1561,7 +1635,10 @@ pub struct Checker {
     /// tsrs-only: accessible-chain cache entries keyed by a node in the current emit scratch region
     /// (`forget_scratch_keyed_caches`, notes/mem-emit-regions.md).
     pub scratch_keyed_chain_cache: Vec<(P<Symbol>, accessibleChainCacheKey)>,
-    pub emit_resolver: Option<P<EmitResolver>>, // Go `emitResolver` + `emitResolverOnce`: None until `get_emit_resolver`
+    pub emit_resolver_links: P<EmitResolverLinks>,
+    /// Rust-only context-independent helper for checker paths that still call resolver methods.
+    /// File emit uses a fresh `EmitResolver` bound to its own scratch `EmitContext`.
+    pub emit_resolver: Option<P<EmitResolver>>,
     /// Shared graph (`tsrs_core::sharedgraph`): this checker's values for lazy fields of frozen objects.
     pub overlay: Box<tsrs_core::sharedgraph::Overlay>,
     /// Shared graph: this checker is the seed whose graph will be frozen (symbol ids are assigned eagerly).
@@ -1669,7 +1746,6 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
         cached_types: FxHashMap::default(),
         cached_signatures: PackedMap::default(),
         undefined_properties: FxHashMap::default(),
-        undefined_properties_by_prop: FxHashMap::default(),
         narrowed_types: FxHashMap::default(),
         assignment_reduced_types: FxHashMap::default(),
         discriminated_contextual_types: FxHashMap::default(),
@@ -1680,6 +1756,7 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
         iteration_types_cache: FxHashMap::default(),
         marker_types: Set::new(),
         resolving_explicit_type_of_symbol: Set::new(),
+        constructor_or_function_checked: Set::new(),
         undefined_symbol: dummy_symbol,
         arguments_symbol: dummy_symbol,
         require_symbol: dummy_symbol,
@@ -1701,11 +1778,12 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
         diagnostics: ast::DiagnosticsCollection::default(),
         suggestion_diagnostics: ast::DiagnosticsCollection::default(),
         merged_symbols: crate::merged_symbols::MergedSymbols::default(),
+        merged_exports_checked: Set::new(),
         factory: ast::NodeFactory::default(),
         node_links: LinkStore::default(),
-        signature_links: KeyedLinkStore::default(),
+        signature_links: NodeValueLinkStore::default(),
         symbol_node_links: NodeLinkStore::default(),
-        type_node_links: KeyedLinkStore::default(),
+        type_node_links: NodeValueLinkStore::default(),
         enum_member_links: LinkStore::default(),
         assertion_links: LinkStore::default(),
         array_literal_links: LinkStore::default(),
@@ -1738,6 +1816,7 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
         object_type_instantiations: crate::basedmap::Based::default(),
         lazy_mapped_tables: crate::basedmap::Based::default(),
         lazy_members: tsrs_core::lazymembers::enabled(),
+        mapped_types_resolving: 0,
         deep_nested_shadow: std::env::var("TSRS_DEEP_NESTED").is_ok_and(|v| v == "shadow"),
         lazy_tuples: tsrs_core::lazymembers::lazy_tuples(),
         #[cfg(feature = "site-counts")]
@@ -1911,6 +1990,7 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
         get_global_promise_type_cache: None,
         get_global_promise_type_checked_cache: None,
         get_global_promise_like_type_cache: None,
+        get_global_abstract_module_source_type_cache: None,
         get_global_promise_constructor_symbol_cache: None,
         get_global_promise_constructor_symbol_or_nil_cache: None,
         get_global_omit_symbol_cache: None,
@@ -1968,6 +2048,7 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
         unassigned_type: dummy_type,
         type_to_string_nodebuilder: None,
         scratch_keyed_chain_cache: Vec::new(),
+        emit_resolver_links: P::new(EmitResolverLinks::default()),
         emit_resolver: None,
         overlay: Box::default(),
         seed_mode: false,
@@ -1979,7 +2060,7 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
     c.unknown_symbol = c.new_symbol(SymbolFlags::Property, "unknown");
     c.global_this_symbol = c.new_symbol_ex(SymbolFlags::Module, "globalThis", CheckFlags::Readonly);
     c.global_this_symbol.set_exports(Some(c.globals));
-    c.globals.set(c.global_this_symbol.name.get(), c.global_this_symbol);
+    c.globals.set(c.global_this_symbol.name(), c.global_this_symbol);
     c.name_resolver = c.create_name_resolver();
     c.name_resolver_for_suggestion = c.create_name_resolver_for_suggestion();
     c.any_type = c.new_intrinsic_type(TypeFlags::Any, "any");
@@ -2206,7 +2287,6 @@ impl Checker {
             cached_types: base.cached_types.clone(),
             cached_signatures: base.cached_signatures.clone(),
             undefined_properties: base.undefined_properties.clone(),
-            undefined_properties_by_prop: base.undefined_properties_by_prop.clone(),
             narrowed_types: base.narrowed_types.clone(),
             assignment_reduced_types: base.assignment_reduced_types.clone(),
             discriminated_contextual_types: base.discriminated_contextual_types.clone(),
@@ -2217,6 +2297,7 @@ impl Checker {
             iteration_types_cache: base.iteration_types_cache.clone(),
             marker_types: base.marker_types.clone(),
             resolving_explicit_type_of_symbol: base.resolving_explicit_type_of_symbol.clone(),
+            constructor_or_function_checked: base.constructor_or_function_checked.clone(),
             undefined_symbol: base.undefined_symbol,
             arguments_symbol: base.arguments_symbol,
             require_symbol: base.require_symbol,
@@ -2238,6 +2319,7 @@ impl Checker {
             diagnostics: base.diagnostics.clone(),
             suggestion_diagnostics: base.suggestion_diagnostics.clone(),
             merged_symbols: base.merged_symbols.clone(),
+            merged_exports_checked: base.merged_exports_checked.clone(),
             factory: ast::NodeFactory::default(),
             node_links: base.node_links.fork(),
             signature_links: base.signature_links.fork(),
@@ -2279,6 +2361,7 @@ impl Checker {
             ),
             lazy_mapped_tables: crate::basedmap::Based::over(&base.lazy_mapped_tables),
             lazy_members: base.lazy_members,
+            mapped_types_resolving: base.mapped_types_resolving,
             deep_nested_shadow: base.deep_nested_shadow,
             lazy_tuples: base.lazy_tuples,
             #[cfg(feature = "site-counts")]
@@ -2461,6 +2544,8 @@ impl Checker {
             get_global_promise_type_cache: base.get_global_promise_type_cache,
             get_global_promise_type_checked_cache: base.get_global_promise_type_checked_cache,
             get_global_promise_like_type_cache: base.get_global_promise_like_type_cache,
+            get_global_abstract_module_source_type_cache: base
+                .get_global_abstract_module_source_type_cache,
             get_global_promise_constructor_symbol_cache: base
                 .get_global_promise_constructor_symbol_cache,
             get_global_promise_constructor_symbol_or_nil_cache: base
@@ -2537,6 +2622,7 @@ impl Checker {
             unassigned_type: base.unassigned_type,
             type_to_string_nodebuilder: None,
             scratch_keyed_chain_cache: Vec::new(),
+            emit_resolver_links: P::new(EmitResolverLinks::default()),
             emit_resolver: None,
             overlay: Box::default(),
             seed_mode: false,
@@ -2907,6 +2993,19 @@ impl Checker {
         }
         let t = self.get_global_type("PromiseLike", 1 /*arity*/, true /*reportErrors*/);
         self.get_global_promise_like_type_cache = Some(t);
+        t
+    }
+
+    pub(crate) fn get_global_abstract_module_source_type(&mut self) -> P<Type> {
+        if let Some(t) = self.get_global_abstract_module_source_type_cache {
+            return t;
+        }
+        let t = self.get_global_type(
+            "AbstractModuleSource",
+            0,    /*arity*/
+            true, /*reportErrors*/
+        );
+        self.get_global_abstract_module_source_type_cache = Some(t);
         t
     }
 

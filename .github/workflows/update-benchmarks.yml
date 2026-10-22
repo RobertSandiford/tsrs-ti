@@ -1,36 +1,37 @@
 name: Update benchmarks
 
 on:
-  push:
-    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
     paths:
       - bench/projects.json
+      - bench/*.mjs
+      - pnpm-lock.yaml
       - .github/workflows/update-benchmarks.yml
   workflow_dispatch:
 
 concurrency:
-  group: update-benchmarks-${{ github.sha }}
-  cancel-in-progress: false
+  group: update-benchmarks-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
   build:
-    if: github.repository == 'oxc-project/tsrs'
+    if: github.repository == 'oxc-project/tsrs' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 180
     outputs:
       projects: ${{ steps.plan.outputs.projects }}
+      typescript: ${{ steps.plan.outputs.typescript }}
     steps:
       - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
 
       - name: Free disk space
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
 
-      - uses: oxc-project/setup-node@f46a72f95efdc55273fcd042d61c84e723b2892c # v1.4.1
-        with:
-          registry-url: ""
+      - uses: ./.github/actions/setup-node-tools
 
       - uses: oxc-project/setup-rust@3d6fb132fbe7cdcb66bf8ec193911c2945369d12 # v1.0.17
         with:
@@ -41,9 +42,11 @@ jobs:
       - name: Plan benchmark
         id: plan
         run: |
-          echo "projects=$(python3 bench/run.py --print-projects)" >> "$GITHUB_OUTPUT"
+          echo "projects=$(node bench/bench.mjs plan --projects all | jq -c .projects)" >> "$GITHUB_OUTPUT"
           echo "reference=$(node npm/build.mjs --print-typescript-commit)" >> "$GITHUB_OUTPUT"
-          python3 bench/run.py --print-cache-keys --projects xstate-main,webpack >> "$GITHUB_OUTPUT"
+          nightly=$(npm view typescript@next version)
+          echo "typescript=$nightly 7.0.2" >> "$GITHUB_OUTPUT"
+          node bench/bench.mjs plan --format keys --projects xstate-main,webpack >> "$GITHUB_OUTPUT"
 
       # PGO training needs both fixtures and the pinned Go fourslash source checkout.
       - name: Check out TypeScript source and fixtures
@@ -60,20 +63,17 @@ jobs:
           go-version-file: ts-ref/tsc/go.mod
           cache: false
 
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
-        with:
-          python-version: '3.15'
-
-      - name: Cache suite and TypeScript compilers
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - name: Restore suite
+        id: shared-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             bench/.work/suite
-            bench/.work/tsgo
           key: bench-shared-${{ runner.os }}-${{ steps.plan.outputs.shared }}
 
-      - name: Cache training projects
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - name: Restore training projects
+        id: training-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             bench/.work/solutions/xstate-main
@@ -82,14 +82,14 @@ jobs:
 
       - name: Build benchmark compilers
         run: |
-          # Build the same PGO + BOLT tsrs binary used by releases, and share one Bun canary across all measuring jobs.
+          # Build the same PGO + BOLT tsrs binary used by releases.
           set -euo pipefail
 
           target=x86_64-unknown-linux-gnu
           work="$RUNNER_TEMP/benchmark-build"
           mkdir -p "$work/raw" "$work/dist" "$work/llvm"
           rustup target add "$target"
-          python3 bench/run.py --setup-only --projects xstate-main,webpack
+          node bench/bench.mjs prepare --projects xstate-main,webpack
 
           # Keep profile settings identical between builds so PGO matches their symbol names.
           export CARGO_PROFILE_RELEASE_STRIP=none
@@ -114,26 +114,39 @@ jobs:
             .github/scripts/bolt.sh "$work/target/$target/release" "$work/bolt" bench/.work
 
           cp "$work/target/$target/release/tsrs" "$work/dist/tsrs"
-          rustc -V > "$work/dist/rustc.txt"
-          curl -fsSL --retry 3 --retry-all-errors \
-            https://github.com/oven-sh/bun/releases/download/canary/bun-linux-x64.zip -o "$work/bun.zip"
-          unzip -oq "$work/bun.zip" -d "$work"
-          cp "$work/bun-linux-x64/bun" "$work/dist/bun"
+          cargo install hyperfine --version 2.0.0 --locked --root "$work/hyperfine"
+          cp "$work/hyperfine/bin/hyperfine" "$work/dist/hyperfine"
           "$work/dist/tsrs" --version
-          "$work/dist/bun" --revision
-          "$work/dist/bun" check --help > /dev/null
-          sha256sum "$work/dist/tsrs" "$work/dist/bun"
+          "$work/dist/hyperfine" --version
+          sha256sum "$work/dist/tsrs" "$work/dist/hyperfine"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: benchmark-compilers
           path: ${{ runner.temp }}/benchmark-build/dist
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 14
+
+      - name: Save suite on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.shared-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            bench/.work/suite
+          key: ${{ steps.shared-cache.outputs.cache-primary-key }}
+
+      - name: Save training projects on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.training-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            bench/.work/solutions/xstate-main
+            bench/.work/solutions/webpack
+          key: ${{ steps.training-cache.outputs.cache-primary-key }}
 
   measure:
     needs: build
-    # 8 vCPUs, so the chart's 8-checker point runs one checker per core.
+    # Each project uses the same single configuration: 4 checkers and 8 worker CPUs.
     runs-on: nscloud-ubuntu-24.04-amd64-8x16
     timeout-minutes: 180
     strategy:
@@ -142,6 +155,7 @@ jobs:
         project: ${{ fromJSON(needs.build.outputs.projects) }}
     env:
       PROJECT: ${{ matrix.project }}
+      TYPESCRIPT_VERSIONS: ${{ needs.build.outputs.typescript }}
       BENCH_RUNNER: Namespace `nscloud-ubuntu-24.04-amd64-8x16`
     steps:
       - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
@@ -154,120 +168,134 @@ jobs:
             echo "::error::expected 8 vCPU / 16 GB / x86_64"; exit 1
           fi
 
-      - uses: oxc-project/setup-node@f46a72f95efdc55273fcd042d61c84e723b2892c # v1.4.1
-        with:
-          registry-url: ""
+      - uses: ./.github/actions/setup-node-tools
 
       - name: Cache keys
         id: keys
-        run: python3 bench/run.py --print-cache-keys --projects "$PROJECT" | sed "s/^$PROJECT=/project=/" >> "$GITHUB_OUTPUT"
+        run: node bench/bench.mjs plan --format keys --projects "$PROJECT" | sed "s/^$PROJECT=/project=/" >> "$GITHUB_OUTPUT"
 
-      - name: Restore suite and TypeScript compilers
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - name: Restore suite
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             bench/.work/suite
-            bench/.work/tsgo
           key: bench-shared-${{ runner.os }}-${{ steps.keys.outputs.shared }}
 
-      - name: Cache project
+      - name: Restore project
         if: steps.keys.outputs.project != ''
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: project-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: bench/.work/solutions/${{ matrix.project }}
           key: bench-${{ matrix.project }}-${{ runner.os }}-${{ steps.keys.outputs.project }}
 
       - name: Set up project
-        run: python3 bench/run.py --setup-only --projects "$PROJECT"
+        run: node bench/bench.mjs prepare --projects "$PROJECT"
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: benchmark-compilers
           path: ${{ runner.temp }}/benchmark-compilers
 
-      - name: Measure chart modes
+      - name: Measure compilers
         run: |
           bin="$RUNNER_TEMP/benchmark-compilers"
-          chmod +x "$bin/tsrs" "$bin/bun"
-          sha256sum "$bin/tsrs" "$bin/bun"
-          python3 bench/run.py --projects "$PROJECT" --modes wide,checkers1,checkers2,checkers4,checkers8 \
-            --tsrs "$bin/tsrs" --tsrs-build pgo-dist --rustc "$(cat "$bin/rustc.txt")" --bun "$bin/bun" \
-            --out-dir "$RUNNER_TEMP/bench-partial/$PROJECT" --reps 10 --tsgo-reps 3
+          chmod +x "$bin/tsrs" "$bin/hyperfine"
+          read -ra versions <<< "$TYPESCRIPT_VERSIONS"
+          node bench/bench.mjs run --projects "$PROJECT" --typescript-versions "${versions[@]}" \
+            --tsrs "$bin/tsrs" --hyperfine "$bin/hyperfine" --checkers 4 --workers 8 \
+            --out-dir "$RUNNER_TEMP/bench-partial/$PROJECT" --runs 10 --warmup 3
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bench-partial-${{ matrix.project }}
           path: ${{ runner.temp }}/bench-partial/${{ matrix.project }}
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 14
 
-      - name: Upload compiler logs
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Save benchmark project on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.project-cache.outputs.cache-hit != 'true' && (steps.keys.outputs.project != '')
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          name: bench-logs-${{ matrix.project }}
-          path: bench/.work/logs
-          if-no-files-found: ignore
+          path: bench/.work/solutions/${{ matrix.project }}
+          key: ${{ steps.project-cache.outputs.cache-primary-key }}
 
   publish:
     needs: measure
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: taiki-e/checkout-action@7d1e50e93dc4fb3bba58f85018fadf77898aee8b # v1.4.2
+
+      - uses: oxc-project/setup-node@f46a72f95efdc55273fcd042d61c84e723b2892c # v1.4.1
+        with:
+          registry-url: ""
 
       - name: Fetch benchmark history
         run: git fetch --unshallow origin main
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: bench-partial-*
           path: ${{ runner.temp }}/bench-partials
 
-      - name: Merge results
-        run: python3 bench/run.py --merge "$RUNNER_TEMP"/bench-partials/*/*.json --out-dir "$RUNNER_TEMP/bench-merged"
+      - name: Combine project data and update report SVGs
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          node bench/bench.mjs merge "$RUNNER_TEMP"/bench-partials/*/* --output-dir "$RUNNER_TEMP/bench-result"
+          node bench/bench.mjs render "$RUNNER_TEMP/bench-result" \
+            --output-dir "$RUNNER_TEMP/bench-publication" --commit "$GITHUB_SHA" --run-url "$RUN_URL"
+          node bench/bench.mjs verify-images "$RUNNER_TEMP/bench-publication/publication.json" \
+            --against "$RUNNER_TEMP/bench-publication"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bench-result
-          path: ${{ runner.temp }}/bench-merged
+          path: |
+            ${{ runner.temp }}/bench-result
+            ${{ runner.temp }}/bench-publication
           if-no-files-found: error
+          retention-days: 14
 
       - name: Create GitHub App token
         if: github.ref == 'refs/heads/main'
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
-      - name: Open results PR
+      - name: Open or update benchmark PR
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
           set -euo pipefail
-          results=("$RUNNER_TEMP"/bench-merged/*.json)
-          [ "${#results[@]}" -eq 1 ]
-          result="${results[0]}"
-          measured=$(git rev-parse --verify "$(jq -r '.tsrs.commit' "$result")^{commit}")
+          measured="$GITHUB_SHA"
           git fetch -q origin main
-          if ! jq -e '.tsrs.dirty == false' "$result" > /dev/null || ! git merge-base --is-ancestor "$measured" origin/main; then
-            echo "Keeping results as an artifact: the measured commit is not a clean commit on main."
+          if ! git merge-base --is-ancestor "$measured" origin/main; then
+            echo "Keeping results as artifacts: the measured commit is no longer on main."
+            exit 0
+          fi
+          git checkout -q -f -B main origin/main
+          displayed=$(sed -n 's/.*tsrs commit: `\([0-9a-f]\{7,40\}\)`.*/\1/p' bench/RESULTS.md | tail -1)
+          if [ -n "$displayed" ] && displayed=$(git rev-parse --verify "$displayed^{commit}") && \
+             [ "$displayed" != "$measured" ] && git merge-base --is-ancestor "$measured" "$displayed"; then
+            echo "Keeping the newer published report and images."
             exit 0
           fi
 
-          git checkout -q -f -B main origin/main
-          mkdir -p bench/results
-          cp "$result" "${result%.json}.md" bench/results/
-          python3 bench/publish.py "$result"
-          git add bench/RESULTS.md 'bench/large-projects*.svg' 'bench/per-project-*.svg'
-          git add -f "bench/results/$(basename "$result")" "bench/results/$(basename "${result%.json}.md")"
+          # Only the public report and images enter git; samples and logs stay in artifacts.
+          cp "$RUNNER_TEMP/bench-publication/RESULTS.md" bench/RESULTS.md
+          cp "$RUNNER_TEMP"/bench-publication/*.svg bench/
+          cp "$RUNNER_TEMP/bench-publication/publication.json" bench/publication.json
+          git add bench/RESULTS.md bench/publication.json bench/benchmark.svg 'bench/large-projects*.svg' 'bench/per-project-*.svg'
           git diff --cached --quiet && exit 0
 
           gh auth setup-git
@@ -285,8 +313,8 @@ jobs:
           git fetch -q origin "$commit"
           git push "--force-with-lease=refs/heads/$branch:$previous" origin "$commit:refs/heads/$branch"
 
-          printf 'Regenerate benchmark reports and README charts for `%s` against TypeScript `%s`.\n\n[Benchmark run](%s).\n' \
-            "${measured:0:12}" "$(jq -r '.tsgo.version' "$result")" "$RUN_URL" > "$RUNNER_TEMP/bench-pr.md"
+          printf 'Update the benchmark report and chart images for `%s`. Raw samples remain in [workflow artifacts](%s).\n' \
+            "${measured:0:12}" "$RUN_URL" > "$RUNNER_TEMP/bench-pr.md"
           pr=$(gh pr list --base main --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$pr" ]; then
             gh pr edit "$pr" --title "$title" --body-file "$RUNNER_TEMP/bench-pr.md"

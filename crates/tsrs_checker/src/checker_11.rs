@@ -1,5 +1,6 @@
 use crate::*;
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 use tsrs_ast as ast;
 use tsrs_ast::*;
 use tsrs_core::collections::OrderedSet;
@@ -773,9 +774,16 @@ impl Checker {
         let types = t.types();
         let skipped = if self.lazy_members {
             types.iter().position(|&t| {
-                t.object_flags_lazy() & (ObjectFlags::Mapped | ObjectFlags::MembersResolved)
+                if t.object_flags_lazy() & (ObjectFlags::Mapped | ObjectFlags::MembersResolved)
                     == ObjectFlags::Mapped
-                    || may_have_lazy_members(t) && t.flags().intersects(TypeFlags::Object)
+                {
+                    // Mapped types with an `as` clause are not given lazy tables and are resolved
+                    // in full on lookup; skipping them only reorders resolution (issue #649).
+                    let mapped_type = t.as_mapped_type().target.get().unwrap_or(t);
+                    self.get_name_type_from_mapped_type(mapped_type).is_none()
+                } else {
+                    may_have_lazy_members(t) && t.flags().intersects(TypeFlags::Object)
+                }
             })
         } else {
             None
@@ -1022,6 +1030,7 @@ impl Checker {
             min_type_argument_count,
             ast::is_in_js_file(node),
         )
+        .into_owned()
     }
 
     // Gets the minimum number of type arguments needed to satisfy all non-optional type parameters.
@@ -1053,17 +1062,17 @@ impl Checker {
     }
 
     // checker.go:22350
-    pub fn fill_missing_type_arguments(
+    pub fn fill_missing_type_arguments<'a>(
         &mut self,
-        type_arguments: &[P<Type>],
+        type_arguments: &'a [P<Type>],
         type_parameters: &[P<Type>],
         min_type_argument_count: usize,
         is_java_script_implicit_any: bool,
-    ) -> Vec<P<Type>> {
+    ) -> Cow<'a, [P<Type>]> {
         let _ = min_type_argument_count;
         let num_type_parameters = type_parameters.len();
         if num_type_parameters == 0 {
-            return Vec::new();
+            return Cow::Borrowed(&[]);
         }
         let num_type_arguments = type_arguments.len();
         if is_java_script_implicit_any || num_type_arguments < num_type_parameters {
@@ -1098,9 +1107,9 @@ impl Checker {
                     result[i] = base_default_type;
                 }
             }
-            return result;
+            return Cow::Owned(result);
         }
-        type_arguments.to_vec()
+        Cow::Borrowed(type_arguments)
     }
 
     // checker.go:22382
@@ -1731,7 +1740,7 @@ impl Checker {
             t
         };
         let type_parameters: &'static [P<Type>] =
-            if let Some(type_parameters) = links.outer_type_parameters.get() {
+            if let Some(type_parameters) = links.outer_type_parameters() {
                 type_parameters
             } else {
                 // The first time an anonymous type is instantiated we compute and store a list of the type
@@ -1766,7 +1775,7 @@ impl Checker {
                     }
                 }
                 let type_parameters = alloc_vec(type_parameters);
-                links.outer_type_parameters.set(Some(type_parameters));
+                links.set_outer_type_parameters(Some(type_parameters));
                 type_parameters
             };
         if type_parameters.is_empty() {
@@ -2423,11 +2432,9 @@ impl Checker {
     pub(crate) fn get_type_parameter_from_mapped_type(&mut self, t: P<Type>) -> P<Type> {
         let m = t.as_mapped_type();
         if m.type_parameter.get().is_none() {
-            let symbol = self
-                .get_symbol_of_declaration(
-                    m.declaration.get().unwrap().as_mapped_type_node().type_parameter,
-                )
-                .unwrap();
+            let symbol = self.get_symbol_of_declaration(
+                m.declaration.get().unwrap().as_mapped_type_node().type_parameter,
+            );
             let type_parameter = self.get_declared_type_of_type_parameter(symbol);
             m.type_parameter.set(Some(type_parameter));
         }
@@ -3271,7 +3278,8 @@ impl Checker {
                 is_js,
             );
             let mut type_arguments = d.outer_type_parameters().to_vec();
-            type_arguments.extend(local_type_arguments);
+            type_arguments.extend_from_slice(&local_type_arguments);
+            drop(local_type_arguments);
             return self.create_type_reference_ex(t, &type_arguments, ObjectFlags::FromTypeNode);
         }
         if self.check_no_type_arguments(node, Some(symbol)) {
@@ -3683,4 +3691,49 @@ impl Checker {
 pub fn is_tuple_type(t: P<Type>) -> bool {
     t.object_flags().intersects(ObjectFlags::Reference)
         && t.target().unwrap().object_flags().intersects(ObjectFlags::Tuple)
+}
+
+#[cfg(test)]
+mod property_counts_tests {
+    use super::*;
+
+    #[test]
+    fn ordered_counts_reuse_without_leaking_nested_state() {
+        let first = Symbol::new(SymbolFlags::Property, "first");
+        let second = Symbol::new(SymbolFlags::Property, "second");
+        let third = Symbol::new(SymbolFlags::Property, "third");
+
+        let mut outer = NameCounts::default();
+        outer.lists.push(alloc_slice(&[second, first]));
+        outer.lists.push(alloc_slice(&[first, third, second]));
+        outer.count_lists(5);
+        assert_eq!(
+            outer.entries.iter().map(|&(name, _, count)| (name, count)).collect::<Vec<_>>(),
+            [("second", 2), ("first", 2), ("third", 1)]
+        );
+
+        let mut inner = NameCounts::default();
+        inner.lists.push(alloc_slice(&[third, first, third]));
+        inner.count_lists(3);
+        assert_eq!(
+            inner.entries.iter().map(|&(name, _, count)| (name, count)).collect::<Vec<_>>(),
+            [("third", 2), ("first", 1)]
+        );
+        assert_eq!(
+            outer.entries.iter().map(|&(name, _, count)| (name, count)).collect::<Vec<_>>(),
+            [("second", 2), ("first", 2), ("third", 1)]
+        );
+
+        let entries = outer.entries.as_ptr();
+        let table = outer.table.as_ptr();
+        outer.lists.clear();
+        outer.lists.push(alloc_slice(&[first, third]));
+        outer.count_lists(2);
+        assert_eq!(outer.entries.as_ptr(), entries);
+        assert_eq!(outer.table.as_ptr(), table);
+        assert_eq!(
+            outer.entries.iter().map(|&(name, _, count)| (name, count)).collect::<Vec<_>>(),
+            [("first", 1), ("third", 1)]
+        );
+    }
 }
