@@ -87,7 +87,7 @@ impl JSXTransformer {
 
     // jsx.go:58
     fn get_jsx_factory_callee_primitive(&self, is_static_children: bool) -> &'static str {
-        if self.compiler_options.jsx == JsxEmit::ReactJSXDev {
+        if self.compiler_options.jsx == JsxEmit::REACT_JSX_DEV {
             return "jsxDEV";
         }
         if is_static_children {
@@ -835,7 +835,7 @@ impl JSXTransformer {
             args.push(self.transform_jsx_attribute_initializer(key_attr.initializer()));
         }
 
-        if self.compiler_options.jsx == JsxEmit::ReactJSXDev {
+        if self.compiler_options.jsx == JsxEmit::REACT_JSX_DEV {
             let original_file =
                 self.emit_context().most_original(Some(self.current_source_file().as_node()));
             if let Some(original_file) = original_file.filter(|n| ast::is_source_file(*n)) {

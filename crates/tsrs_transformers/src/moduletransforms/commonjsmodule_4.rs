@@ -700,7 +700,7 @@ impl CommonJSModuleTransformer {
 
     // commonjsmodule.go:1872
     fn visit_import_call_expression(&self, node: P<Node>, rewrite_or_shim: bool) -> P<Node> {
-        if self.module_kind == ModuleKind::None && self.language_version >= ScriptTarget::ES2020 {
+        if self.module_kind == ModuleKind::NONE && self.language_version >= ScriptTarget::ES2020 {
             return self.visitor().visit_each_child(Some(node)).unwrap();
         }
 
@@ -734,7 +734,7 @@ impl CommonJSModuleTransformer {
             } else {
                 Some(f.new_rewrite_relative_import_extensions_helper(
                     first_argument,
-                    self.compiler_options.jsx == tsrs_core::JsxEmit::Preserve,
+                    self.compiler_options.jsx == tsrs_core::JsxEmit::PRESERVE,
                     &self.content_mapper_extension_rewrites,
                     self.use_case_sensitive_file_names,
                 ))
@@ -857,7 +857,7 @@ impl CommonJSModuleTransformer {
             } else {
                 first_argument = f.new_rewrite_relative_import_extensions_helper(
                     first_argument,
-                    self.compiler_options.jsx == tsrs_core::JsxEmit::Preserve,
+                    self.compiler_options.jsx == tsrs_core::JsxEmit::PRESERVE,
                     &self.content_mapper_extension_rewrites,
                     self.use_case_sensitive_file_names,
                 );

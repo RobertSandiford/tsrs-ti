@@ -230,17 +230,17 @@ fn new_resolution_state<'r>(
     }
 
     match compiler_options.get_module_resolution_kind() {
-        ModuleResolutionKind::Node16 => {
+        ModuleResolutionKind::NODE16 => {
             state.features = NodeResolutionFeatures::Node16Default;
-            state.esm_mode = resolution_mode == ModuleKind::ESNext;
+            state.esm_mode = resolution_mode == ModuleKind::ES_NEXT;
             state.conditions = Some(resolver.conditions(compiler_options, resolution_mode));
         }
-        ModuleResolutionKind::NodeNext => {
+        ModuleResolutionKind::NODE_NEXT => {
             state.features = NodeResolutionFeatures::NodeNextDefault;
-            state.esm_mode = resolution_mode == ModuleKind::ESNext;
+            state.esm_mode = resolution_mode == ModuleKind::ES_NEXT;
             state.conditions = Some(resolver.conditions(compiler_options, resolution_mode));
         }
-        ModuleResolutionKind::Bundler => {
+        ModuleResolutionKind::BUNDLER => {
             state.features = get_node_resolution_features(&compiler_options);
             state.conditions = Some(resolver.conditions(compiler_options, resolution_mode));
         }
@@ -366,7 +366,7 @@ impl Tracer {
         if let Some(redirected_reference) = redirected_reference {
             if redirected_reference.compiler_options().is_some() {
                 self.write(
-                    &diagnostics::Using_compiler_options_of_project_reference_redirect_0,
+                    &diagnostics::USING_COMPILER_OPTIONS_OF_PROJECT_REFERENCE_REDIRECT_0,
                     &[&redirected_reference.config_name()],
                 );
             }
@@ -409,7 +409,7 @@ impl DefaultResolver<'_> {
             compiler_options.get_effective_type_roots(self.host.get_current_directory());
         if let Some(t) = trace_builder.as_mut() {
             t.write(
-                &diagnostics::Resolving_type_reference_directive_0_containing_file_1_root_directory_2,
+                &diagnostics::RESOLVING_TYPE_REFERENCE_DIRECTIVE_0_CONTAINING_FILE_1_ROOT_DIRECTORY_2,
                 &[&type_reference_directive_name, &containing_file, &type_roots.join(",")],
             );
             t.trace_resolution_using_project_reference(redirected_reference);
@@ -514,7 +514,7 @@ impl DefaultResolver<'_> {
         let compiler_options =
             get_compiler_options_with_redirect(self.compiler_options, redirected_reference);
         if let Some(t) = trace_builder.as_mut() {
-            t.write(&diagnostics::Resolving_module_0_from_1, &[&module_name, &containing_file]);
+            t.write(&diagnostics::RESOLVING_MODULE_0_FROM_1, &[&module_name, &containing_file]);
             t.trace_resolution_using_project_reference(redirected_reference);
         }
 
@@ -522,22 +522,22 @@ impl DefaultResolver<'_> {
         if compiler_options.module_resolution != module_resolution {
             trace!(
                 trace_builder,
-                diagnostics::Module_resolution_kind_is_not_specified_using_0,
+                diagnostics::MODULE_RESOLUTION_KIND_IS_NOT_SPECIFIED_USING_0,
                 module_resolution.string()
             );
         } else {
             trace!(
                 trace_builder,
-                diagnostics::Explicitly_specified_module_resolution_kind_Colon_0,
+                diagnostics::EXPLICITLY_SPECIFIED_MODULE_RESOLUTION_KIND_COLON_0,
                 module_resolution.string()
             );
         }
 
         let result: ResolvedModule;
         match module_resolution {
-            ModuleResolutionKind::Node16
-            | ModuleResolutionKind::NodeNext
-            | ModuleResolutionKind::Bundler => {
+            ModuleResolutionKind::NODE16
+            | ModuleResolutionKind::NODE_NEXT
+            | ModuleResolutionKind::BUNDLER => {
                 let mut state = new_resolution_state(
                     module_name,
                     containing_directory,
@@ -558,17 +558,17 @@ impl DefaultResolver<'_> {
             if result.is_resolved() {
                 if !result.package_id.name.is_empty() {
                     t.write(
-                        &diagnostics::Module_name_0_was_successfully_resolved_to_1_with_Package_ID_2,
+                        &diagnostics::MODULE_NAME_0_WAS_SUCCESSFULLY_RESOLVED_TO_1_WITH_PACKAGE_ID_2,
                         &[&module_name, &result.resolved_file_name, &result.package_id],
                     );
                 } else {
                     t.write(
-                        &diagnostics::Module_name_0_was_successfully_resolved_to_1,
+                        &diagnostics::MODULE_NAME_0_WAS_SUCCESSFULLY_RESOLVED_TO_1,
                         &[&module_name, &result.resolved_file_name],
                     );
                 }
             } else {
-                t.write(&diagnostics::Module_name_0_was_not_resolved, &[&module_name]);
+                t.write(&diagnostics::MODULE_NAME_0_WAS_NOT_RESOLVED, &[&module_name]);
             }
         }
 
@@ -634,7 +634,7 @@ impl DefaultResolver<'_> {
             module_name,
             containing_directory,
             false,            /*isTypeReferenceDirective*/
-            ModuleKind::None, // resolutionMode,
+            ModuleKind::NONE, // resolutionMode,
             self.compiler_options,
             None, // redirectedReference,
             self,
@@ -642,7 +642,7 @@ impl DefaultResolver<'_> {
         );
         trace!(
             state.tracer,
-            diagnostics::Auto_discovery_for_typings_is_enabled_in_project_0_Running_extra_resolution_pass_for_module_1_using_cache_location_2,
+            diagnostics::AUTO_DISCOVERY_FOR_TYPINGS_IS_ENABLED_IN_PROJECT_0_RUNNING_EXTRA_RESOLUTION_PASS_FOR_MODULE_1_USING_CACHE_LOCATION_2,
             self.project_name,
             module_name,
             self.typings_location
@@ -670,7 +670,7 @@ impl DefaultResolver<'_> {
             module_name,
             &containing_directory,
             false, /*isTypeReferenceDirective*/
-            ModuleKind::CommonJS,
+            ModuleKind::COMMON_JS,
             self.compiler_options,
             None,
             self,
@@ -742,17 +742,17 @@ impl Tracer {
     ) {
         if !result.is_resolved() {
             self.write(
-                &diagnostics::Type_reference_directive_0_was_not_resolved,
+                &diagnostics::TYPE_REFERENCE_DIRECTIVE_0_WAS_NOT_RESOLVED,
                 &[&type_reference_directive_name],
             );
         } else if !result.package_id.name.is_empty() {
             self.write(
-                &diagnostics::Type_reference_directive_0_was_successfully_resolved_to_1_with_Package_ID_2_primary_Colon_3,
+                &diagnostics::TYPE_REFERENCE_DIRECTIVE_0_WAS_SUCCESSFULLY_RESOLVED_TO_1_WITH_PACKAGE_ID_2_PRIMARY_COLON_3,
                 &[&type_reference_directive_name, &result.resolved_file_name, &result.package_id, &result.primary],
             );
         } else {
             self.write(
-                &diagnostics::Type_reference_directive_0_was_successfully_resolved_to_1_primary_Colon_2,
+                &diagnostics::TYPE_REFERENCE_DIRECTIVE_0_WAS_SUCCESSFULLY_RESOLVED_TO_1_PRIMARY_COLON_2,
                 &[&type_reference_directive_name, &result.resolved_file_name, &result.primary],
             );
         }
@@ -801,7 +801,7 @@ impl<'r> ResolutionState<'r> {
         if !type_roots.is_empty() {
             trace!(
                 self.tracer,
-                diagnostics::Resolving_with_primary_search_path_0,
+                diagnostics::RESOLVING_WITH_PRIMARY_SEARCH_PATH_0,
                 type_roots.join(", ")
             );
             for type_root in type_roots {
@@ -810,7 +810,7 @@ impl<'r> ResolutionState<'r> {
                 if !directory_exists {
                     trace!(
                         self.tracer,
-                        diagnostics::Directory_0_does_not_exist_skipping_all_lookups_in_it,
+                        diagnostics::DIRECTORY_0_DOES_NOT_EXIST_SKIPPING_ALL_LOOKUPS_IN_IT,
                         type_root
                     );
                     continue;
@@ -846,7 +846,7 @@ impl<'r> ResolutionState<'r> {
         } else {
             trace!(
                 self.tracer,
-                diagnostics::Root_directory_cannot_be_determined_skipping_primary_search_paths
+                diagnostics::ROOT_DIRECTORY_CANNOT_BE_DETERMINED_SKIPPING_PRIMARY_SEARCH_PATHS
             );
         }
 
@@ -855,7 +855,7 @@ impl<'r> ResolutionState<'r> {
         if !from_config || !from_inferred_types_containing_file {
             trace!(
                 self.tracer,
-                diagnostics::Looking_up_in_node_modules_folder_initial_location_0,
+                diagnostics::LOOKING_UP_IN_NODE_MODULES_FOLDER_INITIAL_LOCATION_0,
                 self.containing_directory
             );
             if !tspath::is_external_module_name_relative(&self.name) {
@@ -871,7 +871,7 @@ impl<'r> ResolutionState<'r> {
                 );
             }
         } else {
-            trace!(self.tracer, diagnostics::Resolving_type_reference_directive_for_program_that_specifies_custom_typeRoots_skipping_lookup_in_node_modules_folder);
+            trace!(self.tracer, diagnostics::RESOLVING_TYPE_REFERENCE_DIRECTIVE_FOR_PROGRAM_THAT_SPECIFIES_CUSTOM_TYPE_ROOTS_SKIPPING_LOOKUP_IN_NODE_MODULES_FOLDER);
         }
         self.create_resolved_type_reference_directive(resolved, false /*primary*/)
     }
@@ -890,7 +890,7 @@ impl<'r> ResolutionState<'r> {
     fn mangle_scoped_package_name(&mut self, name: &str) -> String {
         let mangled = mangle_scoped_package_name(name);
         if mangled != name {
-            trace!(self.tracer, diagnostics::Scoped_package_detected_looking_in_0, mangled);
+            trace!(self.tracer, diagnostics::SCOPED_PACKAGE_DETECTED_LOOKING_IN_0, mangled);
         }
         mangled
     }
@@ -907,7 +907,7 @@ impl<'r> ResolutionState<'r> {
             if !directory_exists {
                 trace!(
                     self.tracer,
-                    diagnostics::Directory_0_does_not_exist_skipping_all_lookups_in_it,
+                    diagnostics::DIRECTORY_0_DOES_NOT_EXIST_SKIPPING_ALL_LOOKUPS_IN_IT,
                     type_root
                 );
                 continue;
@@ -960,12 +960,12 @@ impl<'r> ResolutionState<'r> {
                 .join(", ");
             if self.esm_mode {
                 t.write(
-                    &diagnostics::Resolving_in_0_mode_with_conditions_1,
+                    &diagnostics::RESOLVING_IN_0_MODE_WITH_CONDITIONS_1,
                     &[&"ESM", &conditions],
                 );
             } else {
                 t.write(
-                    &diagnostics::Resolving_in_0_mode_with_conditions_1,
+                    &diagnostics::RESOLVING_IN_0_MODE_WITH_CONDITIONS_1,
                     &[&"CJS", &conditions],
                 );
             }
@@ -983,7 +983,7 @@ impl<'r> ResolutionState<'r> {
         {
             trace!(
                 self.tracer,
-                diagnostics::Resolution_of_non_relative_name_failed_trying_with_modern_Node_resolution_features_disabled_to_see_if_npm_library_needs_configuration_update
+                diagnostics::RESOLUTION_OF_NON_RELATIVE_NAME_FAILED_TRYING_WITH_MODERN_NODE_RESOLUTION_FEATURES_DISABLED_TO_SEE_IF_NPM_LIBRARY_NEEDS_CONFIGURATION_UPDATE
             );
             self.features &= !NodeResolutionFeatures::Exports;
             self.extensions &= Extensions::TypeScript | Extensions::Declaration;
@@ -1019,12 +1019,12 @@ impl<'r> ResolutionState<'r> {
                 }
             }
             if self.name.contains(':') {
-                trace!(self.tracer, diagnostics::Skipping_module_0_that_looks_like_an_absolute_URI_target_file_types_Colon_1, self.name, self.extensions);
+                trace!(self.tracer, diagnostics::SKIPPING_MODULE_0_THAT_LOOKS_LIKE_AN_ABSOLUTE_URI_TARGET_FILE_TYPES_COLON_1, self.name, self.extensions);
                 return self.create_resolved_module(None, false);
             }
             trace!(
                 self.tracer,
-                diagnostics::Loading_module_0_from_node_modules_folder_target_file_types_Colon_1,
+                diagnostics::LOADING_MODULE_0_FROM_NODE_MODULES_FOLDER_TARGET_FILE_TYPES_COLON_1,
                 self.name,
                 self.extensions
             );
@@ -1114,7 +1114,7 @@ impl<'r> ResolutionState<'r> {
         {
             trace!(
                 self.tracer,
-                diagnostics::Invalid_import_specifier_0_has_no_possible_resolutions,
+                diagnostics::INVALID_IMPORT_SPECIFIER_0_HAS_NO_POSSIBLE_RESOLUTIONS,
                 self.name
             );
             return continue_searching();
@@ -1125,7 +1125,7 @@ impl<'r> ResolutionState<'r> {
         );
         let scope = self.get_package_scope_for_path(&directory_path);
         if !scope.exists() {
-            trace!(self.tracer, diagnostics::Directory_0_has_no_containing_package_json_scope_Imports_will_not_resolve, directory_path);
+            trace!(self.tracer, diagnostics::DIRECTORY_0_HAS_NO_CONTAINING_PACKAGE_JSON_SCOPE_IMPORTS_WILL_NOT_RESOLVE, directory_path);
             return continue_searching();
         }
         let scope_entry = scope.unwrap();
@@ -1135,7 +1135,7 @@ impl<'r> ResolutionState<'r> {
             // Maybe should have a new diagnostic for imports of an invalid type. Also, array should be handled?
             trace!(
                 self.tracer,
-                diagnostics::X_package_json_scope_0_has_no_imports_defined,
+                diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_NO_IMPORTS_DEFINED,
                 scope_entry.package_directory
             );
             return continue_searching();
@@ -1155,7 +1155,7 @@ impl<'r> ResolutionState<'r> {
 
         trace!(
             self.tracer,
-            diagnostics::Import_specifier_0_does_not_exist_in_package_json_scope_at_path_1,
+            diagnostics::IMPORT_SPECIFIER_0_DOES_NOT_EXIST_IN_PACKAGE_JSON_SCOPE_AT_PATH_1,
             self.name,
             scope_entry.package_directory
         );
@@ -1217,7 +1217,7 @@ impl<'r> ResolutionState<'r> {
 
         trace!(
             self.tracer,
-            diagnostics::Export_specifier_0_does_not_exist_in_package_json_scope_at_path_1,
+            diagnostics::EXPORT_SPECIFIER_0_DOES_NOT_EXIST_IN_PACKAGE_JSON_SCOPE_AT_PATH_1,
             subpath,
             package_info.package_directory
         );
@@ -1327,7 +1327,7 @@ impl<'r> ResolutionState<'r> {
             JSONValueType::String => {
                 let target_string = target.as_string();
                 if !is_pattern && !subpath.is_empty() && !target_string.ends_with('/') {
-                    trace!(self.tracer, diagnostics::X_package_json_scope_0_has_invalid_type_for_target_of_specifier_1, scope.package_directory, module_name);
+                    trace!(self.tracer, diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_INVALID_TYPE_FOR_TARGET_OF_SPECIFIER_1, scope.package_directory, module_name);
                     return continue_searching();
                 }
                 if !target_string.starts_with("./") {
@@ -1345,11 +1345,11 @@ impl<'r> ResolutionState<'r> {
                             tspath::ensure_trailing_directory_separator(scope.package_directory);
                         if let Some(t) = self.tracer.as_mut() {
                             t.write(
-                                &diagnostics::Using_0_subpath_1_with_target_2,
+                                &diagnostics::USING_0_SUBPATH_1_WITH_TARGET_2,
                                 &[&"imports", &key, &combined_lookup],
                             );
                             t.write(
-                                &diagnostics::Resolving_module_0_from_1,
+                                &diagnostics::RESOLVING_MODULE_0_FROM_1,
                                 &[&combined_lookup, &scope_containing_directory],
                             );
                         }
@@ -1373,7 +1373,7 @@ impl<'r> ResolutionState<'r> {
                         }
                         return continue_searching();
                     }
-                    trace!(self.tracer, diagnostics::X_package_json_scope_0_has_invalid_type_for_target_of_specifier_1, scope.package_directory, module_name);
+                    trace!(self.tracer, diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_INVALID_TYPE_FOR_TARGET_OF_SPECIFIER_1, scope.package_directory, module_name);
                     return continue_searching();
                 }
                 let parts = if tspath::path_is_relative(target_string) {
@@ -1383,14 +1383,14 @@ impl<'r> ResolutionState<'r> {
                 };
                 let parts_after_first = &parts[1..];
                 if parts_after_first.iter().any(|p| p == ".." || p == "." || p == "node_modules") {
-                    trace!(self.tracer, diagnostics::X_package_json_scope_0_has_invalid_type_for_target_of_specifier_1, scope.package_directory, module_name);
+                    trace!(self.tracer, diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_INVALID_TYPE_FOR_TARGET_OF_SPECIFIER_1, scope.package_directory, module_name);
                     return continue_searching();
                 }
                 // TODO: Assert that `resolvedTarget` is actually within the package directory? That's what the spec says.... but I'm not sure we need
                 // to be in the business of validating everyone's import and export map correctness.
                 let subpath_parts = tspath::get_path_components(subpath, "");
                 if subpath_parts.iter().any(|p| p == ".." || p == "." || p == "node_modules") {
-                    trace!(self.tracer, diagnostics::X_package_json_scope_0_has_invalid_type_for_target_of_specifier_1, scope.package_directory, module_name);
+                    trace!(self.tracer, diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_INVALID_TYPE_FOR_TARGET_OF_SPECIFIER_1, scope.package_directory, module_name);
                     return continue_searching();
                 }
 
@@ -1401,7 +1401,7 @@ impl<'r> ResolutionState<'r> {
                         format!("{target_string}{subpath}")
                     };
                     t.write(
-                        &diagnostics::Using_0_subpath_1_with_target_2,
+                        &diagnostics::USING_0_SUBPATH_1_WITH_TARGET_2,
                         &[&if is_imports { "imports" } else { "exports" }, &key, &message_target],
                     );
                 }
@@ -1437,12 +1437,12 @@ impl<'r> ResolutionState<'r> {
                 continue_searching()
             }
             JSONValueType::Object => {
-                trace!(self.tracer, diagnostics::Entering_conditional_exports);
+                trace!(self.tracer, diagnostics::ENTERING_CONDITIONAL_EXPORTS);
                 for (condition, sub_target) in target.as_object() {
                     if self.condition_matches(condition) {
                         trace!(
                             self.tracer,
-                            diagnostics::Matched_0_condition_1,
+                            diagnostics::MATCHED_0_CONDITION_1,
                             if is_imports { "imports" } else { "exports" },
                             condition
                         );
@@ -1460,28 +1460,28 @@ impl<'r> ResolutionState<'r> {
                             if result.is_resolved() {
                                 trace!(
                                     self.tracer,
-                                    diagnostics::Resolved_under_condition_0,
+                                    diagnostics::RESOLVED_UNDER_CONDITION_0,
                                     condition
                                 );
                             }
-                            trace!(self.tracer, diagnostics::Exiting_conditional_exports);
+                            trace!(self.tracer, diagnostics::EXITING_CONDITIONAL_EXPORTS);
                             return result;
                         }
                         trace!(
                             self.tracer,
-                            diagnostics::Failed_to_resolve_under_condition_0,
+                            diagnostics::FAILED_TO_RESOLVE_UNDER_CONDITION_0,
                             condition
                         );
                     } else {
-                        trace!(self.tracer, diagnostics::Saw_non_matching_condition_0, condition);
+                        trace!(self.tracer, diagnostics::SAW_NON_MATCHING_CONDITION_0, condition);
                     }
                 }
-                trace!(self.tracer, diagnostics::Exiting_conditional_exports);
+                trace!(self.tracer, diagnostics::EXITING_CONDITIONAL_EXPORTS);
                 continue_searching()
             }
             JSONValueType::Array => {
                 if target.as_array().is_empty() {
-                    trace!(self.tracer, diagnostics::X_package_json_scope_0_has_invalid_type_for_target_of_specifier_1, scope.package_directory, module_name);
+                    trace!(self.tracer, diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_INVALID_TYPE_FOR_TARGET_OF_SPECIFIER_1, scope.package_directory, module_name);
                     return continue_searching();
                 }
                 if let Some(result) = target.as_array().iter().find_map(|elem| {
@@ -1505,7 +1505,7 @@ impl<'r> ResolutionState<'r> {
                 }
                 trace!(
                     self.tracer,
-                    diagnostics::X_package_json_scope_0_has_invalid_type_for_target_of_specifier_1,
+                    diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_INVALID_TYPE_FOR_TARGET_OF_SPECIFIER_1,
                     scope.package_directory,
                     module_name
                 );
@@ -1514,7 +1514,7 @@ impl<'r> ResolutionState<'r> {
             JSONValueType::Null => {
                 trace!(
                     self.tracer,
-                    diagnostics::X_package_json_scope_0_explicitly_maps_specifier_1_to_null,
+                    diagnostics::X_PACKAGE_JSON_SCOPE_0_EXPLICITLY_MAPS_SPECIFIER_1_TO_NULL,
                     scope.package_directory,
                     module_name
                 );
@@ -1523,7 +1523,7 @@ impl<'r> ResolutionState<'r> {
             _ => {
                 trace!(
                     self.tracer,
-                    diagnostics::X_package_json_scope_0_has_invalid_type_for_target_of_specifier_1,
+                    diagnostics::X_PACKAGE_JSON_SCOPE_0_HAS_INVALID_TYPE_FOR_TARGET_OF_SPECIFIER_1,
                     scope.package_directory,
                     module_name
                 );
@@ -1571,9 +1571,9 @@ impl<'r> ResolutionState<'r> {
                     None,
                     TextRange::default(),
                     if is_imports {
-                        &diagnostics::The_project_root_is_ambiguous_but_is_required_to_resolve_import_map_entry_0_in_file_1_Supply_the_rootDir_compiler_option_to_disambiguate
+                        &diagnostics::THE_PROJECT_ROOT_IS_AMBIGUOUS_BUT_IS_REQUIRED_TO_RESOLVE_IMPORT_MAP_ENTRY_0_IN_FILE_1_SUPPLY_THE_ROOT_DIR_COMPILER_OPTION_TO_DISAMBIGUATE
                     } else {
-                        &diagnostics::The_project_root_is_ambiguous_but_is_required_to_resolve_export_map_entry_0_in_file_1_Supply_the_rootDir_compiler_option_to_disambiguate
+                        &diagnostics::THE_PROJECT_ROOT_IS_AMBIGUOUS_BUT_IS_REQUIRED_TO_RESOLVE_EXPORT_MAP_ENTRY_0_IN_FILE_1_SUPPLY_THE_ROOT_DIR_COMPILER_OPTION_TO_DISAMBIGUATE
                     },
                     &[&entry_arg, &package_path],
                 );
@@ -1677,9 +1677,9 @@ impl<'r> ResolutionState<'r> {
         types_scope_only: bool,
     ) -> Option<Resolved> {
         let mode = if self.esm_mode || self.condition_matches("import") {
-            ModuleKind::ESNext
+            ModuleKind::ES_NEXT
         } else {
-            ModuleKind::CommonJS
+            ModuleKind::COMMON_JS
         };
         // Do (up to) two passes through node_modules:
         //   1. For each ancestor node_modules directory, try to find:
@@ -1693,7 +1693,7 @@ impl<'r> ResolutionState<'r> {
             self.extensions & !(Extensions::TypeScript | Extensions::Declaration);
         // (1)
         if !priority_extensions.is_empty() {
-            trace!(self.tracer, diagnostics::Searching_all_ancestor_node_modules_directories_for_preferred_extensions_Colon_0, priority_extensions);
+            trace!(self.tracer, diagnostics::SEARCHING_ALL_ANCESTOR_NODE_MODULES_DIRECTORIES_FOR_PREFERRED_EXTENSIONS_COLON_0, priority_extensions);
             let result = self.load_module_from_nearest_node_modules_directory_worker(
                 priority_extensions,
                 mode,
@@ -1705,7 +1705,7 @@ impl<'r> ResolutionState<'r> {
         }
         // (2)
         if !secondary_extensions.is_empty() && !types_scope_only {
-            trace!(self.tracer, diagnostics::Searching_all_ancestor_node_modules_directories_for_fallback_extensions_Colon_0, secondary_extensions);
+            trace!(self.tracer, diagnostics::SEARCHING_ALL_ANCESTOR_NODE_MODULES_DIRECTORIES_FOR_FALLBACK_EXTENSIONS_COLON_0, secondary_extensions);
             return self.load_module_from_nearest_node_modules_directory_worker(
                 secondary_extensions,
                 mode,
@@ -1745,7 +1745,7 @@ impl<'r> ResolutionState<'r> {
         if !self.fs().directory_exists(&node_modules_folder) {
             trace!(
                 self.tracer,
-                diagnostics::Directory_0_does_not_exist_skipping_all_lookups_in_it,
+                diagnostics::DIRECTORY_0_DOES_NOT_EXIST_SKIPPING_ALL_LOOKUPS_IN_IT,
                 node_modules_folder
             );
             return continue_searching();
@@ -1768,7 +1768,7 @@ impl<'r> ResolutionState<'r> {
             if !self.fs().directory_exists(&node_modules_at_types) {
                 trace!(
                     self.tracer,
-                    diagnostics::Directory_0_does_not_exist_skipping_all_lookups_in_it,
+                    diagnostics::DIRECTORY_0_DOES_NOT_EXIST_SKIPPING_ALL_LOOKUPS_IN_IT,
                     node_modules_at_types
                 );
                 return continue_searching();
@@ -1922,7 +1922,7 @@ impl<'r> ResolutionState<'r> {
                 if version_paths.exists() {
                     trace!(
                         self.tracer,
-                        diagnostics::X_package_json_has_a_typesVersions_entry_0_that_matches_compiler_version_1_looking_for_a_pattern_to_match_module_name_2,
+                        diagnostics::X_PACKAGE_JSON_HAS_A_TYPES_VERSIONS_ENTRY_0_THAT_MATCHES_COMPILER_VERSION_1_LOOKING_FOR_A_PATTERN_TO_MATCH_MODULE_NAME_2,
                         version_paths.version,
                         tsrs_core::version(),
                         rest
@@ -2066,7 +2066,7 @@ impl<'r> ResolutionState<'r> {
         if compiler_options.paths.as_ref().is_some_and(|p| !p.is_empty())
             && !tspath::path_is_relative(&self.name)
         {
-            trace!(self.tracer, diagnostics::X_paths_option_is_specified_looking_for_a_pattern_to_match_module_name_0, self.name);
+            trace!(self.tracer, diagnostics::X_PATHS_OPTION_IS_SPECIFIED_LOOKING_FOR_A_PATTERN_TO_MATCH_MODULE_NAME_0, self.name);
         } else {
             return continue_searching();
         }
@@ -2101,7 +2101,7 @@ impl<'r> ResolutionState<'r> {
             let matched_star = matched_pattern.matched_text(module_name);
             trace!(
                 self.tracer,
-                diagnostics::Module_name_0_matched_pattern_1,
+                diagnostics::MODULE_NAME_0_MATCHED_PATTERN_1,
                 module_name,
                 matched_pattern.text
             );
@@ -2117,7 +2117,7 @@ impl<'r> ResolutionState<'r> {
                 );
                 trace!(
                     self.tracer,
-                    diagnostics::Trying_substitution_0_candidate_module_location_Colon_1,
+                    diagnostics::TRYING_SUBSTITUTION_0_CANDIDATE_MODULE_LOCATION_COLON_1,
                     subst,
                     path
                 );
@@ -2157,7 +2157,7 @@ impl<'r> ResolutionState<'r> {
 
         trace!(
             self.tracer,
-            diagnostics::X_rootDirs_option_is_set_using_it_to_resolve_relative_module_name_0,
+            diagnostics::X_ROOT_DIRS_OPTION_IS_SET_USING_IT_TO_RESOLVE_RELATIVE_MODULE_NAME_0,
             self.name
         );
 
@@ -2183,7 +2183,7 @@ impl<'r> ResolutionState<'r> {
 
             trace!(
                 self.tracer,
-                diagnostics::Checking_if_0_is_the_longest_matching_prefix_for_1_2,
+                diagnostics::CHECKING_IF_0_IS_THE_LONGEST_MATCHING_PREFIX_FOR_1_2,
                 normalized_root,
                 candidate,
                 is_longest_matching_prefix
@@ -2198,7 +2198,7 @@ impl<'r> ResolutionState<'r> {
         if !matched_normalized_prefix.is_empty() {
             trace!(
                 self.tracer,
-                diagnostics::Longest_matching_prefix_for_0_is_1,
+                diagnostics::LONGEST_MATCHING_PREFIX_FOR_0_IS_1,
                 candidate,
                 matched_normalized_prefix
             );
@@ -2207,7 +2207,7 @@ impl<'r> ResolutionState<'r> {
             // first - try to load from a initial location
             trace!(
                 self.tracer,
-                diagnostics::Loading_0_from_the_root_dir_1_candidate_location_2,
+                diagnostics::LOADING_0_FROM_THE_ROOT_DIR_1_CANDIDATE_LOCATION_2,
                 suffix,
                 matched_normalized_prefix,
                 candidate
@@ -2223,7 +2223,7 @@ impl<'r> ResolutionState<'r> {
                 return resolved_file_name;
             }
 
-            trace!(self.tracer, diagnostics::Trying_other_entries_in_rootDirs);
+            trace!(self.tracer, diagnostics::TRYING_OTHER_ENTRIES_IN_ROOT_DIRS);
             // then try to resolve using remaining entries in rootDirs
             if let Some(result) = root_dirs.iter().find_map(|root_dir| {
                 if Some(root_dir) == matched_root_dir {
@@ -2252,7 +2252,7 @@ impl<'r> ResolutionState<'r> {
                 };
                 trace!(
                     self.tracer,
-                    diagnostics::Loading_0_from_the_root_dir_1_candidate_location_2,
+                    diagnostics::LOADING_0_FROM_THE_ROOT_DIR_1_CANDIDATE_LOCATION_2,
                     suffix,
                     root_dir,
                     candidate
@@ -2266,7 +2266,7 @@ impl<'r> ResolutionState<'r> {
             }) {
                 return result;
             }
-            trace!(self.tracer, diagnostics::Module_resolution_using_rootDirs_has_failed);
+            trace!(self.tracer, diagnostics::MODULE_RESOLUTION_USING_ROOT_DIRS_HAS_FAILED);
         }
         continue_searching()
     }
@@ -2277,13 +2277,13 @@ impl<'r> ResolutionState<'r> {
         candidate: &str,
         consider_package_json: bool,
     ) -> Option<Resolved> {
-        trace!(self.tracer, diagnostics::Loading_module_as_file_Slash_folder_candidate_module_location_0_target_file_types_Colon_1, candidate, extensions);
+        trace!(self.tracer, diagnostics::LOADING_MODULE_AS_FILE_SLASH_FOLDER_CANDIDATE_MODULE_LOCATION_0_TARGET_FILE_TYPES_COLON_1, candidate, extensions);
         if !tspath::has_trailing_directory_separator(candidate) {
             let parent_of_candidate = tspath::get_directory_path(candidate);
             if !self.fs().directory_exists(&parent_of_candidate) {
                 trace!(
                     self.tracer,
-                    diagnostics::Directory_0_does_not_exist_skipping_all_lookups_in_it,
+                    diagnostics::DIRECTORY_0_DOES_NOT_EXIST_SKIPPING_ALL_LOOKUPS_IN_IT,
                     parent_of_candidate
                 );
                 return continue_searching();
@@ -2304,7 +2304,7 @@ impl<'r> ResolutionState<'r> {
         if !self.fs().directory_exists(&directory_candidate) {
             trace!(
                 self.tracer,
-                diagnostics::Directory_0_does_not_exist_skipping_all_lookups_in_it,
+                diagnostics::DIRECTORY_0_DOES_NOT_EXIST_SKIPPING_ALL_LOOKUPS_IN_IT,
                 directory_candidate
             );
             return continue_searching();
@@ -2367,7 +2367,7 @@ impl<'r> ResolutionState<'r> {
         let extension = &candidate[extensionless.len()..];
         trace!(
             self.tracer,
-            diagnostics::File_name_0_has_a_1_extension_stripping_it,
+            diagnostics::FILE_NAME_0_HAS_A_1_EXTENSION_STRIPPING_IT,
             candidate,
             extension
         );
@@ -2643,12 +2643,12 @@ impl<'r> ResolutionState<'r> {
         if self.fs().file_exists(file_name) {
             trace!(
                 self.tracer,
-                diagnostics::File_0_exists_use_it_as_a_name_resolution_result,
+                diagnostics::FILE_0_EXISTS_USE_IT_AS_A_NAME_RESOLUTION_RESULT,
                 file_name
             );
             return true;
         }
-        trace!(self.tracer, diagnostics::File_0_does_not_exist, file_name);
+        trace!(self.tracer, diagnostics::FILE_0_DOES_NOT_EXIST, file_name);
         false
     }
 
@@ -2761,7 +2761,7 @@ impl<'r> ResolutionState<'r> {
                 }
                 trace!(
                     self.tracer,
-                    diagnostics::X_package_json_has_a_typesVersions_entry_0_that_matches_compiler_version_1_looking_for_a_pattern_to_match_module_name_2,
+                    diagnostics::X_PACKAGE_JSON_HAS_A_TYPES_VERSIONS_ENTRY_0_THAT_MATCHES_COMPILER_VERSION_1_LOOKING_FOR_A_PATTERN_TO_MATCH_MODULE_NAME_2,
                     version_paths.version,
                     tsrs_core::version(),
                     module_name
@@ -2909,7 +2909,7 @@ impl<'r> ResolutionState<'r> {
             if existing.contents.is_some() {
                 trace!(
                     self.tracer,
-                    diagnostics::File_0_exists_according_to_earlier_cached_lookups,
+                    diagnostics::FILE_0_EXISTS_ACCORDING_TO_EARLIER_CACHED_LOOKUPS,
                     package_json_path
                 );
                 return Some(with_package_directory(existing, package_directory));
@@ -2917,7 +2917,7 @@ impl<'r> ResolutionState<'r> {
             if existing.directory_exists {
                 trace!(
                     self.tracer,
-                    diagnostics::File_0_does_not_exist_according_to_earlier_cached_lookups,
+                    diagnostics::FILE_0_DOES_NOT_EXIST_ACCORDING_TO_EARLIER_CACHED_LOOKUPS,
                     package_json_path
                 );
             }
@@ -2929,7 +2929,7 @@ impl<'r> ResolutionState<'r> {
             // Ignore error
             let contents = self.fs().read_file(&package_json_path).unwrap_or_default();
             let parsed = packagejson::parse(&contents);
-            trace!(self.tracer, diagnostics::Found_package_json_at_0, package_json_path);
+            trace!(self.tracer, diagnostics::FOUND_PACKAGE_JSON_AT_0, package_json_path);
             let parseable = parsed.is_ok();
             let result = self.resolver.package_json_info_cache.get_or_insert_with(
                 &package_json_path,
@@ -2942,7 +2942,7 @@ impl<'r> ResolutionState<'r> {
             return Some(with_package_directory(result, package_directory));
         }
         if directory_exists {
-            trace!(self.tracer, diagnostics::File_0_does_not_exist, package_json_path);
+            trace!(self.tracer, diagnostics::FILE_0_DOES_NOT_EXIST, package_json_path);
         }
         self.resolver.package_json_info_cache.get_or_insert_with(&package_json_path, || {
             InfoCacheEntry {
@@ -2993,7 +2993,7 @@ impl<'r> ResolutionState<'r> {
         if !ok || peer_dependencies.value.is_empty() {
             return String::new();
         }
-        trace!(self.tracer, diagnostics::X_package_json_has_a_peerDependencies_field);
+        trace!(self.tracer, diagnostics::X_PACKAGE_JSON_HAS_A_PEER_DEPENDENCIES_FIELD);
         let package_directory = self.real_path(package_json_info.package_directory);
         let Some(node_modules_index) = package_directory.rfind("/node_modules") else {
             return String::new();
@@ -3014,12 +3014,12 @@ impl<'r> ResolutionState<'r> {
                 builder.push_str(version);
                 trace!(
                     self.tracer,
-                    diagnostics::Found_peerDependency_0_with_1_version,
+                    diagnostics::FOUND_PEER_DEPENDENCY_0_WITH_1_VERSION,
                     name,
                     version
                 );
             } else {
-                trace!(self.tracer, diagnostics::Failed_to_find_peerDependency_0, name);
+                trace!(self.tracer, diagnostics::FAILED_TO_FIND_PEER_DEPENDENCY_0, name);
             }
         }
         builder
@@ -3027,7 +3027,7 @@ impl<'r> ResolutionState<'r> {
 
     fn real_path(&mut self, path: &str) -> String {
         let rp = tspath::normalize_path(&self.fs().realpath(path));
-        trace!(self.tracer, diagnostics::Resolving_real_path_for_0_result_1, path, rp);
+        trace!(self.tracer, diagnostics::RESOLVING_REAL_PATH_FOR_0_RESULT_1, path, rp);
         rp
     }
 
@@ -3042,13 +3042,13 @@ impl<'r> ResolutionState<'r> {
             }
             trace!(
                 self.tracer,
-                diagnostics::Expected_type_of_0_field_in_package_json_to_be_1_got_2,
+                diagnostics::EXPECTED_TYPE_OF_0_FIELD_IN_PACKAGE_JSON_TO_BE_1_GOT_2,
                 field_name,
                 field.expected_json_type(),
                 field.actual_json_type()
             );
         }
-        trace!(self.tracer, diagnostics::X_package_json_does_not_have_a_0_field, field_name);
+        trace!(self.tracer, diagnostics::X_PACKAGE_JSON_DOES_NOT_HAVE_A_0_FIELD, field_name);
         false
     }
 
@@ -3063,7 +3063,7 @@ impl<'r> ResolutionState<'r> {
             return None;
         }
         if field.value.is_empty() {
-            trace!(self.tracer, diagnostics::X_package_json_had_a_falsy_0_field, field_name);
+            trace!(self.tracer, diagnostics::X_PACKAGE_JSON_HAD_A_FALSY_0_FIELD, field_name);
             return None;
         }
         let path = resolve_path_for_module(
@@ -3073,7 +3073,7 @@ impl<'r> ResolutionState<'r> {
         );
         trace!(
             self.tracer,
-            diagnostics::X_package_json_has_0_field_1_that_references_2,
+            diagnostics::X_PACKAGE_JSON_HAS_0_FIELD_1_THAT_REFERENCES_2,
             field_name,
             field.value,
             path
@@ -3110,12 +3110,12 @@ impl<'r> ResolutionState<'r> {
 pub fn get_conditions(options: &CompilerOptions, resolution_mode: ResolutionMode) -> Vec<String> {
     let module_resolution = options.get_module_resolution_kind();
     let mut resolution_mode = resolution_mode;
-    if resolution_mode == ModuleKind::None && module_resolution == ModuleResolutionKind::Bundler {
-        resolution_mode = ModuleKind::ESNext;
+    if resolution_mode == ModuleKind::NONE && module_resolution == ModuleResolutionKind::BUNDLER {
+        resolution_mode = ModuleKind::ES_NEXT;
     }
     let custom_conditions: &[String] = options.custom_conditions.as_deref().unwrap_or(&[]);
     let mut conditions = Vec::with_capacity(3 + custom_conditions.len());
-    if resolution_mode == ModuleKind::ESNext {
+    if resolution_mode == ModuleKind::ES_NEXT {
         conditions.push("import".to_string());
     } else {
         conditions.push("require".to_string());
@@ -3124,7 +3124,7 @@ pub fn get_conditions(options: &CompilerOptions, resolution_mode: ResolutionMode
     if options.no_dts_resolution != Tristate::True {
         conditions.push("types".to_string());
     }
-    if module_resolution != ModuleResolutionKind::Bundler {
+    if module_resolution != ModuleResolutionKind::BUNDLER {
         conditions.push("node".to_string());
     }
     conditions.extend(custom_conditions.iter().cloned());
@@ -3135,9 +3135,9 @@ fn get_node_resolution_features(options: &CompilerOptions) -> NodeResolutionFeat
     let mut features = NodeResolutionFeatures::None;
 
     match options.get_module_resolution_kind() {
-        ModuleResolutionKind::Node16 => features = NodeResolutionFeatures::Node16Default,
-        ModuleResolutionKind::NodeNext => features = NodeResolutionFeatures::NodeNextDefault,
-        ModuleResolutionKind::Bundler => features = NodeResolutionFeatures::BundlerDefault,
+        ModuleResolutionKind::NODE16 => features = NodeResolutionFeatures::Node16Default,
+        ModuleResolutionKind::NODE_NEXT => features = NodeResolutionFeatures::NodeNextDefault,
+        ModuleResolutionKind::BUNDLER => features = NodeResolutionFeatures::BundlerDefault,
         _ => {}
     }
     if options.resolve_package_json_exports == Tristate::True {
@@ -3337,7 +3337,7 @@ pub fn resolve_config(
     let resolver = new_resolver(ResolverOptions::new(
         host,
         P::new(CompilerOptions {
-            module_resolution: ModuleResolutionKind::NodeNext,
+            module_resolution: ModuleResolutionKind::NODE_NEXT,
             ..Default::default()
         }),
     ));

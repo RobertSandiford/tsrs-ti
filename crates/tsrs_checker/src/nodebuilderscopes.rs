@@ -236,14 +236,14 @@ fn push_fake_scope(
         None => SymbolTable::new(),
     };
     let mut new_locals: Vec<String> = vec![];
-    let mut old_locals: Vec<localsRecord> = vec![];
+    let mut old_locals: Vec<LocalsRecord> = vec![];
     add_all(b, c, &mut |name: &'static str, symbol: P<Symbol>| {
         // Add cleanup information only if we don't own the fake scope
         if existing_fake_scope.is_some() {
             match locals.lookup(name) {
                 None => new_locals.push(name.to_string()),
                 Some(old_symbol) => {
-                    old_locals.push(localsRecord { name: name.to_string(), old_symbol });
+                    old_locals.push(LocalsRecord { name: name.to_string(), old_symbol });
                 }
             }
         }

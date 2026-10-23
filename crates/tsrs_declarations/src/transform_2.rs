@@ -198,7 +198,7 @@ impl DeclarationTransformer {
                 *self.state.get_symbol_accessibility_diagnostic.borrow_mut() = Rc::new(
                     move |_: &SymbolAccessibilityResult| {
                         Some(P::new(SymbolAccessibilityDiagnostic {
-                        diagnostic_message: &diagnostics::Default_export_of_the_module_has_or_is_using_private_name_0,
+                        diagnostic_message: &diagnostics::DEFAULT_EXPORT_OF_THE_MODULE_HAS_OR_IS_USING_PRIVATE_NAME_0,
                         error_node: Some(input),
                         type_name: None,
                     }))
@@ -258,7 +258,7 @@ impl DeclarationTransformer {
             Rc::new(move |_: &SymbolAccessibilityResult| {
                 Some(P::new(SymbolAccessibilityDiagnostic {
                     diagnostic_message:
-                        &diagnostics::Default_export_of_the_module_has_or_is_using_private_name_0,
+                        &diagnostics::DEFAULT_EXPORT_OF_THE_MODULE_HAS_OR_IS_USING_PRIVATE_NAME_0,
                     error_node: Some(input),
                     type_name: None,
                 }))
@@ -481,7 +481,7 @@ impl DeclarationTransformer {
             if self.state.current_source_file.get().unwrap().is_js() {
                 // JS types have a heap of constructs we can't directly emit into .d.ts files; the node builder contains logic to remap those where possible, so we invoke it here
                 // In strada we always built js declarations symbolically, so all js type nodes went through this postprocessing
-                let mut js_flags = declarationEmitNodeBuilderFlags;
+                let mut js_flags = DECLARATION_EMIT_NODE_BUILDER_FLAGS;
                 if self.in_class_expression_declaration.get() {
                     js_flags &= !nodebuilder::Flags::WriteClassExpressionAsTypeLiteral;
                 }
@@ -489,7 +489,7 @@ impl DeclarationTransformer {
                     node.type_node().unwrap(),
                     self.enclosing_declaration.get(),
                     js_flags,
-                    declarationEmitInternalNodeBuilderFlags,
+                    DECLARATION_EMIT_INTERNAL_NODE_BUILDER_FLAGS,
                     self.tracker.get(),
                 );
                 if res.is_some() {
@@ -512,7 +512,7 @@ impl DeclarationTransformer {
             }
         }
 
-        let mut flags = declarationEmitNodeBuilderFlags;
+        let mut flags = DECLARATION_EMIT_NODE_BUILDER_FLAGS;
         if self.in_class_expression_declaration.get() {
             flags &= !nodebuilder::Flags::WriteClassExpressionAsTypeLiteral;
         }
@@ -521,7 +521,7 @@ impl DeclarationTransformer {
                 node,
                 self.enclosing_declaration.get(),
                 flags,
-                declarationEmitInternalNodeBuilderFlags,
+                DECLARATION_EMIT_INTERNAL_NODE_BUILDER_FLAGS,
                 self.tracker.get(),
             )
         } else if ast::is_function_like(node) {
@@ -529,7 +529,7 @@ impl DeclarationTransformer {
                 node,
                 self.enclosing_declaration.get(),
                 flags,
-                declarationEmitInternalNodeBuilderFlags,
+                DECLARATION_EMIT_INTERNAL_NODE_BUILDER_FLAGS,
                 self.tracker.get(),
             )
         } else {
@@ -872,8 +872,8 @@ impl DeclarationTransformer {
         let late_indexes = self.resolver.create_late_bound_index_signatures(
             class_node,
             self.enclosing_declaration.get(),
-            declarationEmitNodeBuilderFlags,
-            declarationEmitInternalNodeBuilderFlags,
+            DECLARATION_EMIT_NODE_BUILDER_FLAGS,
+            DECLARATION_EMIT_INTERNAL_NODE_BUILDER_FLAGS,
             self.tracker.get(),
         );
 
@@ -936,7 +936,7 @@ impl DeclarationTransformer {
                     *self.state.get_symbol_accessibility_diagnostic.borrow_mut() = Rc::new(
                         move |_: &SymbolAccessibilityResult| {
                             Some(P::new(SymbolAccessibilityDiagnostic {
-                            diagnostic_message: &diagnostics::X_extends_clause_of_exported_class_0_has_or_is_using_private_name_1,
+                            diagnostic_message: &diagnostics::X_EXTENDS_CLAUSE_OF_EXPORTED_CLASS_0_HAS_OR_IS_USING_PRIVATE_NAME_1,
                             error_node: Some(extends_clause),
                             type_name,
                         }))
@@ -949,8 +949,8 @@ impl DeclarationTransformer {
                         self.resolver.create_type_of_expression(
                             extends_clause.expression().unwrap(),
                             Some(input),
-                            declarationEmitNodeBuilderFlags,
-                            declarationEmitInternalNodeBuilderFlags,
+                            DECLARATION_EMIT_NODE_BUILDER_FLAGS,
+                            DECLARATION_EMIT_INTERNAL_NODE_BUILDER_FLAGS,
                             self.tracker.get(),
                         ),
                         None,
@@ -1265,7 +1265,7 @@ impl DeclarationTransformer {
                 // This will be its own compiler error instead, so don't report.
                 !ast::is_computed_property_name(m.name().unwrap())
             {
-                self.state.add_diagnostic(create_diagnostic_for_node(m, &diagnostics::Enum_member_initializers_must_be_computable_without_references_to_external_symbols_with_isolatedDeclarations, &[]));
+                self.state.add_diagnostic(create_diagnostic_for_node(m, &diagnostics::ENUM_MEMBER_INITIALIZERS_MUST_BE_COMPUTABLE_WITHOUT_REFERENCES_TO_EXTERNAL_SYMBOLS_WITH_ISOLATED_DECLARATIONS, &[]));
             }
 
             let new_initializer = match enum_value.value {

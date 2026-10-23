@@ -177,7 +177,7 @@ impl LanguageService {
             }
             let last_import = current - 1;
             if last_import != first_import {
-                let folding_range_kind = lsproto::FoldingRangeKind::Imports;
+                let folding_range_kind = lsproto::FoldingRangeKind::IMPORTS;
                 let imports = create_folding_range_from_bounds(
                     ctx,
                     astnav::get_start_of_node(
@@ -270,7 +270,7 @@ impl LanguageService {
                     continue;
                 }
                 let mut folding_range =
-                    create_folding_range(ctx, text_range, lsproto::FoldingRangeKind::Region, "");
+                    create_folding_range(ctx, text_range, lsproto::FoldingRangeKind::REGION, "");
                 folding_range.collapsed_text = region.collapsed_text;
                 out.push(folding_range);
             }
@@ -442,7 +442,7 @@ fn add_outlining_for_leading_comments_for_pos(
     let mut first_single_line_comment_start = None;
     let mut last_single_line_comment_end = None;
     let mut single_line_comment_count = 0_usize;
-    let folding_range_kind_comment = lsproto::FoldingRangeKind::Comment;
+    let folding_range_kind_comment = lsproto::FoldingRangeKind::COMMENT;
 
     let combine_and_add_multiple_single_line_comments = |single_line_comment_count: usize,
                                                          first: Option<u32>,

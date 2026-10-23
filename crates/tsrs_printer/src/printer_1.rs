@@ -90,7 +90,7 @@ pub struct PrintHandlers {
 
 /// The state Go's `getTextOfNode`/`getLiteralTextOfNode` read from the printer, shared with the name generator's
 /// callbacks (which Go builds as closures over the printer).
-pub(crate) struct printerTextState {
+pub(crate) struct PrinterTextState {
     pub(crate) emit_context: P<EmitContext>,
     pub(crate) current_source_file: Cell<Option<P<SourceFile>>>,
     pub(crate) target: Cell<ScriptTarget>,
@@ -101,7 +101,7 @@ pub struct Printer {
     pub options: PrinterOptions,
     pub(crate) emit_context: P<EmitContext>,
     // Go `currentSourceFile` lives in `text_state` (see `current_source_file()`).
-    pub(crate) text_state: Rc<printerTextState>,
+    pub(crate) text_state: Rc<PrinterTextState>,
     pub(crate) unique_helper_names: Option<FxHashMap<String, P<Node>>>,
     pub(crate) external_helpers_module_name: Option<P<Node>>,
     pub(crate) next_list_element_pos: TextPos,
@@ -115,13 +115,13 @@ pub struct Printer {
     pub(crate) source_map_source: Option<SourceMapSource>,
     pub(crate) source_map_source_index: tsrs_sourcemap::SourceIndex,
     pub(crate) source_map_source_is_json: bool,
-    pub(crate) source_map_line_char_cache: Option<lineCharacterCache>,
+    pub(crate) source_map_line_char_cache: Option<LineCharacterCache>,
     pub(crate) most_recent_source_map_source: Option<SourceMapSource>,
     pub(crate) most_recent_source_map_source_index: tsrs_sourcemap::SourceIndex,
     pub(crate) container_pos: TextPos,
     pub(crate) container_end: TextPos,
     pub(crate) declaration_list_container_end: TextPos,
-    pub(crate) detached_comments_info: Vec<detachedCommentsInfo>,
+    pub(crate) detached_comments_info: Vec<DetachedCommentsInfo>,
     pub(crate) comments_disabled: bool,
     pub(crate) in_extends: bool, // whether we are emitting the `extends` clause of a ConditionalTypeNode or InferTypeNode
     pub(crate) name_generator: NameGenerator,
@@ -129,13 +129,13 @@ pub struct Printer {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct detachedCommentsInfo {
+pub(crate) struct DetachedCommentsInfo {
     pub(crate) node_pos: TextPos,
     pub(crate) detached_comment_end_pos: TextPos,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct commentState {
+pub(crate) struct CommentState {
     pub(crate) emit_flags: EmitFlags, // holds the emit flags for the current node
     pub(crate) comment_range: TextRange, // holds the comment range calculated for the current node
     pub(crate) container_pos: TextPos, // captures the value of containerPos prior to entering an node
@@ -144,16 +144,16 @@ pub(crate) struct commentState {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct sourceMapState {
+pub(crate) struct SourceMapState {
     pub(crate) emit_flags: EmitFlags, // holds the emit flags for the current node
     pub(crate) source_map_range: TextRange, // holds the source map range calculated for the current node
     pub(crate) has_token_source_map_range: bool, // captures whether the source map range was set for the current node
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct printerState {
-    pub(crate) comment_state: Option<commentState>,
-    pub(crate) source_map_state: Option<sourceMapState>,
+pub(crate) struct PrinterState {
+    pub(crate) comment_state: Option<CommentState>,
+    pub(crate) source_map_state: Option<SourceMapState>,
 }
 
 pub fn new_printer(
@@ -166,7 +166,7 @@ pub fn new_printer(
         Some(emit_context) => emit_context,
         None => new_emit_context(),
     };
-    let text_state = Rc::new(printerTextState {
+    let text_state = Rc::new(PrinterTextState {
         emit_context,
         current_source_file: Cell::new(None),
         target: Cell::new(options.target),
@@ -222,7 +222,7 @@ pub fn new_printer(
 /// Go `(*Printer).getLiteralTextOfNode` over the state it reads (see `printerTextState`).
 pub(crate) fn get_literal_text_of_node_worker(
     g: &mut NameGenerator,
-    s: &printerTextState,
+    s: &PrinterTextState,
     node: P<Node>,
     source_file: Option<P<SourceFile>>,
     flags: getLiteralTextFlags,
@@ -276,7 +276,7 @@ pub(crate) fn get_literal_text_of_node_worker(
 // `node` must be one of Identifier | PrivateIdentifier | LiteralExpression | JsxNamespacedName
 pub(crate) fn get_text_of_node_worker(
     g: &mut NameGenerator,
-    s: &printerTextState,
+    s: &PrinterTextState,
     node: P<Node>,
     include_trivia: bool,
 ) -> String {
@@ -334,7 +334,7 @@ pub(crate) fn get_text_of_node_worker(
 /// Go `(*Printer).isFileLevelUniqueNameInCurrentFile` over the state it reads.
 // Returns a value indicating whether a name is unique globally or within the current file.
 pub(crate) fn is_file_level_unique_name_in_current_file_worker(
-    s: &printerTextState,
+    s: &PrinterTextState,
     has_global_name: Option<&dyn Fn(&str) -> bool>,
     name: &str,
 ) -> bool {
@@ -1525,7 +1525,7 @@ impl Printer {
         self.write_punctuation("[");
         self.emit_expression(
             node.as_computed_property_name().expression,
-            OperatorPrecedence::DisallowComma,
+            OperatorPrecedence::DISALLOW_COMMA,
         );
         self.write_punctuation("]");
         self.exit_node(node, state);
@@ -1538,7 +1538,7 @@ impl Printer {
             Kind::PropertyAccessExpression => {
                 // TypeQuery nodes may have PropertyAccessExpression as exprName (e.g. typeof foo.x).
                 // TS's emitter handles this via generic emit(); we dispatch to expression emitter here.
-                self.emit_expression(node, OperatorPrecedence::DisallowComma);
+                self.emit_expression(node, OperatorPrecedence::DISALLOW_COMMA);
             }
             _ => panic!("unexpected EntityName: {:?}", node.kind()),
         }
@@ -1877,7 +1877,7 @@ impl Printer {
         self.write_space();
         self.emit_token(Kind::EqualsToken, equal_token_pos, WriteKind::Operator, context_node);
         self.write_space();
-        self.emit_expression(node, OperatorPrecedence::DisallowComma);
+        self.emit_expression(node, OperatorPrecedence::DISALLOW_COMMA);
     }
 
     pub(crate) fn emit_parameters(
@@ -2310,9 +2310,9 @@ impl Printer {
             //
             // `T extends () => infer U extends V ? W : X` would parse the `? W : X` as part of a ConditionalTypeNode in the
             // return type of the FunctionTypeNode, thus we must emit as `T extends () => (infer U extends V) ? W : X`
-            self.emit_type_node_preserving_extends(node, TypePrecedence::Highest);
+            self.emit_type_node_preserving_extends(node, TypePrecedence::HIGHEST);
         } else {
-            self.emit_type_node_preserving_extends(node, TypePrecedence::Lowest);
+            self.emit_type_node_preserving_extends(node, TypePrecedence::LOWEST);
         }
     }
 
@@ -2719,7 +2719,7 @@ impl Printer {
     pub(crate) fn emit_type_node_in_extends(&mut self, node: P<Node>) {
         let saved_in_extends = self.in_extends;
         self.in_extends = true;
-        self.emit_type_node_preserving_extends(node, TypePrecedence::Lowest);
+        self.emit_type_node_preserving_extends(node, TypePrecedence::LOWEST);
         self.in_extends = saved_in_extends;
     }
 
@@ -2727,7 +2727,7 @@ impl Printer {
     pub(crate) fn emit_type_node_outside_extends(&mut self, node: P<Node>) {
         let saved_in_extends = self.in_extends;
         self.in_extends = false;
-        self.emit_type_node_preserving_extends(node, TypePrecedence::Lowest);
+        self.emit_type_node_preserving_extends(node, TypePrecedence::LOWEST);
         self.in_extends = saved_in_extends;
     }
 

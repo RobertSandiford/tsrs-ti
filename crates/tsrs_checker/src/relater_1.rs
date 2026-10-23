@@ -104,9 +104,9 @@ impl Checker {
     pub(crate) fn compare_types_identical(&mut self, source: P<Type>, target: P<Type>) -> Ternary {
         let relation = self.identity_relation;
         if self.is_type_related_to(source, target, relation) {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:128
@@ -117,9 +117,9 @@ impl Checker {
     ) -> Ternary {
         let relation = self.assignable_relation;
         if self.is_type_related_to(source, target, relation) {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:135
@@ -132,18 +132,18 @@ impl Checker {
         let _ = report_errors;
         let relation = self.assignable_relation;
         if self.is_type_related_to(source, target, relation) {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:142
     pub(crate) fn compare_types_subtype_of(&mut self, source: P<Type>, target: P<Type>) -> Ternary {
         let relation = self.subtype_relation;
         if self.is_type_related_to(source, target, relation) {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:149
@@ -523,7 +523,7 @@ impl Checker {
                             TypeFormatFlags::UseFullyQualifiedType,
                             None,
                         );
-                        reporter(self, &diagnostics::Property_0_is_missing_in_type_1, &[&a, &b]);
+                        reporter(self, &diagnostics::PROPERTY_0_IS_MISSING_IN_TYPE_1, &[&a, &b]);
                     }
                     self.enum_relation.insert(key, RelationComparisonResult::Failed);
                     return false;
@@ -549,7 +549,7 @@ impl Checker {
                             let d = Self::value_to_string(sv);
                             reporter(
                                 self,
-                                &diagnostics::Each_declaration_of_0_1_differs_in_its_value_where_2_was_expected_but_3_was_given,
+                                &diagnostics::EACH_DECLARATION_OF_0_1_DIFFERS_IN_ITS_VALUE_WHERE_2_WAS_EXPECTED_BUT_3_WAS_GIVEN,
                                 &[&a, &b, &c, &d],
                             );
                         }
@@ -572,7 +572,7 @@ impl Checker {
                             let c = Self::value_to_string(known_string_value);
                             reporter(
                                 self,
-                                &diagnostics::One_value_of_0_1_is_the_string_2_and_the_other_is_assumed_to_be_an_unknown_numeric_value,
+                                &diagnostics::ONE_VALUE_OF_0_1_IS_THE_STRING_2_AND_THE_OTHER_IS_ASSUMED_TO_BE_AN_UNKNOWN_NUMERIC_VALUE,
                                 &[&a, &b, &c],
                             );
                         }
@@ -702,7 +702,7 @@ impl Checker {
             let t = self.type_to_string(target, None);
             let diagnostic = new_diagnostic_for_node(
                 error_node,
-                Some(&diagnostics::Excessive_complexity_comparing_types_0_and_1),
+                Some(&diagnostics::EXCESSIVE_COMPLEXITY_COMPARING_TYPES_0_AND_1),
                 &[&s, &t],
             );
             self.report_diagnostic(Some(diagnostic), diagnostic_output);
@@ -710,7 +710,7 @@ impl Checker {
             // Check if we should issue an extra diagnostic to produce a quickfix for a slightly incorrect import statement
             if head_message.is_some()
                 && error_node.is_some()
-                && result == Ternary::False
+                && result == Ternary::FALSE
                 && source.symbol().is_some()
                 && self.export_type_links.has(source.symbol().unwrap())
             {
@@ -724,7 +724,7 @@ impl Checker {
                             // Likely an incorrect import. Issue a helpful diagnostic to produce a quickfix to change the import
                             r.related_info.borrow_mut().push(create_diagnostic_for_node(
                                 Some(originating_import),
-                                &diagnostics::Type_originates_at_this_import_A_namespace_style_import_cannot_be_called_or_constructed_and_will_cause_a_failure_at_runtime_Consider_using_a_default_import_or_import_require_here_instead,
+                                &diagnostics::TYPE_ORIGINATES_AT_THIS_IMPORT_A_NAMESPACE_STYLE_IMPORT_CANNOT_BE_CALLED_OR_CONSTRUCTED_AND_WILL_CAUSE_A_FAILURE_AT_RUNTIME_CONSIDER_USING_A_DEFAULT_IMPORT_OR_IMPORT_REQUIRE_HERE_INSTEAD,
                                 &[],
                             ));
                         }
@@ -740,7 +740,7 @@ impl Checker {
             self.report_diagnostic(diagnostic, diagnostic_output);
         }
         self.put_relater(r);
-        result != Ternary::False
+        result != Ternary::FALSE
     }
 }
 
@@ -997,9 +997,9 @@ impl Checker {
             ) {
                 let diagnostic = diags[0];
                 let message = if kind == SignatureKind::Construct {
-                    &diagnostics::Did_you_mean_to_use_new_with_this_expression
+                    &diagnostics::DID_YOU_MEAN_TO_USE_NEW_WITH_THIS_EXPRESSION
                 } else {
-                    &diagnostics::Did_you_mean_to_call_this_expression
+                    &diagnostics::DID_YOU_MEAN_TO_CALL_THIS_EXPRESSION
                 };
                 self.report_diagnostic(
                     Some(diagnostic.add_related_info(create_diagnostic_for_node(
@@ -1061,7 +1061,7 @@ impl Checker {
                 }
                 Kind::PropertyAssignment => {
                     let message = if is_computed_non_literal_name(prop.name().unwrap()) {
-                        Some(&diagnostics::Type_of_computed_property_s_value_is_0_which_is_not_assignable_to_type_1)
+                        Some(&diagnostics::TYPE_OF_COMPUTED_PROPERTY_S_VALUE_IS_0_WHICH_IS_NOT_ASSIGNABLE_TO_TYPE_1)
                     } else {
                         None
                     };
@@ -1203,7 +1203,7 @@ impl Checker {
             let b = self.type_to_string(target_prop_type, None);
             diags.push(create_diagnostic_for_node(
                 Some(prop),
-                &diagnostics::Type_0_is_not_assignable_to_type_1_with_exactOptionalPropertyTypes_Colon_true_Consider_adding_undefined_to_the_type_of_the_target,
+                &diagnostics::TYPE_0_IS_NOT_ASSIGNABLE_TO_TYPE_1_WITH_EXACT_OPTIONAL_PROPERTY_TYPES_COLON_TRUE_CONSIDER_ADDING_UNDEFINED_TO_THE_TYPE_OF_THE_TARGET,
                 &[&a, &b],
             ));
         } else {
@@ -1262,7 +1262,7 @@ impl Checker {
                         issued_elaboration = true;
                         diagnostic.add_related_info(create_diagnostic_for_node(
                             Some(declaration),
-                            &diagnostics::The_expected_type_comes_from_this_index_signature,
+                            &diagnostics::THE_EXPECTED_TYPE_COMES_FROM_THIS_INDEX_SIGNATURE,
                             &[],
                         ));
                     }
@@ -1288,7 +1288,7 @@ impl Checker {
                 let target_str = self.type_to_string(target, None);
                 diagnostic.add_related_info(create_diagnostic_for_node(
                     Some(target_node),
-                    &diagnostics::The_expected_type_comes_from_property_0_which_is_declared_here_on_type_1,
+                    &diagnostics::THE_EXPECTED_TYPE_COMES_FROM_PROPERTY_0_WHICH_IS_DECLARED_HERE_ON_TYPE_1,
                     &[&property_name, &target_str],
                 ));
             }
@@ -1406,7 +1406,7 @@ impl Checker {
                 let decl = symbol.declarations()[0];
                 diagnostic.add_related_info(create_diagnostic_for_node(
                     Some(decl),
-                    &diagnostics::The_expected_type_comes_from_the_return_type_of_this_signature,
+                    &diagnostics::THE_EXPECTED_TYPE_COMES_FROM_THE_RETURN_TYPE_OF_THIS_SIGNATURE,
                     &[],
                 ));
             }
@@ -1422,7 +1422,7 @@ impl Checker {
                 ) {
                     diagnostic.add_related_info(create_diagnostic_for_node(
                         Some(node),
-                        &diagnostics::Did_you_mean_to_mark_this_function_as_async,
+                        &diagnostics::DID_YOU_MEAN_TO_MARK_THIS_FUNCTION_AS_ASYNC,
                         &[],
                     ));
                 }
@@ -2342,7 +2342,7 @@ impl TypeDiscriminator<'_> {
     pub(crate) fn matches(&mut self, c: &mut Checker, index: usize, t: P<Type>) -> bool {
         let prop_type = c.get_type_of_symbol(self.props[index]);
         for s in prop_type.distributed_iter() {
-            if (self.is_related_to)(c, s, t) != Ternary::False {
+            if (self.is_related_to)(c, s, t) != Ternary::FALSE {
                 return true;
             }
         }
@@ -2464,7 +2464,7 @@ impl Checker {
                 u.constituent_map_for_write().assign(constituent_map);
             }
         }
-        if u.key_property_name() == InternalSymbolNameMissing {
+        if u.key_property_name() == INTERNAL_SYMBOL_NAME_MISSING {
             return String::new();
         }
         u.key_property_name().to_string()
@@ -2496,16 +2496,16 @@ impl Checker {
             || t.object_flags().intersects(ObjectFlags::PrimitiveUnion)
             || count_where(types, |&t| is_object_or_instantiable_non_primitive(t)) < 10
         {
-            return (InternalSymbolNameMissing.to_string(), FxHashMap::default());
+            return (INTERNAL_SYMBOL_NAME_MISSING.to_string(), FxHashMap::default());
         }
         let key_property_name = self.get_key_property_candidate_name(types);
         if key_property_name.is_empty() {
-            return (InternalSymbolNameMissing.to_string(), FxHashMap::default());
+            return (INTERNAL_SYMBOL_NAME_MISSING.to_string(), FxHashMap::default());
         }
         let map_by_key_property = self.map_types_by_key_property(types, &key_property_name);
         // An empty map stands for Go's nil map.
         if map_by_key_property.is_empty() {
-            return (InternalSymbolNameMissing.to_string(), FxHashMap::default());
+            return (INTERNAL_SYMBOL_NAME_MISSING.to_string(), FxHashMap::default());
         }
         (key_property_name, map_by_key_property)
     }
@@ -2586,12 +2586,12 @@ impl Checker {
         discriminator: &mut dyn Discriminator,
     ) -> P<Type> {
         let types = target.types();
-        let mut include = vec![Ternary::False; types.len()];
+        let mut include = vec![Ternary::FALSE; types.len()];
         for (i, &t) in types.iter().enumerate() {
             if !t.flags().intersects(TypeFlags::Primitive)
                 && !self.get_reduced_type(t).flags().intersects(TypeFlags::Never)
             {
-                include[i] = Ternary::True;
+                include[i] = Ternary::TRUE;
             }
         }
         let n_count = discriminator.len(self);
@@ -2603,7 +2603,7 @@ impl Checker {
             let name = discriminator.name(self, n);
             let known = self.discriminant_property_types(target, types, name);
             for i in 0..types.len() {
-                if include[i] != Ternary::False {
+                if include[i] != Ternary::FALSE {
                     let target_type = match known.as_ref().and_then(|known| known[i]) {
                         Some(target_type) => target_type,
                         None => {
@@ -2614,22 +2614,22 @@ impl Checker {
                         if discriminator.matches(self, n, target_type) {
                             matched = true;
                         } else {
-                            include[i] = Ternary::Maybe;
+                            include[i] = Ternary::MAYBE;
                         }
                     }
                 }
             }
             // Turn each Ternary.Maybe into Ternary.False if there was a match. Otherwise, revert to Ternary.True.
             for state in &mut include {
-                if *state == Ternary::Maybe {
-                    *state = if matched { Ternary::False } else { Ternary::True };
+                if *state == Ternary::MAYBE {
+                    *state = if matched { Ternary::FALSE } else { Ternary::TRUE };
                 }
             }
         }
-        if include.contains(&Ternary::False) {
+        if include.contains(&Ternary::FALSE) {
             let mut filtered_types: Vec<P<Type>> = Vec::new();
             for (i, &t) in types.iter().enumerate() {
-                if include[i] == Ternary::True {
+                if include[i] == Ternary::TRUE {
                     filtered_types.push(t);
                 }
             }
@@ -3035,7 +3035,7 @@ impl Checker {
             None,  /*errorReporter*/
             compare_types,
             None, /*reportUnreliableMarkers*/
-        ) != Ternary::False
+        ) != Ternary::FALSE
     }
 
     // relater.go:1491
@@ -3053,19 +3053,19 @@ impl Checker {
         let mut source = source;
         let mut target = target;
         if source == target {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if !(check_mode.intersects(SignatureCheckMode::StrictTopSignature)
             && self.is_top_signature(source))
             && self.is_top_signature(target)
         {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if check_mode.intersects(SignatureCheckMode::StrictTopSignature)
             && self.is_top_signature(source)
             && !self.is_top_signature(target)
         {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         let target_count = self.get_parameter_count(target);
         let mut source_has_more_parameters = false;
@@ -3084,11 +3084,11 @@ impl Checker {
                 let min_argument_count = self.get_min_argument_count(source);
                 (error_reporter.as_mut().unwrap())(
                     self,
-                    &diagnostics::Target_signature_provides_too_few_arguments_Expected_0_or_more_but_got_1,
+                    &diagnostics::TARGET_SIGNATURE_PROVIDES_TOO_FEW_ARGUMENTS_EXPECTED_0_OR_MORE_BUT_GOT_1,
                     &[&min_argument_count, &target_count],
                 );
             }
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         if !source.type_parameters().is_empty()
             && !same(source.type_parameters(), target.type_parameters())
@@ -3116,13 +3116,13 @@ impl Checker {
             && kind != Kind::MethodDeclaration
             && kind != Kind::MethodSignature
             && kind != Kind::Constructor;
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         let source_this_type = self.get_this_type_of_signature(source);
         if let Some(source_this_type) = source_this_type.filter(|&t| t != self.void_type) {
             let target_this_type = self.get_this_type_of_signature(target);
             if let Some(target_this_type) = target_this_type {
                 // void sources are assignable to anything.
-                let mut related = Ternary::False;
+                let mut related = Ternary::FALSE;
                 if !strict_variance {
                     related = compare_types(
                         self,
@@ -3131,19 +3131,19 @@ impl Checker {
                         false, /*reportErrors*/
                     );
                 }
-                if related == Ternary::False {
+                if related == Ternary::FALSE {
                     related =
                         compare_types(self, target_this_type, source_this_type, report_errors);
                 }
-                if related == Ternary::False {
+                if related == Ternary::FALSE {
                     if report_errors {
                         (error_reporter.as_mut().unwrap())(
                             self,
-                            &diagnostics::The_this_types_of_each_signature_are_incompatible,
+                            &diagnostics::THE_THIS_TYPES_OF_EACH_SIGNATURE_ARE_INCOMPATIBLE,
                             &[],
                         );
                     }
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 result &= related;
             }
@@ -3201,7 +3201,7 @@ impl Checker {
                         && self.get_type_predicate_of_signature(target_sig.unwrap()).is_none()
                         && self.get_type_facts(source_type, TypeFacts::IsUndefinedOrNull)
                             == self.get_type_facts(target_type, TypeFacts::IsUndefinedOrNull);
-                    let mut related = Ternary::False;
+                    let mut related = Ternary::FALSE;
                     if callbacks {
                         related = self.compare_signatures_related(
                             target_sig.unwrap(),
@@ -3227,12 +3227,12 @@ impl Checker {
                                 false, /*reportErrors*/
                             );
                         }
-                        if related == Ternary::False {
+                        if related == Ternary::FALSE {
                             related = compare_types(self, target_type, source_type, report_errors);
                         }
                     }
                     // With strict arity, (x: number | undefined) => void is a subtype of (x?: number | undefined) => void
-                    if related != Ternary::False
+                    if related != Ternary::FALSE
                         && check_mode.intersects(SignatureCheckMode::StrictArity)
                         && i >= self.get_min_argument_count(source)
                         && i < self.get_min_argument_count(target)
@@ -3241,21 +3241,21 @@ impl Checker {
                             source_type,
                             target_type,
                             false, /*reportErrors*/
-                        ) != Ternary::False
+                        ) != Ternary::FALSE
                     {
-                        related = Ternary::False;
+                        related = Ternary::FALSE;
                     }
-                    if related == Ternary::False {
+                    if related == Ternary::FALSE {
                         if report_errors {
                             let a = self.get_parameter_name_at_position(source, i);
                             let b = self.get_parameter_name_at_position(target, i);
                             (error_reporter.as_mut().unwrap())(
                                 self,
-                                &diagnostics::Types_of_parameters_0_and_1_are_incompatible,
+                                &diagnostics::TYPES_OF_PARAMETERS_0_AND_1_ARE_INCOMPATIBLE,
                                 &[&a, &b],
                             );
                         }
-                        return Ternary::False;
+                        return Ternary::FALSE;
                     }
                     result &= related;
                 }
@@ -3288,17 +3288,17 @@ impl Checker {
                         let a = self.signature_to_string(source);
                         (error_reporter.as_mut().unwrap())(
                             self,
-                            &diagnostics::Signature_0_must_be_a_type_predicate,
+                            &diagnostics::SIGNATURE_0_MUST_BE_A_TYPE_PREDICATE,
                             &[&a],
                         );
                     }
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
             } else {
                 // When relating callback signatures, we still need to relate return types bi-variantly as otherwise
                 // the containing type wouldn't be co-variant. For example, interface Foo<T> { add(cb: () => T): void }
                 // wouldn't be co-variant for T without this rule.
-                let mut related = Ternary::False;
+                let mut related = Ternary::FALSE;
                 if check_mode.intersects(SignatureCheckMode::BivariantCallback) {
                     related = compare_types(
                         self,
@@ -3307,26 +3307,26 @@ impl Checker {
                         false, /*reportErrors*/
                     );
                 }
-                if related == Ternary::False {
+                if related == Ternary::FALSE {
                     related =
                         compare_types(self, source_return_type, target_return_type, report_errors);
                 }
                 result &= related;
-                if result == Ternary::False && report_errors {
+                if result == Ternary::FALSE && report_errors {
                     // The errors reported here serve as markers that trigger error chain reduction in the (*Relater).reportError
                     // method. The markers are elided in the final diagnostic chain and never actually reported.
                     let message: &'static Message = if source.parameters().is_empty()
                         && target.parameters().is_empty()
                     {
                         if source.flags().intersects(SignatureFlags::Construct) {
-                            &diagnostics::Construct_signatures_with_no_arguments_have_incompatible_return_types_0_and_1
+                            &diagnostics::CONSTRUCT_SIGNATURES_WITH_NO_ARGUMENTS_HAVE_INCOMPATIBLE_RETURN_TYPES_0_AND_1
                         } else {
-                            &diagnostics::Call_signatures_with_no_arguments_have_incompatible_return_types_0_and_1
+                            &diagnostics::CALL_SIGNATURES_WITH_NO_ARGUMENTS_HAVE_INCOMPATIBLE_RETURN_TYPES_0_AND_1
                         }
                     } else if source.flags().intersects(SignatureFlags::Construct) {
-                        &diagnostics::Construct_signature_return_types_0_and_1_are_incompatible
+                        &diagnostics::CONSTRUCT_SIGNATURE_RETURN_TYPES_0_AND_1_ARE_INCOMPATIBLE
                     } else {
-                        &diagnostics::Call_signature_return_types_0_and_1_are_incompatible
+                        &diagnostics::CALL_SIGNATURE_RETURN_TYPES_0_AND_1_ARE_INCOMPATIBLE
                     };
                     let a = self.type_to_string(source_return_type, None);
                     let b = self.type_to_string(target_return_type, None);
@@ -3349,16 +3349,16 @@ impl Checker {
         let mut error_reporter = error_reporter;
         if source.kind() != target.kind() {
             if report_errors {
-                (error_reporter.as_mut().unwrap())(self, &diagnostics::A_this_based_type_guard_is_not_compatible_with_a_parameter_based_type_guard, &[]);
+                (error_reporter.as_mut().unwrap())(self, &diagnostics::A_THIS_BASED_TYPE_GUARD_IS_NOT_COMPATIBLE_WITH_A_PARAMETER_BASED_TYPE_GUARD, &[]);
                 let a = self.type_predicate_to_string(source);
                 let b = self.type_predicate_to_string(target);
                 (error_reporter.as_mut().unwrap())(
                     self,
-                    &diagnostics::Type_predicate_0_is_not_assignable_to_1,
+                    &diagnostics::TYPE_PREDICATE_0_IS_NOT_ASSIGNABLE_TO_1,
                     &[&a, &b],
                 );
             }
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         if source.kind() == TypePredicateKind::Identifier
             || source.kind() == TypePredicateKind::AssertsIdentifier
@@ -3369,33 +3369,33 @@ impl Checker {
                     let b = target.parameter_name();
                     (error_reporter.as_mut().unwrap())(
                         self,
-                        &diagnostics::Parameter_0_is_not_in_the_same_position_as_parameter_1,
+                        &diagnostics::PARAMETER_0_IS_NOT_IN_THE_SAME_POSITION_AS_PARAMETER_1,
                         &[&a, &b],
                     );
                     let a = self.type_predicate_to_string(source);
                     let b = self.type_predicate_to_string(target);
                     (error_reporter.as_mut().unwrap())(
                         self,
-                        &diagnostics::Type_predicate_0_is_not_assignable_to_1,
+                        &diagnostics::TYPE_PREDICATE_0_IS_NOT_ASSIGNABLE_TO_1,
                         &[&a, &b],
                     );
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
         let related = if source.type_() == target.type_() {
-            Ternary::True
+            Ternary::TRUE
         } else if let (Some(st), Some(tt)) = (source.type_(), target.type_()) {
             compare_types(self, st, tt, report_errors)
         } else {
-            Ternary::False
+            Ternary::FALSE
         };
-        if related == Ternary::False && report_errors {
+        if related == Ternary::FALSE && report_errors {
             let a = self.type_predicate_to_string(source);
             let b = self.type_predicate_to_string(target);
             (error_reporter.as_mut().unwrap())(
                 self,
-                &diagnostics::Type_predicate_0_is_not_assignable_to_1,
+                &diagnostics::TYPE_PREDICATE_0_IS_NOT_ASSIGNABLE_TO_1,
                 &[&a, &b],
             );
         }
@@ -4176,7 +4176,7 @@ impl Checker {
                 ignore_this_types,
                 ignore_return_types,
                 compare_types,
-            ) != Ternary::False
+            ) != Ternary::FALSE
             {
                 return Some(s);
             }
@@ -4200,14 +4200,14 @@ impl Checker {
         let mut compare_types = compare_types;
         let mut source = source;
         if source == target {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if !self.is_matching_signature(source, target, partial_match) {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // Check that the two signatures have the same number of type parameters.
         if source.type_parameters().len() != target.type_parameters().len() {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // Check that type parameter constraints and defaults match. If they do, instantiate the source
         // signature with the type parameters of the target signature and continue the comparison.
@@ -4220,28 +4220,28 @@ impl Checker {
                     let sc = self.get_constraint_or_unknown_from_type_parameter(s);
                     let sc = self.instantiate_type(sc, Some(mapper));
                     let tc = self.get_constraint_or_unknown_from_type_parameter(t);
-                    compare_types(self, sc, tc) != Ternary::False
+                    compare_types(self, sc, tc) != Ternary::FALSE
                 } && {
                     let sd = self.get_default_or_unknown_from_type_parameter(s);
                     let sd = self.instantiate_type(sd, Some(mapper));
                     let td = self.get_default_or_unknown_from_type_parameter(t);
-                    compare_types(self, sd, td) != Ternary::False
+                    compare_types(self, sd, td) != Ternary::FALSE
                 }) {
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
             }
             source =
                 self.instantiate_signature_ex(source, mapper, true /*eraseTypeParameters*/);
         }
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         if !ignore_this_types {
             let source_this_type = self.get_this_type_of_signature(source);
             if let Some(source_this_type) = source_this_type {
                 let target_this_type = self.get_this_type_of_signature(target);
                 if let Some(target_this_type) = target_this_type {
                     let related = compare_types(self, source_this_type, target_this_type);
-                    if related == Ternary::False {
-                        return Ternary::False;
+                    if related == Ternary::FALSE {
+                        return Ternary::FALSE;
                     }
                     result &= related;
                 }
@@ -4252,8 +4252,8 @@ impl Checker {
             let s = self.get_type_at_position(source, i);
             let t = self.get_type_at_position(target, i);
             let related = compare_types(self, t, s);
-            if related == Ternary::False {
-                return Ternary::False;
+            if related == Ternary::FALSE {
+                return Ternary::FALSE;
             }
             result &= related;
         }
@@ -4346,18 +4346,18 @@ impl Checker {
     ) -> Ternary {
         let mut compare_types = compare_types;
         let (Some(source), Some(target)) = (source, target) else {
-            return Ternary::False;
+            return Ternary::FALSE;
         };
         if !Self::type_predicate_kinds_match(source, target) {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         if source.type_() == target.type_() {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if let (Some(st), Some(tt)) = (source.type_(), target.type_()) {
             return compare_types(self, st, tt);
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:2315
@@ -4480,7 +4480,7 @@ impl Checker {
                 result.extend(source_template.types().iter().enumerate().map(|(i, &s)| {
                     let a = self.get_base_constraint_or_type(s);
                     let b = self.get_base_constraint_or_type(target.types()[i]);
-                    if compare_types(self, a, b, false /*partialMatch*/) != Ternary::False {
+                    if compare_types(self, a, b, false /*partialMatch*/) != Ternary::FALSE {
                         s
                     } else {
                         self.get_string_like_type_for_type(s)
@@ -4646,7 +4646,7 @@ impl Checker {
             });
         }
         if target.flags().intersects(TypeFlags::String)
-            || compare_types(self, source, target, false) != Ternary::False
+            || compare_types(self, source, target, false) != Ternary::FALSE
         {
             return true;
         }
@@ -4677,7 +4677,7 @@ impl Checker {
                     source.as_template_literal_type().types()[0],
                     target,
                     false,
-                ) != Ternary::False;
+                ) != Ternary::FALSE;
         }
         false
     }

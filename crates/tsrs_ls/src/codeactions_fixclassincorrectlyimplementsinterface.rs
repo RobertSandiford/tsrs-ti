@@ -28,8 +28,8 @@ const FIX_CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE_FIX_ID: &str =
 fn fix_class_incorrectly_implements_interface_error_codes() -> &'static [i32] {
     static CODES: std::sync::LazyLock<Vec<i32>> = std::sync::LazyLock::new(|| {
         vec![
-            diagnostics::Class_0_incorrectly_implements_interface_1.code(),
-            diagnostics::Class_0_incorrectly_implements_class_1_Did_you_mean_to_extend_1_and_inherit_its_members_as_a_subclass.code(),
+            diagnostics::CLASS_0_INCORRECTLY_IMPLEMENTS_INTERFACE_1.code(),
+            diagnostics::CLASS_0_INCORRECTLY_IMPLEMENTS_CLASS_1_DID_YOU_MEAN_TO_EXTEND_1_AND_INHERIT_ITS_MEMBERS_AS_A_SUBCLASS.code(),
         ]
     });
     &CODES
@@ -85,11 +85,11 @@ fn get_code_actions_to_fix_class_incorrectly_implements_interface(
         }
 
         actions.push(CodeAction {
-            description: diagnostics::Implement_interface_0
+            description: diagnostics::IMPLEMENT_INTERFACE_0
                 .localize(&[&scanner::get_text_of_node(implemented_type_node)]),
             changes,
             fix_id: FIX_CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE_FIX_ID.to_string(),
-            fix_all_description: diagnostics::Implement_all_unimplemented_interfaces.localize(&[]),
+            fix_all_description: diagnostics::IMPLEMENT_ALL_UNIMPLEMENTED_INTERFACES.localize(&[]),
         });
     }
     Ok(actions)
@@ -148,7 +148,7 @@ fn get_all_code_actions_to_fix_class_incorrectly_implements_interface(
     }
 
     Ok(Some(CombinedCodeActions {
-        description: diagnostics::Implement_all_unimplemented_interfaces.localize(&[]),
+        description: diagnostics::IMPLEMENT_ALL_UNIMPLEMENTED_INTERFACES.localize(&[]),
         changes,
     }))
 }

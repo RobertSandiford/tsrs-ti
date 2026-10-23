@@ -63,7 +63,7 @@ impl Printer {
         if format.intersects(ListFormat::BracketsMask) {
             self.write_punctuation(get_opening_bracket(format));
             if is_empty && !is_nil {
-                self.emit_trailing_comments(children.unwrap().pos(), commentSeparator::Before); // Emit comments within empty lists
+                self.emit_trailing_comments(children.unwrap().pos(), CommentSeparator::Before); // Emit comments within empty lists
             }
         }
 
@@ -400,9 +400,9 @@ impl Printer {
 
 /// Adapter that lets the printer hold the caller's writer for the duration of `Printer::write`, like Go's
 /// `p.writer = writer` (a Rust field cannot hold the `&mut` borrow without a lifetime parameter).
-struct borrowedWriter(*mut (dyn EmitTextWriter + 'static));
+struct BorrowedWriter(*mut (dyn EmitTextWriter + 'static));
 
-impl borrowedWriter {
+impl BorrowedWriter {
     fn w(&mut self) -> &mut (dyn EmitTextWriter + 'static) {
         // SAFETY: `Printer::write` stores this adapter in `Printer::writer` only while it holds the `&mut` borrow the
         // pointer came from, and removes it (restoring the previous writer) before returning; no other code can reach it.
@@ -415,7 +415,7 @@ impl borrowedWriter {
     }
 }
 
-impl EmitTextWriter for borrowedWriter {
+impl EmitTextWriter for BorrowedWriter {
     fn write(&mut self, s: &str) {
         self.w().write(s);
     }
@@ -566,7 +566,7 @@ impl Printer {
 
         self.set_source_file(source_file);
         let mut writer: Box<dyn EmitTextWriter> =
-            Box::new(borrowedWriter(std::ptr::from_mut::<dyn EmitTextWriter + 'static>(writer)));
+            Box::new(BorrowedWriter(std::ptr::from_mut::<dyn EmitTextWriter + 'static>(writer)));
         if self.options.omit_trailing_semicolon {
             writer = get_trailing_semicolon_deferring_writer(writer);
         }
@@ -676,7 +676,7 @@ impl Printer {
                 } else if is_statement(node) {
                     self.emit_statement(node);
                 } else if is_expression(node) {
-                    self.emit_expression(node, OperatorPrecedence::Lowest);
+                    self.emit_expression(node, OperatorPrecedence::LOWEST);
                 } else if is_keyword_kind(node.kind()) {
                     self.emit_keyword_node(Some(node));
                 } else if is_punctuation_kind(node.kind()) {
@@ -705,7 +705,7 @@ impl Printer {
 //
 
 impl Printer {
-    pub(crate) fn emit_comments_before_node(&mut self, node: P<Node>) -> Option<commentState> {
+    pub(crate) fn emit_comments_before_node(&mut self, node: P<Node>) -> Option<CommentState> {
         if !self.should_emit_comments(node) {
             return None;
         }
@@ -723,7 +723,7 @@ impl Printer {
             self.comments_disabled = true;
         }
 
-        Some(commentState {
+        Some(CommentState {
             emit_flags,
             comment_range,
             container_pos,
@@ -732,7 +732,7 @@ impl Printer {
         })
     }
 
-    pub(crate) fn emit_comments_after_node(&mut self, node: P<Node>, state: Option<commentState>) {
+    pub(crate) fn emit_comments_after_node(&mut self, node: P<Node>, state: Option<CommentState>) {
         let Some(state) = state else {
             return;
         };
@@ -777,7 +777,7 @@ impl Printer {
         pos: TextPos,
         context_node: P<Node>,
         flags: tokenEmitFlags,
-    ) -> (Option<commentState>, TextPos) {
+    ) -> (Option<CommentState>, TextPos) {
         let mut pos = pos;
         if flags.intersects(tokenEmitFlags::NoComments) || self.comments_disabled {
             // Still skip trivia so that the returned pos correctly identifies the token position.
@@ -821,7 +821,7 @@ impl Printer {
             self.decrease_indent_if(needs_indent);
         }
 
-        (Some(commentState::default()), pos)
+        (Some(CommentState::default()), pos)
     }
 
     pub(crate) fn emit_comments_after_token(
@@ -829,7 +829,7 @@ impl Printer {
         _token: Kind,
         pos: TextPos,
         context_node: P<Node>,
-        state: Option<commentState>,
+        state: Option<CommentState>,
     ) {
         if state.is_none() {
             return;
@@ -839,7 +839,7 @@ impl Printer {
             let is_jsx_expr_context = context_node.kind() == Kind::JsxExpression;
             self.emit_trailing_comments(
                 pos,
-                if is_jsx_expr_context { commentSeparator::None } else { commentSeparator::Before },
+                if is_jsx_expr_context { CommentSeparator::None } else { CommentSeparator::Before },
             );
         }
     }
@@ -848,7 +848,7 @@ impl Printer {
         &mut self,
         node: P<Node>,
         detached_range: TextRange,
-    ) -> Option<commentState> {
+    ) -> Option<CommentState> {
         if !Self::should_emit_detached_comments(node) {
             return None;
         }
@@ -868,7 +868,7 @@ impl Printer {
             self.comments_disabled = true;
         }
 
-        Some(commentState {
+        Some(CommentState {
             emit_flags,
             comment_range: detached_range,
             container_pos,
@@ -881,7 +881,7 @@ impl Printer {
         &mut self,
         _node: P<Node>,
         detached_range: TextRange,
-        state: Option<commentState>,
+        state: Option<CommentState>,
     ) {
         let Some(state) = state else {
             return;
@@ -975,7 +975,7 @@ impl Printer {
             // Emit trailing comments if the position is not synthesized and the node
             // has not opted out from emitting leading comments and is an emitted node.
             if !skip_trailing_comments && node.kind() != Kind::NotEmittedStatement {
-                self.emit_trailing_comments(end, commentSeparator::Before);
+                self.emit_trailing_comments(end, CommentSeparator::Before);
             }
         }
     }
@@ -1109,7 +1109,7 @@ impl Printer {
         }
 
         // Leading comments are emitted as /*leading comment1*/space/*leading comment*/space
-        self.emit_comments(&comments, commentSeparator::After)
+        self.emit_comments(&comments, CommentSeparator::After)
     }
 
     pub(crate) fn should_emit_comment_if_triple_slash(
@@ -1152,7 +1152,7 @@ impl Printer {
     pub(crate) fn emit_trailing_comments(
         &mut self,
         pos: TextPos,
-        comment_separator: commentSeparator,
+        comment_separator: CommentSeparator,
     ) {
         if self.comments_disabled {
             return;
@@ -1252,7 +1252,7 @@ impl Printer {
     pub(crate) fn emit_detached_comments(
         &mut self,
         text_range: TextRange,
-    ) -> Option<detachedCommentsInfo> {
+    ) -> Option<DetachedCommentsInfo> {
         let current_source_file = self.current_source_file()?;
 
         let text = current_source_file.text();
@@ -1343,9 +1343,9 @@ impl Printer {
                             self.write_line();
                         }
 
-                        self.emit_comments(&comments_to_emit, commentSeparator::After);
+                        self.emit_comments(&comments_to_emit, CommentSeparator::After);
                     }
-                    result = Some(detachedCommentsInfo {
+                    result = Some(DetachedCommentsInfo {
                         node_pos: text_range.pos(),
                         detached_comment_end_pos: detached_comments.last().unwrap().end().into(),
                     });
@@ -1358,7 +1358,7 @@ impl Printer {
 
 #[repr(u32)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
-pub(crate) enum commentSeparator {
+pub(crate) enum CommentSeparator {
     None,
     Before,
     After,
@@ -1368,14 +1368,14 @@ impl Printer {
     pub(crate) fn emit_comments(
         &mut self,
         comments: &[CommentRange],
-        comment_separator: commentSeparator,
+        comment_separator: CommentSeparator,
     ) -> bool {
         let mut intervening_separator = false;
         if comments.is_empty() {
             return false;
         }
 
-        if comment_separator == commentSeparator::Before {
+        if comment_separator == CommentSeparator::Before {
             self.write_space();
         }
 
@@ -1388,15 +1388,15 @@ impl Printer {
             self.emit_comment(comment);
 
             if comment.kind == Kind::SingleLineCommentTrivia
-                || comment.has_trailing_new_line && comment_separator != commentSeparator::None
+                || comment.has_trailing_new_line && comment_separator != CommentSeparator::None
             {
                 self.write_line();
             } else {
-                intervening_separator = comment_separator != commentSeparator::None;
+                intervening_separator = comment_separator != CommentSeparator::None;
             }
         }
 
-        if intervening_separator && comment_separator == commentSeparator::After {
+        if intervening_separator && comment_separator == CommentSeparator::After {
             self.write_space();
         }
 
@@ -1473,7 +1473,7 @@ impl Printer {
         let source = self.source_map_source.unwrap();
         let mut source_index = self.source_map_source_index;
         // Go shares the cache through a pointer; `mapped_cache` holds the mapped source's fresh cache instead.
-        let mut mapped_cache: Option<lineCharacterCache> = None;
+        let mut mapped_cache: Option<LineCharacterCache> = None;
         if let Some(map_source_position) = &self.print_handlers.map_source_position {
             let Some((mapped_source, mapped_pos)) = map_source_position(source, pos) else {
                 let (line, column) = (self.writer().get_line(), self.writer().get_column());
@@ -1534,7 +1534,7 @@ impl Printer {
 
     // TODO: Support emitting nameIndex for source maps (Go emitSourcePosName is commented out)
 
-    pub(crate) fn emit_source_maps_before_node(&mut self, node: P<Node>) -> Option<sourceMapState> {
+    pub(crate) fn emit_source_maps_before_node(&mut self, node: P<Node>) -> Option<SourceMapState> {
         if !self.should_emit_source_maps(node) {
             return None;
         }
@@ -1558,7 +1558,7 @@ impl Printer {
             self.source_maps_disabled = true;
         }
 
-        Some(sourceMapState {
+        Some(SourceMapState {
             emit_flags,
             source_map_range: loc,
             has_token_source_map_range: false,
@@ -1568,7 +1568,7 @@ impl Printer {
     pub(crate) fn emit_source_maps_after_node(
         &mut self,
         node: P<Node>,
-        previous_state: Option<sourceMapState>,
+        previous_state: Option<SourceMapState>,
     ) {
         let Some(previous_state) = previous_state else {
             return;
@@ -1595,7 +1595,7 @@ impl Printer {
         pos: TextPos,
         context_node: P<Node>,
         flags: tokenEmitFlags,
-    ) -> Option<sourceMapState> {
+    ) -> Option<SourceMapState> {
         if !self.should_emit_token_source_maps(token, pos, context_node, flags) {
             return None;
         }
@@ -1621,7 +1621,7 @@ impl Printer {
             self.emit_source_pos(self.source_map_source, pos);
         }
 
-        Some(sourceMapState {
+        Some(SourceMapState {
             emit_flags,
             source_map_range: loc,
             has_token_source_map_range: has_loc,
@@ -1633,7 +1633,7 @@ impl Printer {
         _token: Kind,
         pos: TextPos,
         _context_node: P<Node>,
-        previous_state: Option<sourceMapState>,
+        previous_state: Option<SourceMapState>,
     ) {
         let Some(previous_state) = previous_state else {
             return;
@@ -1808,8 +1808,8 @@ impl Printer {
 //
 
 impl Printer {
-    pub(crate) fn enter_node(&mut self, node: P<Node>) -> printerState {
-        let mut state = printerState::default();
+    pub(crate) fn enter_node(&mut self, node: P<Node>) -> PrinterState {
+        let mut state = PrinterState::default();
 
         if let Some(on_before_emit_node) = &mut self.print_handlers.on_before_emit_node {
             on_before_emit_node(Some(node));
@@ -1820,7 +1820,7 @@ impl Printer {
         state
     }
 
-    pub(crate) fn exit_node(&mut self, node: P<Node>, previous_state: printerState) {
+    pub(crate) fn exit_node(&mut self, node: P<Node>, previous_state: PrinterState) {
         self.emit_source_maps_after_node(node, previous_state.source_map_state);
         self.emit_comments_after_node(node, previous_state.comment_state);
 
@@ -1833,8 +1833,8 @@ impl Printer {
         &mut self,
         node: P<Node>,
         flags: tokenEmitFlags,
-    ) -> printerState {
-        let mut state = printerState::default();
+    ) -> PrinterState {
+        let mut state = PrinterState::default();
 
         if let Some(on_before_emit_token) = &mut self.print_handlers.on_before_emit_token {
             on_before_emit_token(Some(node));
@@ -1849,7 +1849,7 @@ impl Printer {
         state
     }
 
-    pub(crate) fn exit_token_node(&mut self, node: P<Node>, previous_state: printerState) {
+    pub(crate) fn exit_token_node(&mut self, node: P<Node>, previous_state: PrinterState) {
         self.emit_source_maps_after_node(node, previous_state.source_map_state);
         self.emit_comments_after_node(node, previous_state.comment_state);
 
@@ -1861,6 +1861,7 @@ impl Printer {
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Default)]
+    #[expect(non_camel_case_types, reason = "Keep the upstream bitflags type name.")]
     pub(crate) struct tokenEmitFlags: u32 {
         const NoComments = 1 << 0;
         const IndentLeadingComments = 1 << 1;
@@ -1877,8 +1878,8 @@ impl Printer {
         pos: TextPos,
         context_node: P<Node>,
         flags: tokenEmitFlags,
-    ) -> (printerState, TextPos) {
-        let mut state = printerState::default();
+    ) -> (PrinterState, TextPos) {
+        let mut state = PrinterState::default();
         let (comment_state, pos) = self.emit_comments_before_token(token, pos, context_node, flags);
         state.comment_state = comment_state;
         state.source_map_state =
@@ -1891,7 +1892,7 @@ impl Printer {
         token: Kind,
         pos: TextPos,
         context_node: P<Node>,
-        previous_state: printerState,
+        previous_state: PrinterState,
     ) {
         self.emit_source_maps_after_token(
             token,

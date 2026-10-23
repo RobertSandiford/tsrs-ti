@@ -124,7 +124,7 @@ fn test_errors_are_buffered_in_report_order() {
     assert_eq!(s.scan(), Kind::StringLiteral);
     let errors = s.take_errors();
     assert_eq!(errors.len(), 1);
-    assert_eq!(errors[0].message.code(), tsrs_diagnostics::Unterminated_string_literal.code());
+    assert_eq!(errors[0].message.code(), tsrs_diagnostics::UNTERMINATED_STRING_LITERAL.code());
     assert_eq!((errors[0].start, errors[0].length), (4, 0));
     assert_eq!(s.scan(), Kind::NumericLiteral);
     assert_eq!(s.token_value(), "12");
@@ -132,7 +132,7 @@ fn test_errors_are_buffered_in_report_order() {
     assert_eq!(errors.len(), 1);
     assert_eq!(
         errors[0].message.code(),
-        tsrs_diagnostics::Multiple_consecutive_numeric_separators_are_not_permitted.code()
+        tsrs_diagnostics::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_ARE_NOT_PERMITTED.code()
     );
     assert!(!s.has_errors());
 }

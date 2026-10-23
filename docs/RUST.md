@@ -4,11 +4,16 @@
 performance techniques are in place, rejected or untried.
 
 The Clippy baseline follows oxc's `all`, `pedantic`, `complexity`, `nursery`, and `cargo` groups, with the
-remaining global exceptions documented in `Cargo.toml`. The port keeps the Go source's public API, names, numeric
+remaining global exceptions documented in `Cargo.toml`. The port keeps the Go source's API structure, vocabulary, numeric
 domains, and control-flow shape where changing them would obscure parity, so `Cargo.toml` documents the additional
 active exceptions. The stricter rules below target costs and risks that a port can introduce: copies, allocations,
 argument passing, hash iteration order, threading, and `unsafe`. They draw on Bun, oxc, Rolldown, rust-analyzer, Ruff
 and ty, Biome, Turborepo, and swc. Where a rule copies one of them, it says which.
+
+Rust naming lints are denied: types and traits use UpperCamelCase, functions and fields use snake_case, and constants
+and statics use SCREAMING_SNAKE_CASE. Bitflags types and constants keep their upstream names. Upstream acronym spellings
+remain (`ID`, `APIState`, `JSX`), with local reasoned Clippy expectations where needed. Serialized names, diagnostics
+and native ABI symbols keep their upstream spelling.
 
 ## Clippy
 

@@ -214,7 +214,7 @@ impl<H: 'static> NameResolver<H> {
                             // It's an external module. First see if the module has an export default and if the local
                             // name of that export default matches.
                             result = module_exports
-                                .and_then(|e| (*e).get(ast::InternalSymbolNameDefault));
+                                .and_then(|e| (*e).get(ast::INTERNAL_SYMBOL_NAME_DEFAULT));
                             if let Some(res) = result {
                                 let local_symbol = get_local_symbol_for_export_default(res);
                                 if let Some(local_symbol) = local_symbol {
@@ -255,7 +255,7 @@ impl<H: 'static> NameResolver<H> {
                                 }
                             }
                         }
-                        if name != ast::InternalSymbolNameDefault {
+                        if name != ast::INTERNAL_SYMBOL_NAME_DEFAULT {
                             result = self.lookup(
                                 host,
                                 module_exports,
@@ -307,7 +307,7 @@ impl<H: 'static> NameResolver<H> {
                                 self.error(
                                     host,
                                     original_location,
-                                    &diagnostics::Cannot_access_0_from_another_file_without_qualification_when_1_is_enabled_Use_2_instead,
+                                    &diagnostics::CANNOT_ACCESS_0_FROM_ANOTHER_FILE_WITHOUT_QUALIFICATION_WHEN_1_IS_ENABLED_USE_2_INSTEAD,
                                     &[&name, &isolated_modules_like_flag_name, &qualified],
                                 );
                             }
@@ -350,7 +350,7 @@ impl<H: 'static> NameResolver<H> {
                                     // The scope of a type parameter extends over the entire declaration with which the type
                                     // parameter list is associated, with the exception of static member declarations in classes.
                                     if name_not_found_message.is_some() {
-                                        self.error(host, original_location, &diagnostics::Static_members_cannot_reference_class_type_parameters, &[]);
+                                        self.error(host, original_location, &diagnostics::STATIC_MEMBERS_CANNOT_REFERENCE_CLASS_TYPE_PARAMETERS, &[]);
                                     }
                                     return None;
                                 }
@@ -382,7 +382,7 @@ impl<H: 'static> NameResolver<H> {
                                     self.lookup(host, members, name, meaning & SymbolFlags::Type);
                                 if result.is_some() {
                                     if name_not_found_message.is_some() {
-                                        self.error(host, original_location, &diagnostics::Base_class_expressions_cannot_reference_class_type_parameters, &[]);
+                                        self.error(host, original_location, &diagnostics::BASE_CLASS_EXPRESSIONS_CANNOT_REFERENCE_CLASS_TYPE_PARAMETERS, &[]);
                                     }
                                     return None;
                                 }
@@ -409,7 +409,7 @@ impl<H: 'static> NameResolver<H> {
                                     self.error(
                                         host,
                                         original_location,
-                                        &diagnostics::A_computed_property_name_cannot_reference_a_type_parameter_from_its_containing_type,
+                                        &diagnostics::A_COMPUTED_PROPERTY_NAME_CANNOT_REFERENCE_A_TYPE_PARAMETER_FROM_ITS_CONTAINING_TYPE,
                                         &[],
                                     );
                                 }

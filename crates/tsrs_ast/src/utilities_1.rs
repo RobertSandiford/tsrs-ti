@@ -267,7 +267,7 @@ pub fn is_modifier_like(node: P<Node>) -> bool {
 }
 
 pub fn is_compound_assignment(token: Kind) -> bool {
-    token >= Kind::FirstCompoundAssignment && token <= Kind::LastCompoundAssignment
+    token >= Kind::FIRST_COMPOUND_ASSIGNMENT && token <= Kind::LAST_COMPOUND_ASSIGNMENT
 }
 
 pub fn is_assignment_expression(node: P<Node>, exclude_compound_assignment: bool) -> bool {
@@ -962,7 +962,7 @@ pub fn is_type_node_kind(kind: Kind) -> bool {
         | Kind::JSDocNonNullableType
         | Kind::JSDocOptionalType
         | Kind::JSDocVariadicType => true,
-        _ => kind >= Kind::FirstTypeNode && kind <= Kind::LastTypeNode,
+        _ => kind >= Kind::FIRST_TYPE_NODE && kind <= Kind::LAST_TYPE_NODE,
     }
 }
 
@@ -971,7 +971,7 @@ pub fn is_type_node(node: P<Node>) -> bool {
 }
 
 pub fn is_jsdoc_kind(kind: Kind) -> bool {
-    Kind::FirstJSDocNode <= kind && kind <= Kind::LastJSDocNode
+    Kind::FIRST_JSDOC_NODE <= kind && kind <= Kind::LAST_JSDOC_NODE
 }
 
 pub fn is_jsdoc_type_assertion(node: impl Into<Option<P<Node>>>) -> bool {

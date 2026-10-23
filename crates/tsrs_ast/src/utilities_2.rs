@@ -191,7 +191,7 @@ pub fn try_get_ambient_module_name_from_symbol_name(s: &str) -> Option<&str> {
     if let Some(name) = s.strip_circumfix('"', '"') {
         return Some(name);
     }
-    let pattern_prefix = format!("{InternalSymbolNamePrefix}\"");
+    let pattern_prefix = format!("{INTERNAL_SYMBOL_NAME_PREFIX}\"");
     let rest = s.strip_prefix(pattern_prefix.as_str())?;
     let marker_index = rest.rfind("\"pattern@")?;
     if marker_index < 1 {
@@ -219,7 +219,7 @@ pub fn is_effective_external_module(
 }
 
 pub(crate) fn is_common_js_containing_module_kind(kind: ModuleKind) -> bool {
-    kind == ModuleKind::CommonJS || ModuleKind::Node16 <= kind && kind <= ModuleKind::NodeNext
+    kind == ModuleKind::COMMON_JS || ModuleKind::NODE16 <= kind && kind <= ModuleKind::NODE_NEXT
 }
 
 pub fn is_global_scope_augmentation(node: P<Node>) -> bool {
@@ -644,7 +644,7 @@ pub fn is_in_expression_context(node: P<Node>) -> bool {
 
 pub fn is_part_of_type_node(node: P<Node>) -> bool {
     let kind = node.kind();
-    if kind >= Kind::FirstTypeNode && kind <= Kind::LastTypeNode {
+    if kind >= Kind::FIRST_TYPE_NODE && kind <= Kind::LAST_TYPE_NODE {
         return true;
     }
     match node.kind() {
@@ -697,7 +697,7 @@ pub(crate) fn is_part_of_type_node_in_parent(node: P<Node>) -> bool {
     //
     // Calling isPartOfTypeNode would consider the qualified name A.B a type node.
     // Only C and A.B.C are type nodes.
-    if parent.kind() >= Kind::FirstTypeNode && parent.kind() <= Kind::LastTypeNode {
+    if parent.kind() >= Kind::FIRST_TYPE_NODE && parent.kind() <= Kind::LAST_TYPE_NODE {
         return true;
     }
     match parent.kind() {
@@ -740,7 +740,7 @@ pub fn is_jsdoc_link_like(node: P<Node>) -> bool {
 }
 
 pub fn is_jsdoc_tag(node: P<Node>) -> bool {
-    node.kind() >= Kind::FirstJSDocTagNode && node.kind() <= Kind::LastJSDocTagNode
+    node.kind() >= Kind::FIRST_JSDOC_TAG_NODE && node.kind() <= Kind::LAST_JSDOC_TAG_NODE
 }
 
 pub fn is_import_call(node: P<Node>) -> bool {
@@ -853,7 +853,7 @@ pub fn try_get_text_of_property_name(name: P<Node>) -> Option<String> {
 }
 
 pub fn is_jsdoc_node(node: P<Node>) -> bool {
-    node.kind() >= Kind::FirstJSDocNode && node.kind() <= Kind::LastJSDocNode
+    node.kind() >= Kind::FIRST_JSDOC_NODE && node.kind() <= Kind::LAST_JSDOC_NODE
 }
 
 pub fn get_new_target_container(node: P<Node>) -> Option<P<Node>> {
@@ -1285,11 +1285,11 @@ pub fn get_namespace_declaration_node(node: P<Node>) -> Option<P<Node>> {
 }
 
 pub fn module_export_name_is_default(node: P<Node>) -> bool {
-    node.text() == InternalSymbolNameDefault
+    node.text() == INTERNAL_SYMBOL_NAME_DEFAULT
 }
 
 pub fn get_implied_node_format_for_file(path: &str, package_json_type: &str) -> ModuleKind {
-    let mut implied_node_format = ResolutionMode::None;
+    let mut implied_node_format = ResolutionMode::NONE;
     if tspath::file_extension_is_one_of(
         path,
         &[tspath::EXTENSION_DMTS, tspath::EXTENSION_MTS, tspath::EXTENSION_MJS],
@@ -1299,7 +1299,7 @@ pub fn get_implied_node_format_for_file(path: &str, package_json_type: &str) -> 
         path,
         &[tspath::EXTENSION_DCTS, tspath::EXTENSION_CTS, tspath::EXTENSION_CJS],
     ) {
-        implied_node_format = ResolutionMode::CommonJS;
+        implied_node_format = ResolutionMode::COMMON_JS;
     } else if tspath::file_extension_is_one_of(
         path,
         &[
@@ -1313,7 +1313,7 @@ pub fn get_implied_node_format_for_file(path: &str, package_json_type: &str) -> 
         implied_node_format = if package_json_type == "module" {
             ResolutionMode::ESM
         } else {
-            ResolutionMode::CommonJS
+            ResolutionMode::COMMON_JS
         };
     }
 
@@ -1330,7 +1330,7 @@ pub fn get_emit_module_format_of_file_worker(
         options.get_emit_module_kind(),
         source_file_meta_data,
     );
-    if result != ModuleKind::None {
+    if result != ModuleKind::NONE {
         return result;
     }
     options.get_emit_module_kind()
@@ -1341,28 +1341,28 @@ pub fn get_implied_node_format_for_emit_worker(
     emit_module_kind: ModuleKind,
     source_file_meta_data: &SourceFileMetaData,
 ) -> ResolutionMode {
-    if ModuleKind::Node16 <= emit_module_kind && emit_module_kind <= ModuleKind::NodeNext {
+    if ModuleKind::NODE16 <= emit_module_kind && emit_module_kind <= ModuleKind::NODE_NEXT {
         return source_file_meta_data.implied_node_format;
     }
-    if source_file_meta_data.implied_node_format == ModuleKind::CommonJS
+    if source_file_meta_data.implied_node_format == ModuleKind::COMMON_JS
         && (source_file_meta_data.package_json_type == "commonjs"
             || tspath::file_extension_is_one_of(
                 file_name,
                 &[tspath::EXTENSION_CJS, tspath::EXTENSION_CTS],
             ))
     {
-        return ModuleKind::CommonJS;
+        return ModuleKind::COMMON_JS;
     }
-    if source_file_meta_data.implied_node_format == ModuleKind::ESNext
+    if source_file_meta_data.implied_node_format == ModuleKind::ES_NEXT
         && (source_file_meta_data.package_json_type == "module"
             || tspath::file_extension_is_one_of(
                 file_name,
                 &[tspath::EXTENSION_MJS, tspath::EXTENSION_MTS],
             ))
     {
-        return ModuleKind::ESNext;
+        return ModuleKind::ES_NEXT;
     }
-    ModuleKind::None
+    ModuleKind::NONE
 }
 
 pub fn get_declaration_container(node: P<Node>) -> Option<P<Node>> {
@@ -1466,7 +1466,7 @@ pub(crate) fn node_contains_position(node: P<Node>, position: u32) -> bool {
     let (Some(pos), Some(end)) = (node.pos().source_offset(), node.end().source_offset()) else {
         return false;
     };
-    node.kind() >= Kind::FirstNode
+    node.kind() >= Kind::FIRST_NODE
         && pos <= position
         && (position < end || position == end && node.kind() == Kind::EndOfFile)
 }
@@ -1551,8 +1551,8 @@ pub fn get_jsx_implicit_import_base(
     if get_pragma_argument(jsx_runtime_pragma, "factory") == "classic" {
         return String::new();
     }
-    if compiler_options.jsx == JsxEmit::ReactJSX
-        || compiler_options.jsx == JsxEmit::ReactJSXDev
+    if compiler_options.jsx == JsxEmit::REACT_JSX
+        || compiler_options.jsx == JsxEmit::REACT_JSX_DEV
         || !compiler_options.jsx_import_source.is_empty()
         || jsx_import_source_pragma.is_some()
         || get_pragma_argument(jsx_runtime_pragma, "factory") == "automatic"
@@ -1576,7 +1576,7 @@ pub fn get_jsx_runtime_import(base: &str, options: &CompilerOptions) -> String {
     format!(
         "{}/{}",
         base,
-        if options.jsx == JsxEmit::ReactJSXDev { "jsx-dev-runtime" } else { "jsx-runtime" }
+        if options.jsx == JsxEmit::REACT_JSX_DEV { "jsx-dev-runtime" } else { "jsx-runtime" }
     )
 }
 

@@ -1025,8 +1025,8 @@ impl Checker {
         // The reactNamespace/jsxFactory's root symbol should be marked as 'used' so we don't incorrectly elide its import.
         // And if there is no reactNamespace/jsxFactory's symbol in scope when targeting React emit, we should issue an error.
         let jsx_factory_ref_err: Option<&'static Message> = if_else(
-            self.compiler_options.jsx == JsxEmit::React,
-            Some(&diagnostics::This_JSX_tag_requires_0_to_be_in_scope_but_it_could_not_be_found),
+            self.compiler_options.jsx == JsxEmit::REACT,
+            Some(&diagnostics::THIS_JSX_TAG_REQUIRES_0_TO_BE_IN_SCOPE_BUT_IT_COULD_NOT_BE_FOUND),
             None,
         );
         let jsx_factory_namespace = self.get_jsx_namespace(Some(node));
@@ -1034,8 +1034,8 @@ impl Checker {
         if is_jsx_opening_like_element(node) {
             jsx_factory_location = node.tag_name();
         }
-        let should_factory_ref_err = self.compiler_options.jsx != JsxEmit::Preserve
-            && self.compiler_options.jsx != JsxEmit::ReactNative;
+        let should_factory_ref_err = self.compiler_options.jsx != JsxEmit::PRESERVE
+            && self.compiler_options.jsx != JsxEmit::REACT_NATIVE;
         // #38720/60122, allow null as jsxFragmentFactory
         let mut jsx_factory_sym: Option<P<Symbol>> = None;
         if !(is_jsx_opening_fragment(node) && jsx_factory_namespace == "null") {
@@ -1172,18 +1172,18 @@ impl Checker {
                             .map(|s| self.resolve_symbol(s));
                         match symbol {
                             None => {
-                                self.error(Some(location), &diagnostics::This_syntax_requires_an_imported_helper_named_1_which_does_not_exist_in_0_Consider_upgrading_your_version_of_0, &[&externalHelpersModuleNameText, &name]);
+                                self.error(Some(location), &diagnostics::THIS_SYNTAX_REQUIRES_AN_IMPORTED_HELPER_NAMED_1_WHICH_DOES_NOT_EXIST_IN_0_CONSIDER_UPGRADING_YOUR_VERSION_OF_0, &[&EXTERNAL_HELPERS_MODULE_NAME_TEXT, &name]);
                             }
                             Some(symbol) => {
                                 if helper.intersects(ExternalEmitHelpers::ClassPrivateFieldGet) {
                                     if !self.has_signature_with_arity_greater_than(symbol, 3) {
-                                        self.error(Some(location), &diagnostics::This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, &[&externalHelpersModuleNameText, &name, &4]);
+                                        self.error(Some(location), &diagnostics::THIS_SYNTAX_REQUIRES_AN_IMPORTED_HELPER_NAMED_1_WITH_2_PARAMETERS_WHICH_IS_NOT_COMPATIBLE_WITH_THE_ONE_IN_0_CONSIDER_UPGRADING_YOUR_VERSION_OF_0, &[&EXTERNAL_HELPERS_MODULE_NAME_TEXT, &name, &4]);
                                     }
                                 } else if helper
                                     .intersects(ExternalEmitHelpers::ClassPrivateFieldSet)
                                 {
                                     if !self.has_signature_with_arity_greater_than(symbol, 4) {
-                                        self.error(Some(location), &diagnostics::This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, &[&externalHelpersModuleNameText, &name, &5]);
+                                        self.error(Some(location), &diagnostics::THIS_SYNTAX_REQUIRES_AN_IMPORTED_HELPER_NAMED_1_WITH_2_PARAMETERS_WHICH_IS_NOT_COMPATIBLE_WITH_THE_ONE_IN_0_CONSIDER_UPGRADING_YOUR_VERSION_OF_0, &[&EXTERNAL_HELPERS_MODULE_NAME_TEXT, &name, &5]);
                                     }
                                 } else if helper
                                     .intersects(ExternalEmitHelpers::RewriteRelativeImportExtension)
@@ -1194,7 +1194,7 @@ impl Checker {
                                         .is_empty()
                                     && !self.has_signature_with_arity_greater_than(symbol, 3)
                                 {
-                                    self.error(Some(location), &diagnostics::This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, &[&externalHelpersModuleNameText, &name, &4]);
+                                    self.error(Some(location), &diagnostics::THIS_SYNTAX_REQUIRES_AN_IMPORTED_HELPER_NAMED_1_WITH_2_PARAMETERS_WHICH_IS_NOT_COMPATIBLE_WITH_THE_ONE_IN_0_CONSIDER_UPGRADING_YOUR_VERSION_OF_0, &[&EXTERNAL_HELPERS_MODULE_NAME_TEXT, &name, &4]);
                                 }
                             }
                         }
@@ -1280,7 +1280,7 @@ impl Checker {
         let links = self.source_file_links.get(file);
         if links.external_helpers_module.get().is_none() {
             let location = self.program.get_import_helpers_import_specifier(file.path());
-            let helpers_module = match self.resolve_external_module(location, externalHelpersModuleNameText, Some(&diagnostics::This_syntax_requires_an_imported_helper_but_module_0_cannot_be_found), Some(error_node), false /*isForAugmentation*/, None /*importAttributesType*/) {
+            let helpers_module = match self.resolve_external_module(location, EXTERNAL_HELPERS_MODULE_NAME_TEXT, Some(&diagnostics::THIS_SYNTAX_REQUIRES_AN_IMPORTED_HELPER_BUT_MODULE_0_CANNOT_BE_FOUND), Some(error_node), false /*isForAugmentation*/, None /*importAttributesType*/) {
                 Some(m) => m,
                 None => self.unknown_symbol,
             };
@@ -1576,7 +1576,7 @@ impl Checker {
                     .iter()
                     .any(|&d| is_type_only_import_or_export_declaration(d))
             {
-                let diag = self.error(Some(type_name), &diagnostics::A_type_referenced_in_a_decorated_signature_must_be_imported_with_import_type_or_a_namespace_import_when_isolatedModules_and_emitDecoratorMetadata_are_enabled, &[]);
+                let diag = self.error(Some(type_name), &diagnostics::A_TYPE_REFERENCED_IN_A_DECORATED_SIGNATURE_MUST_BE_IMPORTED_WITH_IMPORT_TYPE_OR_A_NAMESPACE_IMPORT_WHEN_ISOLATED_MODULES_AND_EMIT_DECORATOR_METADATA_ARE_ENABLED, &[]);
                 let alias_declaration = root_symbol
                     .declarations()
                     .iter()
@@ -1585,7 +1585,7 @@ impl Checker {
                 if let Some(alias_declaration) = alias_declaration {
                     diag.set_related_info(&[create_diagnostic_for_node(
                         Some(alias_declaration),
-                        &diagnostics::X_0_was_imported_here,
+                        &diagnostics::X_0_WAS_IMPORTED_HERE,
                         &[&root_name.text()],
                     )]);
                 }
@@ -1646,7 +1646,7 @@ impl Checker {
         }
         if then_signatures.is_empty() {
             if error_node.is_some() {
-                self.error(error_node, &diagnostics::A_promise_must_have_a_then_method, &[]);
+                self.error(error_node, &diagnostics::A_PROMISE_MUST_HAVE_A_THEN_METHOD, &[]);
             }
             return None;
         }
@@ -1674,7 +1674,7 @@ impl Checker {
             if error_node.is_some() {
                 let t_str = self.type_to_string(t, None);
                 let this_str = self.type_to_string(this_type_for_error, None);
-                self.error(error_node, &diagnostics::The_this_context_of_type_0_is_not_assignable_to_method_s_this_of_type_1, &[&t_str, &this_str]);
+                self.error(error_node, &diagnostics::THE_THIS_CONTEXT_OF_TYPE_0_IS_NOT_ASSIGNABLE_TO_METHOD_S_THIS_OF_TYPE_1, &[&t_str, &this_str]);
             }
             return None;
         }
@@ -1690,7 +1690,7 @@ impl Checker {
             self.get_signatures_of_type(onfulfilled_parameter_type, SignatureKind::Call);
         if onfulfilled_parameter_signatures.is_empty() {
             if error_node.is_some() {
-                self.error(error_node, &diagnostics::The_first_parameter_of_the_then_method_of_a_promise_must_be_a_callback, &[]);
+                self.error(error_node, &diagnostics::THE_FIRST_PARAMETER_OF_THE_THEN_METHOD_OF_A_PROMISE_MUST_BE_A_CALLBACK, &[]);
             }
             return None;
         }
@@ -1963,7 +1963,7 @@ impl Checker {
                 let current_node = self.current_node;
                 self.error(
                     current_node,
-                    &diagnostics::Type_instantiation_is_excessively_deep_and_possibly_infinite,
+                    &diagnostics::TYPE_INSTANTIATION_IS_EXCESSIVELY_DEEP_AND_POSSIBLY_INFINITE,
                     &[],
                 );
                 return self.error_type;
@@ -2086,8 +2086,8 @@ fn add_template_spans(
         } else {
             return false;
         }
-        if state.text_length + state.sb.len() > maxTemplateLiteralTypeLength
-            || state.new_types.len() > maxTemplateLiteralTypeSpans
+        if state.text_length + state.sb.len() > MAX_TEMPLATE_LITERAL_TYPE_LENGTH
+            || state.new_types.len() > MAX_TEMPLATE_LITERAL_TYPE_SPANS
         {
             state.too_large = true;
             return false;
@@ -2098,7 +2098,7 @@ fn add_template_spans(
 
 // checker.go:29731
 pub(crate) fn apply_string_mapping(symbol: P<Symbol>, str: &str) -> String {
-    match intrinsicTypeKinds.get(symbol.name()).copied().unwrap_or_default() {
+    match INTRINSIC_TYPE_KINDS.get(symbol.name()).copied().unwrap_or_default() {
         IntrinsicTypeKind::Uppercase => stringutil::to_upper_js(str),
         IntrinsicTypeKind::Lowercase => stringutil::to_lower_js(str),
         IntrinsicTypeKind::Capitalize => {
@@ -2121,7 +2121,7 @@ impl Checker {
         texts: &[&str],
         types: &[P<Type>],
     ) -> (Vec<String>, Vec<P<Type>>) {
-        match intrinsicTypeKinds.get(symbol.name()).copied().unwrap_or_default() {
+        match INTRINSIC_TYPE_KINDS.get(symbol.name()).copied().unwrap_or_default() {
             IntrinsicTypeKind::Uppercase | IntrinsicTypeKind::Lowercase => {
                 let new_texts: Vec<String> =
                     texts.iter().map(|t| apply_string_mapping(symbol, t)).collect();

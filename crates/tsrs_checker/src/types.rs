@@ -313,7 +313,7 @@ bitflags! {
     }
 }
 
-pub const externalHelpersModuleNameText: &str = "tslib";
+pub const EXTERNAL_HELPERS_MODULE_NAME_TEXT: &str = "tslib";
 
 // Ids
 
@@ -719,7 +719,7 @@ pub struct MarkedAssignmentSymbolLinks {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct accessibleChainCacheKey {
+pub struct AccessibleChainCacheKey {
     pub use_only_external_aliasing: bool,
     pub location: Option<P<Node>>,
     pub meaning: SymbolFlags,
@@ -729,7 +729,7 @@ pub struct accessibleChainCacheKey {
 pub struct ContainingSymbolLinks {
     pub extended_containers_by_file: RefCell<FxHashMap<NodeId, &'static [P<Symbol>]>>, // Symbols of nodes which which logically contain this one, cached by file the request is made within
     pub extended_containers: Cell<Option<&'static [P<Symbol>]>>, // Containers (other than the parent) which this symbol is aliased in
-    pub accessible_chain_cache: RefCell<FxHashMap<accessibleChainCacheKey, &'static [P<Symbol>]>>,
+    pub accessible_chain_cache: RefCell<FxHashMap<AccessibleChainCacheKey, &'static [P<Symbol>]>>,
 }
 
 bitflags! {
@@ -958,7 +958,7 @@ bitflags! {
     }
 }
 
-static typeFlagNames: [(TypeFlags, &str); 29] = [
+static TYPE_FLAG_NAMES: [(TypeFlags, &str); 29] = [
     (TypeFlags::Any, "Any"),
     (TypeFlags::Unknown, "Unknown"),
     (TypeFlags::Undefined, "Undefined"),
@@ -994,7 +994,7 @@ static typeFlagNames: [(TypeFlags, &str); 29] = [
 pub fn format_type_flags(flags: TypeFlags) -> Vec<&'static str> {
     let mut result = Vec::with_capacity(flags.bits().count_ones() as usize);
     result.extend(
-        typeFlagNames.iter().filter_map(
+        TYPE_FLAG_NAMES.iter().filter_map(
             |(flag, name)| {
                 if flags.intersects(*flag) { Some(*name) } else { None }
             },
@@ -3327,10 +3327,10 @@ impl IndexInfo {
 pub struct Ternary(pub i8);
 
 impl Ternary {
-    pub const False: Ternary = Ternary(0);
-    pub const Unknown: Ternary = Ternary(1);
-    pub const Maybe: Ternary = Ternary(3);
-    pub const True: Ternary = Ternary(-1);
+    pub const FALSE: Ternary = Ternary(0);
+    pub const UNKNOWN: Ternary = Ternary(1);
+    pub const MAYBE: Ternary = Ternary(3);
+    pub const TRUE: Ternary = Ternary(-1);
 }
 
 impl std::ops::BitAnd for Ternary {
@@ -3394,7 +3394,7 @@ pub struct LanguageFeatureMinimumTargetMap {
     pub regular_expression_flags_unicode_sets: ScriptTarget,
 }
 
-pub static LanguageFeatureMinimumTarget: LanguageFeatureMinimumTargetMap =
+pub static LANGUAGE_FEATURE_MINIMUM_TARGET: LanguageFeatureMinimumTargetMap =
     LanguageFeatureMinimumTargetMap {
         exponentiation: ScriptTarget::ES2016,
         async_functions: ScriptTarget::ES2017,
@@ -3412,10 +3412,10 @@ pub static LanguageFeatureMinimumTarget: LanguageFeatureMinimumTargetMap =
         class_fields: ScriptTarget::ES2022,
         private_names_and_class_static_blocks: ScriptTarget::ES2022,
         regular_expression_flags_has_indices: ScriptTarget::ES2022,
-        shebang_comments: ScriptTarget::ESNext,
-        using_and_await_using: ScriptTarget::ESNext,
-        class_and_class_element_decorators: ScriptTarget::ESNext,
-        regular_expression_flags_unicode_sets: ScriptTarget::ESNext,
+        shebang_comments: ScriptTarget::ES_NEXT,
+        using_and_await_using: ScriptTarget::ES_NEXT,
+        class_and_class_element_decorators: ScriptTarget::ES_NEXT,
+        regular_expression_flags_unicode_sets: ScriptTarget::ES_NEXT,
     };
 
 // Aliases for types

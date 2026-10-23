@@ -227,9 +227,9 @@ impl LanguageService {
 
 // Go passes `program.Host()` (a compiler.CompilerHost, which has the FS/GetCurrentDirectory methods of
 // module.ResolutionHost) to module.NewResolver; Rust needs the explicit adapter.
-struct compilerHostResolutionHost(&'static dyn CompilerHost);
+struct CompilerHostResolutionHost(&'static dyn CompilerHost);
 
-impl ResolutionHost for compilerHostResolutionHost {
+impl ResolutionHost for CompilerHostResolutionHost {
     fn fs(&self) -> &dyn FS {
         self.0.fs()
     }
@@ -265,8 +265,8 @@ impl LanguageService {
         let mut no_dts_options: CompilerOptions = (*options).clone();
         no_dts_options.no_dts_resolution = Tristate::True;
         let host: &'static dyn CompilerHost = &**program.host();
-        let resolution_host: &'static compilerHostResolutionHost =
-            tsrs_core::alloc(compilerHostResolutionHost(host));
+        let resolution_host: &'static CompilerHostResolutionHost =
+            tsrs_core::alloc(CompilerHostResolutionHost(host));
         SourceDefResolver {
             ls: self,
             fs: host.fs(),
@@ -627,11 +627,11 @@ impl SourceDefResolver<'_> {
         preferred_mode: ResolutionMode,
     ) -> String {
         let mut modes = vec![preferred_mode];
-        if preferred_mode != ModuleKind::ESNext {
-            modes.push(ModuleKind::ESNext);
+        if preferred_mode != ModuleKind::ES_NEXT {
+            modes.push(ModuleKind::ES_NEXT);
         }
-        if preferred_mode != ModuleKind::CommonJS {
-            modes.push(ModuleKind::CommonJS);
+        if preferred_mode != ModuleKind::COMMON_JS {
+            modes.push(ModuleKind::COMMON_JS);
         }
 
         if let Some(result) = modes.into_iter().find_map(|mode| {

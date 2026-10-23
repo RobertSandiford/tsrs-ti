@@ -135,7 +135,7 @@ pub fn get_property_name_for_property_name_node(name: P<Node>) -> std::borrow::C
                 }
                 return text.into();
             }
-            InternalSymbolNameMissing.into()
+            INTERNAL_SYMBOL_NAME_MISSING.into()
         }
         _ => panic!("Unhandled case in getPropertyNameForPropertyNameNode"),
     }
@@ -188,7 +188,7 @@ pub fn has_resolution_mode_override(node: impl Into<Option<P<Node>>>) -> bool {
 }
 
 pub fn is_template_literal_kind(kind: Kind) -> bool {
-    Kind::FirstTemplateToken <= kind && kind <= Kind::LastTemplateToken
+    Kind::FIRST_TEMPLATE_TOKEN <= kind && kind <= Kind::LAST_TEMPLATE_TOKEN
 }
 
 pub fn get_external_module_import_equals_declaration_expression(node: P<Node>) -> Option<P<Node>> {
@@ -612,8 +612,8 @@ pub fn should_transform_import_call(
     implied_node_format_for_emit: ModuleKind,
 ) -> bool {
     let module_kind = options.get_emit_module_kind();
-    if ModuleKind::Node16 <= module_kind && module_kind <= ModuleKind::NodeNext
-        || module_kind == ModuleKind::Preserve
+    if ModuleKind::NODE16 <= module_kind && module_kind <= ModuleKind::NODE_NEXT
+        || module_kind == ModuleKind::PRESERVE
     {
         return false;
     }
@@ -938,7 +938,7 @@ pub fn has_inferred_type(node: P<Node>) -> bool {
 }
 
 pub fn is_keyword(token: Kind) -> bool {
-    Kind::FirstKeyword <= token && token <= Kind::LastKeyword
+    Kind::FIRST_KEYWORD <= token && token <= Kind::LAST_KEYWORD
 }
 
 pub fn has_modifier(node: P<Node>, flags: ModifierFlags) -> bool {
@@ -1013,7 +1013,7 @@ pub fn get_first_constructor_with_body(node: P<Node>) -> Option<P<Node>> {
 
 // Returns true for nodes that are considered executable for the purposes of unreachable code detection.
 pub fn is_potentially_executable_node(node: P<Node>) -> bool {
-    if Kind::FirstStatement <= node.kind() && node.kind() <= Kind::LastStatement {
+    if Kind::FIRST_STATEMENT <= node.kind() && node.kind() <= Kind::LAST_STATEMENT {
         if is_variable_statement(node) {
             let declaration_list = node.as_variable_statement().declaration_list;
             if get_combined_node_flags(declaration_list).intersects(NodeFlags::BlockScoped) {
@@ -1430,7 +1430,7 @@ pub fn clone_as_import_declaration(node: P<Node>, f: &NodeFactory) -> P<Node> {
 
 // utilities.go:3028
 pub fn is_contextual_keyword(token: Kind) -> bool {
-    Kind::FirstContextualKeyword <= token && token <= Kind::LastContextualKeyword
+    Kind::FIRST_CONTEXTUAL_KEYWORD <= token && token <= Kind::LAST_CONTEXTUAL_KEYWORD
 }
 
 // utilities.go:4170
@@ -1521,7 +1521,7 @@ pub fn is_jsdoc_single_comment_node(node: P<Node>) -> bool {
 
 // utilities.go:3806
 pub fn is_trivia(token: Kind) -> bool {
-    Kind::FirstTriviaToken <= token && token <= Kind::LastTriviaToken
+    Kind::FIRST_TRIVIA_TOKEN <= token && token <= Kind::LAST_TRIVIA_TOKEN
 }
 
 // utilities.go:3848

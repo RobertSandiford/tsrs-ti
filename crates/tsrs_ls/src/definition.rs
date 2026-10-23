@@ -354,7 +354,7 @@ pub(crate) fn combine_definition_responses(
 
 // definition.go:195
 pub(crate) fn get_declaration_name_for_keyword(node: P<Node>) -> P<Node> {
-    if node.kind() >= Kind::FirstKeyword && node.kind() <= Kind::LastKeyword {
+    if node.kind() >= Kind::FIRST_KEYWORD && node.kind() <= Kind::LAST_KEYWORD {
         let parent = node.parent().unwrap();
         if ast::is_variable_declaration_list(parent) {
             if let Some(&decl) = parent.as_variable_declaration_list().declarations.nodes().first()
@@ -562,7 +562,7 @@ pub(crate) fn get_declarations_from_location(c: &mut Checker, node: P<Node>) -> 
             && node.kind() == Kind::ConstructorKeyword
         {
             if let Some(constructor) =
-                symbol.members().and_then(|m| m.lookup(ast::InternalSymbolNameConstructor))
+                symbol.members().and_then(|m| m.lookup(ast::INTERNAL_SYMBOL_NAME_CONSTRUCTOR))
             {
                 symbol = constructor;
             }

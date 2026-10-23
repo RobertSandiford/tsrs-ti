@@ -84,11 +84,11 @@ impl NodeBuilderImpl {
             return ctx.truncating.get();
         }
         let max_length = if ctx.flags.get().intersects(Flags::NoTruncation) {
-            noTruncationMaximumTruncationLength
+            NO_TRUNCATION_MAXIMUM_TRUNCATION_LENGTH
         } else if ctx.max_truncation_length.get() > 0 {
             ctx.max_truncation_length.get()
         } else {
-            defaultMaximumTruncationLength
+            DEFAULT_MAXIMUM_TRUNCATION_LENGTH
         };
         ctx.truncating.set(ctx.approximate_length.get() > max_length);
         ctx.truncating.get()
@@ -403,11 +403,11 @@ impl NodeBuilderImpl {
         let may_have_name_collisions =
             !self.ctx().flags.get().intersects(Flags::UseFullyQualifiedType);
         #[derive(Clone, Copy)]
-        struct seenName {
+        struct SeenName {
             t: P<Type>,
             i: usize,
         }
-        let mut seen_names: Option<tsrs_core::collections::MultiMap<&'static str, seenName>> = None;
+        let mut seen_names: Option<tsrs_core::collections::MultiMap<&'static str, SeenName>> = None;
         if may_have_name_collisions {
             seen_names = Some(tsrs_core::collections::MultiMap::default());
         }
@@ -446,7 +446,7 @@ impl NodeBuilderImpl {
                     if is_identifier_type_reference(type_node) {
                         seen_names.add(
                             type_node.as_type_reference_node().type_name.text(),
-                            seenName { t, i: result.len() - 1 },
+                            SeenName { t, i: result.len() - 1 },
                         );
                     }
                 }
@@ -465,7 +465,7 @@ impl NodeBuilderImpl {
             let ctx = self.ctx();
             ctx.flags.set(ctx.flags.get() | Flags::UseFullyQualifiedType);
             for types in seen_names.values() {
-                if !array_is_homogeneous(types, |a: seenName, b: seenName| {
+                if !array_is_homogeneous(types, |a: SeenName, b: SeenName| {
                     types_are_same_reference(a.t, b.t)
                 }) {
                     for seen in types {
@@ -850,21 +850,21 @@ impl NodeBuilderImpl {
                 self.e.most_original(self.ctx().enclosing_declaration.get()),
             ); // TODO: Just use b.ctx.enclosingFile ? Or is the delayed lookup important for context moves?
             let target_file = get_source_file_of_module(chain[0]);
-            let mut specifier_result = moduleSpecifierResult::default();
+            let mut specifier_result = ModuleSpecifierResult::default();
             let mut import_mode_override = RESOLUTION_MODE_NONE;
             let module_resolution_kind = c.compiler_options.get_module_resolution_kind();
-            if module_resolution_kind == ModuleResolutionKind::Node16
-                || module_resolution_kind == ModuleResolutionKind::NodeNext
+            if module_resolution_kind == ModuleResolutionKind::NODE16
+                || module_resolution_kind == ModuleResolutionKind::NODE_NEXT
             {
                 // An `import` type directed at an esm format file is only going to resolve in esm mode - set the esm mode assertion
                 if let (Some(target_file), Some(context_file)) = (target_file, context_file) {
-                    if c.emit_module_format_of_file(target_file) == ModuleKind::ESNext
+                    if c.emit_module_format_of_file(target_file) == ModuleKind::ES_NEXT
                         && c.emit_module_format_of_file(target_file)
                             != c.emit_module_format_of_file(context_file)
                     {
                         specifier_result =
-                            self.get_specifier_for_module_symbol(c, chain[0], ModuleKind::ESNext);
-                        import_mode_override = ModuleKind::ESNext;
+                            self.get_specifier_for_module_symbol(c, chain[0], ModuleKind::ES_NEXT);
+                        import_mode_override = ModuleKind::ES_NEXT;
                     }
                 }
             }
@@ -877,13 +877,13 @@ impl NodeBuilderImpl {
                 let old_specifier_result = specifier_result;
 
                 let module_resolution_kind = c.compiler_options.get_module_resolution_kind();
-                if module_resolution_kind == ModuleResolutionKind::Node16
-                    || module_resolution_kind == ModuleResolutionKind::NodeNext
+                if module_resolution_kind == ModuleResolutionKind::NODE16
+                    || module_resolution_kind == ModuleResolutionKind::NODE_NEXT
                 {
                     // We might be able to write a portable import type using a mode override; try specifier generation again, but with a different mode set
-                    let mut swapped_mode = ModuleKind::ESNext;
-                    if c.emit_module_format_of_file(context_file.unwrap()) == ModuleKind::ESNext {
-                        swapped_mode = ModuleKind::CommonJS;
+                    let mut swapped_mode = ModuleKind::ES_NEXT;
+                    if c.emit_module_format_of_file(context_file.unwrap()) == ModuleKind::ES_NEXT {
+                        swapped_mode = ModuleKind::COMMON_JS;
                     }
                     specifier_result =
                         self.get_specifier_for_module_symbol(c, chain[0], swapped_mode);
@@ -1013,7 +1013,7 @@ impl NodeBuilderImpl {
                 if let Some(exports) = exports {
                     // avoid exhaustive iteration in the common case
                     let res = exports.lookup(symbol.name());
-                    if symbol.name() != ast::InternalSymbolNameExportEquals
+                    if symbol.name() != ast::INTERNAL_SYMBOL_NAME_EXPORT_EQUALS
                         && !is_late_bound_name(symbol.name())
                         && res.is_some()
                         && c.get_symbol_if_same_reference(res.unwrap(), symbol).is_some()
@@ -1024,7 +1024,7 @@ impl NodeBuilderImpl {
                         results.extend(exports.entries().into_iter().filter_map(|(name, ex)| {
                             if c.get_symbol_if_same_reference(ex, symbol).is_some()
                                 && !is_late_bound_name(name)
-                                && name != ast::InternalSymbolNameExportEquals
+                                && name != ast::INTERNAL_SYMBOL_NAME_EXPORT_EQUALS
                             {
                                 Some((ex, name))
                                 // break // must collect all results and sort them - exports are randomly iterated
@@ -1334,7 +1334,7 @@ impl NodeBuilderImpl {
             symbol = result;
         }
         let ctx = self.ctx();
-        if symbol.name() == ast::InternalSymbolNameDefault
+        if symbol.name() == ast::INTERNAL_SYMBOL_NAME_DEFAULT
             && !ctx.flags.get().intersects(Flags::UseAliasDefinedOutsideCurrentScope)
             // If it's not the first part of an entity name, it must print as `default`
             && (!ctx.flags.get().intersects(Flags::InInitialEntityName)
@@ -1535,7 +1535,7 @@ impl NodeBuilderImpl {
             }
             let parents = c.get_containers_of_symbol(root, enclosing_declaration, meaning);
             if !parents.is_empty() {
-                let mut parent_specifiers: Vec<sortedSymbolNamePair> = parents
+                let mut parent_specifiers: Vec<SortedSymbolNamePair> = parents
                     .iter()
                     .map(|&symbol| {
                         if symbol
@@ -1543,7 +1543,7 @@ impl NodeBuilderImpl {
                             .iter()
                             .any(|&d| has_non_global_augmentation_external_module_symbol(d))
                         {
-                            return sortedSymbolNamePair {
+                            return SortedSymbolNamePair {
                                 sym: symbol,
                                 name: self
                                     .get_specifier_for_module_symbol(
@@ -1555,7 +1555,7 @@ impl NodeBuilderImpl {
                                     .to_string(),
                             };
                         }
-                        sortedSymbolNamePair { sym: symbol, name: String::new() }
+                        SortedSymbolNamePair { sym: symbol, name: String::new() }
                     })
                     .collect();
                 parent_specifiers.sort_by(|a, b| Self::sort_by_best_name(c, a, b));
@@ -1570,7 +1570,7 @@ impl NodeBuilderImpl {
                     );
                     if !parent_chain.is_empty() {
                         if let Some(exports) = parent.exports() {
-                            let exported = exports.lookup(ast::InternalSymbolNameExportEquals);
+                            let exported = exports.lookup(ast::INTERNAL_SYMBOL_NAME_EXPORT_EQUALS);
                             if let Some(exported) = exported {
                                 if c.get_symbol_if_same_reference(exported, symbol).is_some() {
                                     // parentChain root _is_ symbol - symbol is a module export=, so it kinda looks like it's own parent
@@ -1623,8 +1623,8 @@ impl NodeBuilderImpl {
     // nodebuilderimpl.go:1153
     pub(crate) fn sort_by_best_name(
         c: &mut Checker,
-        a: &sortedSymbolNamePair,
-        b: &sortedSymbolNamePair,
+        a: &SortedSymbolNamePair,
+        b: &SortedSymbolNamePair,
     ) -> std::cmp::Ordering {
         let specifier_a = &a.name;
         let specifier_b = &b.name;
@@ -1720,7 +1720,7 @@ impl NodeBuilderImpl {
         c: &mut Checker,
         symbol: P<Symbol>,
         override_import_mode: ModuleKind,
-    ) -> moduleSpecifierResult {
+    ) -> ModuleSpecifierResult {
         let enclosing_declaration = self.e.most_original(self.ctx().enclosing_declaration.get());
         let mut original_module_specifier: Option<P<Node>> = None;
         if can_have_module_specifier(enclosing_declaration) {
@@ -1760,25 +1760,25 @@ impl NodeBuilderImpl {
                         symbol,
                     )
                 {
-                    return moduleSpecifierResult {
+                    return ModuleSpecifierResult {
                         specifier,
                         import_attributes_type: original_import_attributes_type,
                     };
                 }
-                return moduleSpecifierResult {
+                return ModuleSpecifierResult {
                     specifier,
                     import_attributes_type: Some(c.get_type_of_module_import_attributes(symbol)),
                 };
             }
             if let Some(specifier) = try_get_ambient_module_name_from_symbol_name(symbol.name()) {
-                return moduleSpecifierResult { specifier, import_attributes_type: None };
+                return ModuleSpecifierResult { specifier, import_attributes_type: None };
             }
         }
         if self.ctx().enclosing_file.get().is_none() {
             if let Some(specifier) = try_get_ambient_module_name_from_symbol_name(symbol.name()) {
-                return moduleSpecifierResult { specifier, import_attributes_type: None };
+                return ModuleSpecifierResult { specifier, import_attributes_type: None };
             }
-            return moduleSpecifierResult {
+            return ModuleSpecifierResult {
                 specifier: get_source_file_of_module(symbol).unwrap().get().file_name(),
                 import_attributes_type: None,
             };
@@ -1836,7 +1836,7 @@ impl NodeBuilderImpl {
             false, /*forAutoImports*/
         );
         assert_ne!(module_specifiers_result.specifiers, [] as [std::string::String; 0]);
-        let mut result = moduleSpecifierResult {
+        let mut result = ModuleSpecifierResult {
             specifier: self.f.alloc_text(&module_specifiers_result.specifiers[0]),
             import_attributes_type: None,
         };
@@ -1852,10 +1852,10 @@ impl NodeBuilderImpl {
     pub(crate) fn module_specifier_result_for_symbol(
         &self,
         c: &mut Checker,
-        result: moduleSpecifierResult,
+        result: ModuleSpecifierResult,
         import_attributes_type: Option<P<Type>>,
         symbol: P<Symbol>,
-    ) -> moduleSpecifierResult {
+    ) -> ModuleSpecifierResult {
         let mut result = result;
         if let Some(import_attributes_type) = import_attributes_type {
             if self.module_specifier_resolves_to_symbol(
@@ -1928,7 +1928,7 @@ impl NodeBuilderImpl {
     pub(crate) fn create_import_attributes_for_module_specifier(
         &self,
         c: &mut Checker,
-        result: moduleSpecifierResult,
+        result: ModuleSpecifierResult,
         import_mode_override: ModuleKind,
     ) -> Option<P<Node>> {
         let is_empty_attributes_type = result.import_attributes_type.is_none()

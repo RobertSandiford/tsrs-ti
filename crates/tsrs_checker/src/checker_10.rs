@@ -251,7 +251,7 @@ impl Checker {
         if signature.type_parameters().is_empty() {
             return signature;
         }
-        let key = CachedSignatureKey { sig: signature, key: SignatureKeyErased };
+        let key = CachedSignatureKey { sig: signature, key: SIGNATURE_KEY_ERASED };
         let mut erased = self.cached_signatures.get(&key);
         if erased.is_none() {
             let m = new_array_to_single_type_mapper(signature.type_parameters(), self.any_type);
@@ -268,7 +268,7 @@ impl Checker {
         if signature.type_parameters().is_empty() {
             return signature;
         }
-        let key = CachedSignatureKey { sig: signature, key: SignatureKeyCanonical };
+        let key = CachedSignatureKey { sig: signature, key: SIGNATURE_KEY_CANONICAL };
         let mut canonical = self.cached_signatures.get(&key);
         if canonical.is_none() {
             let created = self.create_canonical_signature(signature);
@@ -309,7 +309,7 @@ impl Checker {
         if type_parameters.is_empty() {
             return signature;
         }
-        let key = CachedSignatureKey { sig: signature, key: SignatureKeyBase };
+        let key = CachedSignatureKey { sig: signature, key: SIGNATURE_KEY_BASE };
         if let Some(cached) = self.cached_signatures.get(&key) {
             return cached;
         }
@@ -382,7 +382,7 @@ impl Checker {
         };
         self.apply_to_parameter_types(source_signature, signature, |c, source, target| {
             // Type parameters from outer context referenced by source type are fixed by instantiation of the source type
-            c.infer_types(context.inferences.get(), source, target, InferencePriority::None, false);
+            c.infer_types(context.inferences.get(), source, target, InferencePriority::NONE, false);
         });
         if inference_context.is_none() {
             self.apply_to_return_types(contextual_signature, signature, |c, source, target| {
@@ -390,7 +390,7 @@ impl Checker {
                     context.inferences.get(),
                     source,
                     target,
-                    InferencePriority::ReturnType,
+                    InferencePriority::RETURN_TYPE,
                     false,
                 );
             });
@@ -423,7 +423,7 @@ impl Checker {
                                 self.report_circular_base_type(declaration, t);
                             }
                         } else {
-                            self.error(Some(node), &diagnostics::An_interface_can_only_extend_an_object_type_or_intersection_of_object_types_with_statically_known_members, &[]);
+                            self.error(Some(node), &diagnostics::AN_INTERFACE_CAN_ONLY_EXTEND_AN_OBJECT_TYPE_OR_INTERSECTION_OF_OBJECT_TYPES_WITH_STATICALLY_KNOWN_MEMBERS, &[]);
                         }
                     }
                 }
@@ -449,7 +449,7 @@ impl Checker {
         let s = self.type_to_string_ex(t, None, TypeFormatFlags::WriteArrayAsGenericType, None);
         self.error(
             Some(node),
-            &diagnostics::Type_0_recursively_references_itself_as_a_base_type,
+            &diagnostics::TYPE_0_RECURSIVELY_REFERENCES_ITSELF_AS_A_BASE_TYPE,
             &[&s],
         );
     }
@@ -567,10 +567,11 @@ impl Checker {
             d.declared_members_resolved.set(true);
             d.declared_members.set(members);
             let call_symbol =
-                d.declared_members.get().and_then(|m| m.lookup(InternalSymbolNameCall));
+                d.declared_members.get().and_then(|m| m.lookup(INTERNAL_SYMBOL_NAME_CALL));
             let call_signatures = self.get_signatures_of_symbol(call_symbol);
             d.declared_call_signatures.set(alloc_vec(call_signatures));
-            let new_symbol = d.declared_members.get().and_then(|m| m.lookup(InternalSymbolNameNew));
+            let new_symbol =
+                d.declared_members.get().and_then(|m| m.lookup(INTERNAL_SYMBOL_NAME_NEW));
             let construct_signatures = self.get_signatures_of_symbol(new_symbol);
             d.declared_construct_signatures.set(alloc_vec(construct_signatures));
             let index_infos = self.get_index_infos_of_symbol(t.symbol().unwrap());
@@ -823,7 +824,7 @@ impl Checker {
 
     // checker.go:20143
     pub(crate) fn get_index_symbol(&mut self, symbol: P<Symbol>) -> Option<P<Symbol>> {
-        self.get_members_of_symbol(symbol)?.lookup(InternalSymbolNameIndex)
+        self.get_members_of_symbol(symbol)?.lookup(INTERNAL_SYMBOL_NAME_INDEX)
     }
 
     // checker.go:20147
@@ -907,7 +908,7 @@ impl Checker {
                     param_symbol = resolved_symbol;
                 }
             }
-            if i == 0 && param_symbol.unwrap().name() == InternalSymbolNameThis {
+            if i == 0 && param_symbol.unwrap().name() == INTERNAL_SYMBOL_NAME_THIS {
                 has_this_parameter = true;
                 this_parameter = param.symbol();
             } else {
@@ -1147,16 +1148,16 @@ impl Checker {
                 if let Some(type_node) = type_node {
                     self.error(
                         Some(type_node),
-                        &diagnostics::Return_type_annotation_circularly_references_itself,
+                        &diagnostics::RETURN_TYPE_ANNOTATION_CIRCULARLY_REFERENCES_ITSELF,
                         &[],
                     );
                 } else if self.no_implicit_any {
                     let name = ast::get_name_of_declaration(declaration);
                     if let Some(name) = name {
                         let name_text = tsrs_scanner::declaration_name_to_string(Some(name));
-                        self.error(Some(name), &diagnostics::X_0_implicitly_has_return_type_any_because_it_does_not_have_a_return_type_annotation_and_is_referenced_directly_or_indirectly_in_one_of_its_return_expressions, &[&name_text]);
+                        self.error(Some(name), &diagnostics::X_0_IMPLICITLY_HAS_RETURN_TYPE_ANY_BECAUSE_IT_DOES_NOT_HAVE_A_RETURN_TYPE_ANNOTATION_AND_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ONE_OF_ITS_RETURN_EXPRESSIONS, &[&name_text]);
                     } else {
-                        self.error(Some(declaration), &diagnostics::Function_implicitly_has_return_type_any_because_it_does_not_have_a_return_type_annotation_and_is_referenced_directly_or_indirectly_in_one_of_its_return_expressions, &[]);
+                        self.error(Some(declaration), &diagnostics::FUNCTION_IMPLICITLY_HAS_RETURN_TYPE_ANY_BECAUSE_IT_DOES_NOT_HAVE_A_RETURN_TYPE_ANNOTATION_AND_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ONE_OF_ITS_RETURN_EXPRESSIONS, &[]);
                     }
                 }
             }
@@ -1313,7 +1314,7 @@ impl Checker {
                 // Promise/A+ compatible implementation will always assimilate any foreign promise, so the
                 // return type of the body should be unwrapped to its awaited type, which we will wrap in
                 // the native Promise<T> type later in this function.
-                let awaited = self.check_awaited_type(rt, false /*withAlias*/, fn_ /*errorNode*/, &diagnostics::The_return_type_of_an_async_function_must_either_be_a_valid_promise_or_must_not_contain_a_callable_then_member);
+                let awaited = self.check_awaited_type(rt, false /*withAlias*/, fn_ /*errorNode*/, &diagnostics::THE_RETURN_TYPE_OF_AN_ASYNC_FUNCTION_MUST_EITHER_BE_A_VALID_PROMISE_OR_MUST_NOT_CONTAIN_A_CALLABLE_THEN_MEMBER);
                 rt = self.unwrap_awaited_type(awaited);
             }
             return_type = Some(rt);
@@ -1517,7 +1518,7 @@ impl Checker {
                 // Promise/A+ compatible implementation will always assimilate any foreign promise, so the
                 // return type of the body should be unwrapped to its awaited type, which should be wrapped in
                 // the native Promise<T> type by the caller.
-                let awaited = self.check_awaited_type(t, false /*withAlias*/, fn_, &diagnostics::The_return_type_of_an_async_function_must_either_be_a_valid_promise_or_must_not_contain_a_callable_then_member);
+                let awaited = self.check_awaited_type(t, false /*withAlias*/, fn_, &diagnostics::THE_RETURN_TYPE_OF_AN_ASYNC_FUNCTION_MUST_EITHER_BE_A_VALID_PROMISE_OR_MUST_NOT_CONTAIN_A_CALLABLE_THEN_MEMBER);
                 t = self.unwrap_awaited_type(awaited);
             }
             if t.flags().intersects(TypeFlags::Never) {
@@ -1650,18 +1651,18 @@ impl Checker {
         let promise_type = self.create_promise_type(promised_type);
         if promise_type == self.unknown_type {
             let message: &'static Message = if ast::is_import_call(fn_) {
-                &diagnostics::A_dynamic_import_call_returns_a_Promise_Make_sure_you_have_a_declaration_for_Promise_or_include_ES2015_in_your_lib_option
+                &diagnostics::A_DYNAMIC_IMPORT_CALL_RETURNS_A_PROMISE_MAKE_SURE_YOU_HAVE_A_DECLARATION_FOR_PROMISE_OR_INCLUDE_ES2015_IN_YOUR_LIB_OPTION
             } else {
-                &diagnostics::An_async_function_or_method_must_return_a_Promise_Make_sure_you_have_a_declaration_for_Promise_or_include_ES2015_in_your_lib_option
+                &diagnostics::AN_ASYNC_FUNCTION_OR_METHOD_MUST_RETURN_A_PROMISE_MAKE_SURE_YOU_HAVE_A_DECLARATION_FOR_PROMISE_OR_INCLUDE_ES2015_IN_YOUR_LIB_OPTION
             };
             self.error(Some(fn_), message, &[]);
             return self.error_type;
         }
         if self.get_global_promise_constructor_symbol().is_none() {
             let message: &'static Message = if ast::is_import_call(fn_) {
-                &diagnostics::A_dynamic_import_call_in_ES5_requires_the_Promise_constructor_Make_sure_you_have_a_declaration_for_the_Promise_constructor_or_include_ES2015_in_your_lib_option
+                &diagnostics::A_DYNAMIC_IMPORT_CALL_IN_ES5_REQUIRES_THE_PROMISE_CONSTRUCTOR_MAKE_SURE_YOU_HAVE_A_DECLARATION_FOR_THE_PROMISE_CONSTRUCTOR_OR_INCLUDE_ES2015_IN_YOUR_LIB_OPTION
             } else {
-                &diagnostics::An_async_function_or_method_in_ES5_requires_the_Promise_constructor_Make_sure_you_have_a_declaration_for_the_Promise_constructor_or_include_ES2015_in_your_lib_option
+                &diagnostics::AN_ASYNC_FUNCTION_OR_METHOD_IN_ES5_REQUIRES_THE_PROMISE_CONSTRUCTOR_MAKE_SURE_YOU_HAVE_A_DECLARATION_FOR_THE_PROMISE_CONSTRUCTOR_OR_INCLUDE_ES2015_IN_YOUR_LIB_OPTION
             };
             self.error(Some(fn_), message, &[]);
         }
@@ -1908,7 +1909,7 @@ impl Checker {
                                 let p_name = self.symbol_to_string(p);
                                 let widened = self.get_widened_type(s);
                                 let widened_name = self.type_to_string_exported(widened);
-                                self.error(Some(value_declaration), &diagnostics::Object_literal_s_property_0_implicitly_has_an_1_type, &[&p_name, &widened_name]);
+                                self.error(Some(value_declaration), &diagnostics::OBJECT_LITERAL_S_PROPERTY_0_IMPLICITLY_HAS_AN_1_TYPE, &[&p_name, &widened_name]);
                                 error_reported = true;
                             }
                         }
@@ -2161,10 +2162,11 @@ impl Checker {
         if symbol.flags().intersects(SymbolFlags::TypeLiteral) {
             self.set_structured_type_members(t, None, &[], &[], &[]);
             let members = self.get_members_of_symbol(symbol);
-            let call_signatures = self
-                .get_signatures_of_symbol(members.and_then(|m| m.lookup(InternalSymbolNameCall)));
+            let call_signatures = self.get_signatures_of_symbol(
+                members.and_then(|m| m.lookup(INTERNAL_SYMBOL_NAME_CALL)),
+            );
             let construct_signatures = self
-                .get_signatures_of_symbol(members.and_then(|m| m.lookup(InternalSymbolNameNew)));
+                .get_signatures_of_symbol(members.and_then(|m| m.lookup(INTERNAL_SYMBOL_NAME_NEW)));
             let index_infos = self.get_index_infos_of_symbol(symbol);
             self.set_structured_type_members(
                 t,
@@ -2210,7 +2212,7 @@ impl Checker {
                 base_constructor_index_info = Some(self.any_base_type_index_info);
             }
         }
-        let index_symbol = members.and_then(|m| m.lookup(InternalSymbolNameIndex));
+        let index_symbol = members.and_then(|m| m.lookup(INTERNAL_SYMBOL_NAME_INDEX));
         if let Some(index_symbol) = index_symbol {
             let values = members.map(|m| m.values()).unwrap_or_default();
             index_infos = self.get_index_infos_of_index_symbol(index_symbol, &values);
@@ -2241,7 +2243,7 @@ impl Checker {
         if symbol.flags().intersects(SymbolFlags::Class) {
             let class_type = self.get_declared_type_of_class_or_interface(symbol);
             let constructor_symbol =
-                symbol.members().and_then(|m| m.lookup(InternalSymbolNameConstructor));
+                symbol.members().and_then(|m| m.lookup(INTERNAL_SYMBOL_NAME_CONSTRUCTOR));
             let mut construct_signatures = self.get_signatures_of_symbol(constructor_symbol);
             if construct_signatures.is_empty() {
                 construct_signatures = self.get_default_construct_signatures(class_type);
@@ -3077,7 +3079,7 @@ impl Checker {
                 let mapped_type_name = self.type_to_string_exported(mapped_type);
                 self.error(
                     self.current_node,
-                    &diagnostics::Type_of_property_0_circularly_references_itself_in_mapped_type_1,
+                    &diagnostics::TYPE_OF_PROPERTY_0_CIRCULARLY_REFERENCES_ITSELF_IN_MAPPED_TYPE_1,
                     &[&symbol_name, &mapped_type_name],
                 );
             }
@@ -3615,7 +3617,7 @@ impl Checker {
                         false, /*ignoreThisTypes*/
                         false, /*ignoreReturnTypes*/
                         super::checker::Checker::compare_types_identical,
-                    ) != Ternary::False
+                    ) != Ternary::FALSE
                     {
                         all_different = false;
                         break;

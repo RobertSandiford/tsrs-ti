@@ -4,7 +4,7 @@
 use super::*;
 use printer::{EmitFlags, PrivateIdentifierKind};
 
-impl classFieldsTransformer {
+impl ClassFieldsTransformer {
     // classfields.go:1889
     pub(crate) fn visit_class_declaration(&self, node: P<Node>) -> Option<P<Node>> {
         self.visit_in_new_class_lexical_environment(
@@ -1426,7 +1426,7 @@ impl classFieldsTransformer {
 
     // classfields.go:2910
     pub(crate) fn start_class_lexical_environment(&self) {
-        self.lexical_environment.set(Some(P::new(classLexicalEnv {
+        self.lexical_environment.set(Some(P::new(ClassLexicalEnv {
             previous: self.lexical_environment.get(),
             data: Cell::new(None),
             private_env: Cell::new(None),
@@ -1439,21 +1439,21 @@ impl classFieldsTransformer {
     }
 
     // classfields.go:2918
-    pub(crate) fn get_class_lexical_environment(&self) -> P<classLexicalEnvironment> {
+    pub(crate) fn get_class_lexical_environment(&self) -> P<ClassLexicalEnvironment> {
         assert!(self.lexical_environment.get().is_some());
         let lex = self.lexical_environment.get().unwrap();
         if lex.data.get().is_none() {
-            lex.data.set(Some(P::new(classLexicalEnvironment::default())));
+            lex.data.set(Some(P::new(ClassLexicalEnvironment::default())));
         }
         lex.data.get().unwrap()
     }
 
     // classfields.go:2926
-    pub(crate) fn get_private_identifier_environment(&self) -> P<privateEnvironment> {
+    pub(crate) fn get_private_identifier_environment(&self) -> P<PrivateEnvironment> {
         assert!(self.lexical_environment.get().is_some());
         let lex = self.lexical_environment.get().unwrap();
         if lex.private_env.get().is_none() {
-            lex.private_env.set(Some(P::new(privateEnvironment::default())));
+            lex.private_env.set(Some(P::new(PrivateEnvironment::default())));
         }
         lex.private_env.get().unwrap()
     }
@@ -1484,7 +1484,7 @@ impl classFieldsTransformer {
             self.set_private_identifier(
                 env,
                 name,
-                P::new(privateIdentifierInfo {
+                P::new(PrivateIdentifierInfo {
                     kind: PrivateIdentifierKind::Field,
                     is_static: true,
                     brand_check_identifier,
@@ -1500,7 +1500,7 @@ impl classFieldsTransformer {
             self.set_private_identifier(
                 env,
                 name,
-                P::new(privateIdentifierInfo {
+                P::new(PrivateIdentifierInfo {
                     kind: PrivateIdentifierKind::Field,
                     is_static: false,
                     brand_check_identifier: Some(weak_map_name),
@@ -1526,8 +1526,8 @@ impl classFieldsTransformer {
     pub(crate) fn add_private_identifier_method_to_environment(
         &self,
         name: P<Node>,
-        lex: P<classLexicalEnvironment>,
-        env: P<privateEnvironment>,
+        lex: P<ClassLexicalEnvironment>,
+        env: P<PrivateEnvironment>,
         is_static: bool,
         is_valid: bool,
     ) {
@@ -1545,7 +1545,7 @@ impl classFieldsTransformer {
         self.set_private_identifier(
             env,
             name,
-            P::new(privateIdentifierInfo {
+            P::new(PrivateIdentifierInfo {
                 kind: PrivateIdentifierKind::Method,
                 method_name: Some(method_name),
                 brand_check_identifier,
@@ -1562,11 +1562,11 @@ impl classFieldsTransformer {
     pub(crate) fn add_private_identifier_get_accessor_to_environment(
         &self,
         name: P<Node>,
-        lex: P<classLexicalEnvironment>,
-        env: P<privateEnvironment>,
+        lex: P<ClassLexicalEnvironment>,
+        env: P<PrivateEnvironment>,
         is_static: bool,
         is_valid: bool,
-        previous_info: Option<P<privateIdentifierInfo>>,
+        previous_info: Option<P<PrivateIdentifierInfo>>,
     ) {
         let getter_name = self.create_hoisted_variable_for_private_name(name, "_get");
         let brand_check_identifier: Option<P<Node>>;
@@ -1594,7 +1594,7 @@ impl classFieldsTransformer {
             self.set_private_identifier(
                 env,
                 name,
-                P::new(privateIdentifierInfo {
+                P::new(PrivateIdentifierInfo {
                     kind: PrivateIdentifierKind::Accessor,
                     getter_name: Cell::new(Some(getter_name)),
                     brand_check_identifier,
@@ -1612,11 +1612,11 @@ impl classFieldsTransformer {
     pub(crate) fn add_private_identifier_set_accessor_to_environment(
         &self,
         name: P<Node>,
-        lex: P<classLexicalEnvironment>,
-        env: P<privateEnvironment>,
+        lex: P<ClassLexicalEnvironment>,
+        env: P<PrivateEnvironment>,
         is_static: bool,
         is_valid: bool,
-        previous_info: Option<P<privateIdentifierInfo>>,
+        previous_info: Option<P<PrivateIdentifierInfo>>,
     ) {
         let setter_name = self.create_hoisted_variable_for_private_name(name, "_set");
         let brand_check_identifier: Option<P<Node>>;
@@ -1644,7 +1644,7 @@ impl classFieldsTransformer {
             self.set_private_identifier(
                 env,
                 name,
-                P::new(privateIdentifierInfo {
+                P::new(PrivateIdentifierInfo {
                     kind: PrivateIdentifierKind::Accessor,
                     setter_name: Cell::new(Some(setter_name)),
                     brand_check_identifier,
@@ -1663,8 +1663,8 @@ impl classFieldsTransformer {
         &self,
         node: P<Node>,
         name: P<Node>,
-        lex: P<classLexicalEnvironment>,
-        env: P<privateEnvironment>,
+        lex: P<ClassLexicalEnvironment>,
+        env: P<PrivateEnvironment>,
         is_static: bool,
         is_valid: bool,
     ) {
@@ -1689,7 +1689,7 @@ impl classFieldsTransformer {
         self.set_private_identifier(
             env,
             name,
-            P::new(privateIdentifierInfo {
+            P::new(PrivateIdentifierInfo {
                 kind: PrivateIdentifierKind::Accessor,
                 getter_name: Cell::new(Some(getter_name)),
                 setter_name: Cell::new(Some(setter_name)),
@@ -1743,9 +1743,9 @@ impl classFieldsTransformer {
     // classfields.go:3102
     pub(crate) fn set_private_identifier(
         &self,
-        env: P<privateEnvironment>,
+        env: P<PrivateEnvironment>,
         name: P<Node>,
-        info: P<privateIdentifierInfo>,
+        info: P<PrivateIdentifierInfo>,
     ) {
         if self.emit_context().has_auto_generate_info(Some(name)) {
             env.generated_identifiers
@@ -1759,9 +1759,9 @@ impl classFieldsTransformer {
     // classfields.go:3113
     pub(crate) fn get_private_identifier(
         &self,
-        env: P<privateEnvironment>,
+        env: P<PrivateEnvironment>,
         name: P<Node>,
-    ) -> Option<P<privateIdentifierInfo>> {
+    ) -> Option<P<PrivateIdentifierInfo>> {
         if self.emit_context().has_auto_generate_info(Some(name)) {
             return env
                 .generated_identifiers
@@ -1864,7 +1864,7 @@ impl classFieldsTransformer {
     pub(crate) fn access_private_identifier(
         &self,
         name: P<Node>,
-    ) -> Option<P<privateIdentifierInfo>> {
+    ) -> Option<P<PrivateIdentifierInfo>> {
         let mut env = self.lexical_environment.get();
         while let Some(e) = env {
             if let Some(private_env) = e.private_env.get() {
@@ -2147,7 +2147,7 @@ pub(crate) fn create_private_instance_method_initializer(
     factory.new_method_call(weak_set_name, factory.new_identifier("add"), vec![receiver])
 }
 
-impl classFieldsTransformer {
+impl ClassFieldsTransformer {
     // classfields.go:3391
     pub(crate) fn is_reserved_private_name(&self, node: P<Node>) -> bool {
         !(ast::is_private_identifier(node)
@@ -2162,7 +2162,7 @@ pub(crate) fn is_static_property_declaration_or_class_static_block(node: P<Node>
         || (ast::is_property_declaration(node) && ast::has_static_modifier(node))
 }
 
-impl classFieldsTransformer {
+impl ClassFieldsTransformer {
     // classfields.go:3400
     pub(crate) fn get_properties(
         node: P<Node>,
@@ -2244,7 +2244,7 @@ pub(crate) fn create_member_access_for_property_name(
     expression
 }
 
-impl classFieldsTransformer {
+impl ClassFieldsTransformer {
     // classfields.go:3457
     // Returns (thisArg, target).
     pub(crate) fn create_call_binding(&self, node: P<Node>) -> (P<Node>, P<Node>) {
@@ -2288,7 +2288,7 @@ pub(crate) fn should_be_captured_in_temp_variable(node: P<Node>) -> bool {
     )
 }
 
-impl classFieldsTransformer {
+impl ClassFieldsTransformer {
     // classfields.go:3493
     pub(crate) fn create_accessor_property_get_redirector(
         &self,
@@ -2453,8 +2453,8 @@ pub(crate) fn expand_pre_or_postfix_increment_or_decrement_expression(
 }
 
 // Go `&privateIdentifierInfo{kind: ...}` with every other field at its zero value.
-pub(crate) fn new_private_identifier_info(kind: PrivateIdentifierKind) -> P<privateIdentifierInfo> {
-    P::new(privateIdentifierInfo {
+pub(crate) fn new_private_identifier_info(kind: PrivateIdentifierKind) -> P<PrivateIdentifierInfo> {
+    P::new(PrivateIdentifierInfo {
         kind,
         brand_check_identifier: None,
         is_static: false,

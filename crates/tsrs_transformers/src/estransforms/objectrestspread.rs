@@ -2,7 +2,7 @@ use crate::*;
 use tsrs_core::TextRange;
 
 // objectrestspread.go:10
-pub struct objectRestSpreadTransformer {
+pub struct ObjectRestSpreadTransformer {
     pub base: Transformer,
     pub compiler_options: P<CompilerOptions>,
 
@@ -12,7 +12,7 @@ pub struct objectRestSpreadTransformer {
     pub parameters_with_preceding_object_rest_or_spread: RefCell<Option<FxHashSet<P<Node>>>>,
 }
 
-impl objectRestSpreadTransformer {
+impl ObjectRestSpreadTransformer {
     fn emit_context(&self) -> P<EmitContext> {
         self.base.emit_context()
     }
@@ -731,7 +731,7 @@ impl objectRestSpreadTransformer {
     reason = "Transformer factories share an optional result so disabled transforms can return None."
 )]
 pub fn new_object_rest_spread_transformer(opt: &TransformOptions) -> Option<P<Transformer>> {
-    let tx = P::new(objectRestSpreadTransformer {
+    let tx = P::new(ObjectRestSpreadTransformer {
         base: Transformer::default(),
         compiler_options: opt.compiler_options,
         in_exported_variable_statement: Cell::new(false),

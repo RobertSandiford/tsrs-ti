@@ -92,7 +92,7 @@ impl LanguageService {
                 continue;
             };
             candidates.extend(span_map.segments().into_iter().filter_map(|segment| {
-                if segment.kind != spanmap::Kind::Verbatim
+                if segment.kind != spanmap::Kind::VERBATIM
                     || !segment.features.intersects(Feature::Formatting)
                 {
                     return None;

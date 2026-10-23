@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Default)]
-pub(crate) struct externalModuleInfo {
+pub(crate) struct ExternalModuleInfo {
     pub(crate) external_imports: Vec<P<Node>>, // ImportDeclaration | ImportEqualsDeclaration | ExportDeclaration. imports and reexports of other external modules
     pub(crate) export_specifiers: MultiMap<&'static str, P<Node>>, // Maps local names to their associated export specifiers (excludes reexports)
     pub(crate) exported_bindings: MultiMap<P<Node>, P<Node>>, // Maps local declarations to their associated export aliases
@@ -11,13 +11,13 @@ pub(crate) struct externalModuleInfo {
     pub(crate) has_export_stars_to_export_values: bool, // whether this module contains export*
 }
 
-struct externalModuleInfoCollector {
+struct ExternalModuleInfoCollector {
     source_file: P<SourceFile>,
     emit_context: P<EmitContext>,
     resolver: ReferenceResolverRef,
     unique_exports: Set<&'static str>,
     has_export_default: bool,
-    output: externalModuleInfo,
+    output: ExternalModuleInfo,
 }
 
 // externalmoduleinfo.go:35
@@ -26,21 +26,21 @@ pub(crate) fn collect_external_module_info(
     _compiler_options: P<CompilerOptions>,
     emit_context: P<EmitContext>,
     resolver: ReferenceResolverRef,
-) -> externalModuleInfo {
-    let c = externalModuleInfoCollector {
+) -> ExternalModuleInfo {
+    let c = ExternalModuleInfoCollector {
         source_file,
         emit_context,
         resolver,
         unique_exports: Set::default(),
         has_export_default: false,
-        output: externalModuleInfo::default(),
+        output: ExternalModuleInfo::default(),
     };
     c.collect()
 }
 
-impl externalModuleInfoCollector {
+impl ExternalModuleInfoCollector {
     // externalmoduleinfo.go:46
-    fn collect(mut self) -> externalModuleInfo {
+    fn collect(mut self) -> ExternalModuleInfo {
         let mut has_import_star = false;
         let mut has_import_default = false;
         for &node in self.source_file.statements.nodes() {
@@ -297,7 +297,7 @@ impl externalModuleInfoCollector {
     }
 }
 
-const externalHelpersModuleNameText: &str = "tslib";
+const EXTERNAL_HELPERS_MODULE_NAME_TEXT: &str = "tslib";
 
 // externalmoduleinfo.go:257
 pub(crate) fn create_external_helpers_import_declaration_if_needed(
@@ -315,8 +315,8 @@ pub(crate) fn create_external_helpers_import_declaration_if_needed(
         let f = &emit_context.get().factory;
         let module_kind = compiler_options.get_emit_module_kind();
         let helpers = get_imported_helpers(emit_context, source_file);
-        if file_module_kind == ModuleKind::CommonJS
-            || file_module_kind == ModuleKind::None && module_kind == ModuleKind::CommonJS
+        if file_module_kind == ModuleKind::COMMON_JS
+            || file_module_kind == ModuleKind::NONE && module_kind == ModuleKind::COMMON_JS
         {
             // When we emit to a non-ES module, generate a synthetic `import tslib = require("tslib")` to be further transformed.
             let external_helpers_module_name = get_or_create_external_helpers_module_name_if_needed(
@@ -334,7 +334,7 @@ pub(crate) fn create_external_helpers_import_declaration_if_needed(
                     false, /*isTypeOnly*/
                     external_helpers_module_name,
                     f.new_external_module_reference(
-                        f.new_string_literal(externalHelpersModuleNameText, TokenFlags::None),
+                        f.new_string_literal(EXTERNAL_HELPERS_MODULE_NAME_TEXT, TokenFlags::None),
                     ),
                 );
                 emit_context
@@ -390,7 +390,7 @@ pub(crate) fn create_external_helpers_import_declaration_if_needed(
                         None,          /*name*/
                         Some(named_bindings),
                     )),
-                    f.new_string_literal(externalHelpersModuleNameText, TokenFlags::None),
+                    f.new_string_literal(EXTERNAL_HELPERS_MODULE_NAME_TEXT, TokenFlags::None),
                     None, /*attributes*/
                 );
 
@@ -435,11 +435,11 @@ fn get_or_create_external_helpers_module_name_if_needed(
 
     let create = !helpers.is_empty()
         || (has_export_stars_to_export_values || has_import_star_or_import_default)
-            && file_module_kind < ModuleKind::System;
+            && file_module_kind < ModuleKind::SYSTEM;
 
     if create {
         let external_helpers_module_name =
-            emit_context.factory.new_unique_name(externalHelpersModuleNameText);
+            emit_context.factory.new_unique_name(EXTERNAL_HELPERS_MODULE_NAME_TEXT);
         emit_context.set_external_helpers_module_name(node, external_helpers_module_name);
         return Some(external_helpers_module_name);
     }

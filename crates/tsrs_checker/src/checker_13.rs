@@ -791,8 +791,8 @@ impl Checker {
         type_set: &mut Vec<P<Type>>,
     ) -> P<Type> {
         type_set.reserve(types.len());
-        let mut ordered_types: orderedSet<P<Type>> =
-            orderedSet { values_by_key: None, values: std::mem::take(type_set) };
+        let mut ordered_types: CheckerOrderedSet<P<Type>> =
+            CheckerOrderedSet { values_by_key: None, values: std::mem::take(type_set) };
         let includes =
             self.add_types_to_intersection(&mut ordered_types, TypeFlags::empty(), types);
         *type_set = ordered_types.values;
@@ -1098,7 +1098,7 @@ impl Checker {
     // checker.go:26721
     pub(crate) fn add_types_to_intersection(
         &mut self,
-        type_set: &mut orderedSet<P<Type>>,
+        type_set: &mut CheckerOrderedSet<P<Type>>,
         includes: TypeFlags,
         types: &[P<Type>],
     ) -> TypeFlags {
@@ -1113,7 +1113,7 @@ impl Checker {
     // checker.go:26728
     pub(crate) fn add_type_to_intersection(
         &mut self,
-        type_set: &mut orderedSet<P<Type>>,
+        type_set: &mut CheckerOrderedSet<P<Type>>,
         includes: TypeFlags,
         t: P<Type>,
     ) -> TypeFlags {
@@ -1889,13 +1889,13 @@ impl Checker {
                 } else if self.checking_file.is_some() {
                     self.too_complex_nodes.push(node);
                 } else {
-                    self.error(Some(node), &diagnostics::Expression_produces_a_union_type_that_is_too_complex_to_represent, &[]);
+                    self.error(Some(node), &diagnostics::EXPRESSION_PRODUCES_A_UNION_TYPE_THAT_IS_TOO_COMPLEX_TO_REPRESENT, &[]);
                 }
             }
             location => {
                 self.error(
                     location,
-                    &diagnostics::Expression_produces_a_union_type_that_is_too_complex_to_represent,
+                    &diagnostics::EXPRESSION_PRODUCES_A_UNION_TYPE_THAT_IS_TOO_COMPLEX_TO_REPRESENT,
                     &[],
                 );
             }
@@ -1921,7 +1921,7 @@ impl Checker {
         for node in std::mem::take(&mut self.too_complex_nodes) {
             self.error(
                 Some(node),
-                &diagnostics::Expression_produces_a_union_type_that_is_too_complex_to_represent,
+                &diagnostics::EXPRESSION_PRODUCES_A_UNION_TYPE_THAT_IS_TOO_COMPLEX_TO_REPRESENT,
                 &[],
             );
         }
@@ -2095,7 +2095,7 @@ impl Checker {
             let late_bound = self.get_late_bound_symbol(prop);
             let mut t = self.value_symbol_links.get(late_bound).name_type();
             if t.is_none() {
-                if prop.name() == InternalSymbolNameDefault {
+                if prop.name() == INTERNAL_SYMBOL_NAME_DEFAULT {
                     t = Some(self.get_string_literal_type("default"));
                 } else {
                     let name = get_name_of_declaration(prop.value_declaration());
@@ -2130,7 +2130,7 @@ impl Checker {
             return self.get_regular_type_of_literal_type(t);
         }
         let property_name = get_property_name_for_property_name_node(name);
-        if property_name != InternalSymbolNameMissing {
+        if property_name != INTERNAL_SYMBOL_NAME_MISSING {
             return self.get_string_literal_type(&property_name);
         }
         if is_expression(name) {
@@ -2183,7 +2183,7 @@ impl Checker {
                     self.string_number_symbol_type,
                 )
             {
-                self.error(Some(node), &diagnostics::A_computed_property_name_must_be_of_type_string_number_symbol_or_any, &[]);
+                self.error(Some(node), &diagnostics::A_COMPUTED_PROPERTY_NAME_MUST_BE_OF_TYPE_STRING_NUMBER_SYMBOL_OR_ANY, &[]);
             }
         }
         links.resolved_type.get().unwrap()
@@ -2661,7 +2661,7 @@ impl Checker {
         let mut has_prop_name = false;
         if !access_node.is_some_and(is_private_identifier) {
             prop_name = Self::get_property_name_from_index(index_type, access_node);
-            has_prop_name = prop_name != InternalSymbolNameMissing;
+            has_prop_name = prop_name != INTERNAL_SYMBOL_NAME_MISSING;
         }
         if has_prop_name {
             if access_flags.intersects(AccessFlags::Contextual) {
@@ -2710,7 +2710,7 @@ impl Checker {
                                     .as_element_access_expression()
                                     .argument_expression,
                             ),
-                            &diagnostics::Cannot_assign_to_0_because_it_is_a_read_only_property,
+                            &diagnostics::CANNOT_ASSIGN_TO_0_BECAUSE_IT_IS_A_READ_ONLY_PROPERTY,
                             &[&name],
                         );
                         return None;
@@ -2760,7 +2760,7 @@ impl Checker {
                         if index < jsnum::Number(0.0) {
                             self.error(
                                 index_node,
-                                &diagnostics::A_tuple_type_cannot_be_indexed_with_a_negative_value,
+                                &diagnostics::A_TUPLE_TYPE_CANNOT_BE_INDEXED_WITH_A_NEGATIVE_VALUE,
                                 &[],
                             );
                             return Some(self.undefined_type);
@@ -2769,14 +2769,14 @@ impl Checker {
                         let arity = Self::get_type_reference_arity(object_type);
                         self.error(
                             index_node,
-                            &diagnostics::Tuple_type_0_of_length_1_has_no_element_at_index_2,
+                            &diagnostics::TUPLE_TYPE_0_OF_LENGTH_1_HAS_NO_ELEMENT_AT_INDEX_2,
                             &[&type_string, &arity, &prop_name],
                         );
                     } else {
                         let type_string = self.type_to_string_exported(object_type);
                         self.error(
                             index_node,
-                            &diagnostics::Property_0_does_not_exist_on_type_1,
+                            &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                             &[&prop_name, &type_string],
                         );
                     }
@@ -2827,7 +2827,7 @@ impl Checker {
                             let type_string = self.type_to_string_exported(original_object_type);
                             self.error(
                                 Some(access_expression),
-                                &diagnostics::Type_0_is_generic_and_can_only_be_indexed_for_reading,
+                                &diagnostics::TYPE_0_IS_GENERIC_AND_CAN_ONLY_BE_INDEXED_FOR_READING,
                                 &[&type_string],
                             );
                         } else {
@@ -2835,7 +2835,7 @@ impl Checker {
                             let type_string = self.type_to_string_exported(original_object_type);
                             self.error(
                                 Some(access_expression),
-                                &diagnostics::Type_0_cannot_be_used_to_index_type_1,
+                                &diagnostics::TYPE_0_CANNOT_BE_USED_TO_INDEX_TYPE_1,
                                 &[&index_string, &type_string],
                             );
                         }
@@ -2853,7 +2853,7 @@ impl Checker {
                     let index_string = self.type_to_string_exported(index_type);
                     self.error(
                         index_node,
-                        &diagnostics::Type_0_cannot_be_used_as_an_index_type,
+                        &diagnostics::TYPE_0_CANNOT_BE_USED_AS_AN_INDEX_TYPE,
                         &[&index_string],
                     );
                     if access_flags.intersects(AccessFlags::IncludeUndefined) {
@@ -2902,7 +2902,7 @@ impl Checker {
                         let type_string = self.type_to_string_exported(object_type);
                         self.add_diagnostic(create_diagnostic_for_node(
                             Some(access_expression),
-                            &diagnostics::Property_0_does_not_exist_on_type_1,
+                            &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                             &[&value, &type_string],
                         ));
                         return Some(self.undefined_type);
@@ -2930,7 +2930,7 @@ impl Checker {
                     let type_string = self.type_to_string_exported(object_type);
                     self.error(
                         Some(access_expression),
-                        &diagnostics::Property_0_does_not_exist_on_type_1,
+                        &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                         &[&prop_name, &type_string],
                     );
                 } else if self.no_implicit_any
@@ -2947,9 +2947,9 @@ impl Checker {
                                     .argument_expression,
                             )
                             + "]";
-                        self.error(Some(access_expression), &diagnostics::Property_0_does_not_exist_on_type_1_Did_you_mean_to_access_the_static_member_2_instead, &[&prop_name /* as string */, &type_name, &suggestion]);
+                        self.error(Some(access_expression), &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1_DID_YOU_MEAN_TO_ACCESS_THE_STATIC_MEMBER_2_INSTEAD, &[&prop_name /* as string */, &type_name, &suggestion]);
                     } else if self.get_index_type_of_type(object_type, number_type).is_some() {
-                        self.error(Some(access_expression.as_element_access_expression().argument_expression), &diagnostics::Element_implicitly_has_an_any_type_because_index_expression_is_not_of_type_number, &[]);
+                        self.error(Some(access_expression.as_element_access_expression().argument_expression), &diagnostics::ELEMENT_IMPLICITLY_HAS_AN_ANY_TYPE_BECAUSE_INDEX_EXPRESSION_IS_NOT_OF_TYPE_NUMBER, &[]);
                     } else {
                         let mut suggestion = String::new();
                         if has_prop_name {
@@ -2964,7 +2964,7 @@ impl Checker {
                                         .as_element_access_expression()
                                         .argument_expression,
                                 ),
-                                &diagnostics::Property_0_does_not_exist_on_type_1_Did_you_mean_2,
+                                &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1_DID_YOU_MEAN_2,
                                 &[&prop_name /* as string */, &type_string, &suggestion],
                             );
                         } else {
@@ -2975,7 +2975,7 @@ impl Checker {
                             );
                             if !suggestion.is_empty() {
                                 let type_string = self.type_to_string_exported(object_type);
-                                self.error(Some(access_expression), &diagnostics::Element_implicitly_has_an_any_type_because_type_0_has_no_index_signature_Did_you_mean_to_call_1, &[&type_string, &suggestion]);
+                                self.error(Some(access_expression), &diagnostics::ELEMENT_IMPLICITLY_HAS_AN_ANY_TYPE_BECAUSE_TYPE_0_HAS_NO_INDEX_SIGNATURE_DID_YOU_MEAN_TO_CALL_1, &[&type_string, &suggestion]);
                             } else {
                                 let mut diagnostic: Option<P<Diagnostic>> = None;
                                 if index_type.flags().intersects(TypeFlags::EnumLiteral) {
@@ -2985,7 +2985,7 @@ impl Checker {
                                     let type_string = self.type_to_string_exported(object_type);
                                     diagnostic = Some(new_diagnostic_for_node(
                                         Some(access_expression),
-                                        Some(&diagnostics::Property_0_does_not_exist_on_type_1),
+                                        Some(&diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1),
                                         &[&name, &type_string],
                                     ));
                                 } else if index_type.flags().intersects(TypeFlags::UniqueESSymbol) {
@@ -2997,7 +2997,7 @@ impl Checker {
                                     let type_string = self.type_to_string_exported(object_type);
                                     diagnostic = Some(new_diagnostic_for_node(
                                         Some(access_expression),
-                                        Some(&diagnostics::Property_0_does_not_exist_on_type_1),
+                                        Some(&diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1),
                                         &[&name, &type_string],
                                     ));
                                 } else if (index_type.flags().intersects(TypeFlags::StringLiteral))
@@ -3009,7 +3009,7 @@ impl Checker {
                                     let type_string = self.type_to_string_exported(object_type);
                                     diagnostic = Some(new_diagnostic_for_node(
                                         Some(access_expression),
-                                        Some(&diagnostics::Property_0_does_not_exist_on_type_1),
+                                        Some(&diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1),
                                         &[&value, &type_string],
                                     ));
                                 } else if index_type
@@ -3018,7 +3018,7 @@ impl Checker {
                                 {
                                     let index_string = self.type_to_string_exported(index_type);
                                     let type_string = self.type_to_string_exported(object_type);
-                                    diagnostic = Some(new_diagnostic_for_node(Some(access_expression), Some(&diagnostics::No_index_signature_with_a_parameter_of_type_0_was_found_on_type_1), &[&index_string, &type_string]));
+                                    diagnostic = Some(new_diagnostic_for_node(Some(access_expression), Some(&diagnostics::NO_INDEX_SIGNATURE_WITH_A_PARAMETER_OF_TYPE_0_WAS_FOUND_ON_TYPE_1), &[&index_string, &type_string]));
                                 }
                                 let full_index_string =
                                     self.type_to_string_exported(full_index_type);
@@ -3026,7 +3026,7 @@ impl Checker {
                                 self.add_diagnostic(new_diagnostic_chain_for_node(
                                     diagnostic,
                                     access_expression,
-                                    Some(&diagnostics::Element_implicitly_has_an_any_type_because_expression_of_type_0_can_t_be_used_to_index_type_1),
+                                    Some(&diagnostics::ELEMENT_IMPLICITLY_HAS_AN_ANY_TYPE_BECAUSE_EXPRESSION_OF_TYPE_0_CAN_T_BE_USED_TO_INDEX_TYPE_1),
                                     &[&full_index_string, &type_string],
                                 ));
                             }
@@ -3054,7 +3054,7 @@ impl Checker {
                 let type_string = self.type_to_string_exported(object_type);
                 self.error(
                     Some(index_node),
-                    &diagnostics::Property_0_does_not_exist_on_type_1,
+                    &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                     &[&value, &type_string],
                 );
             } else if index_type.flags().intersects(TypeFlags::String | TypeFlags::Number) {
@@ -3062,7 +3062,7 @@ impl Checker {
                 let index_string = self.type_to_string_exported(index_type);
                 self.error(
                     Some(index_node),
-                    &diagnostics::Type_0_has_no_matching_index_signature_for_type_1,
+                    &diagnostics::TYPE_0_HAS_NO_MATCHING_INDEX_SIGNATURE_FOR_TYPE_1,
                     &[&type_string, &index_string],
                 );
             } else {
@@ -3073,7 +3073,7 @@ impl Checker {
                 };
                 self.error(
                     Some(index_node),
-                    &diagnostics::Type_0_cannot_be_used_as_an_index_type,
+                    &diagnostics::TYPE_0_CANNOT_BE_USED_AS_AN_INDEX_TYPE,
                     &[&type_string],
                 );
             }
@@ -3199,7 +3199,7 @@ impl Checker {
                 let type_string = self.type_to_string_exported(object_type);
                 self.error(
                     Some(access_expression),
-                    &diagnostics::Index_signature_in_type_0_only_permits_reading,
+                    &diagnostics::INDEX_SIGNATURE_IN_TYPE_0_ONLY_PERMITS_READING,
                     &[&type_string],
                 );
             }
@@ -3286,7 +3286,7 @@ impl Checker {
     ) -> bool {
         let mut constructor: Option<P<Node>> = None;
         let (kind, location) = self.is_constructor_declared_this_property(prop);
-        if kind == thisAssignmentDeclarationKind::Constructor {
+        if kind == ThisAssignmentDeclarationKind::Constructor {
             constructor = location;
         } else if is_this_property(node) && self.is_auto_typed_property(prop) {
             constructor = Self::get_declaring_constructor(prop);
@@ -3336,7 +3336,7 @@ impl Checker {
         if let Some(access_node) = access_node.filter(|&n| is_property_name(n)) {
             return get_property_name_for_property_name_node(access_node);
         }
-        InternalSymbolNameMissing.into()
+        INTERNAL_SYMBOL_NAME_MISSING.into()
     }
 
     // checker.go:27835
@@ -3524,7 +3524,7 @@ impl Checker {
                     let type_string = self.type_to_string_exported(t);
                     let diagnostic = self.error(
                         Some(error_node),
-                        &diagnostics::Type_parameter_0_has_a_circular_constraint,
+                        &diagnostics::TYPE_PARAMETER_0_HAS_A_CIRCULAR_CONSTRAINT,
                         &[&type_string],
                     );
                     if let Some(current_node) = self.current_node {
@@ -3533,7 +3533,7 @@ impl Checker {
                         {
                             diagnostic.add_related_info(new_diagnostic_for_node(
                                 Some(current_node),
-                                Some(&diagnostics::Circularity_originates_in_type_at_this_location),
+                                Some(&diagnostics::CIRCULARITY_ORIGINATES_IN_TYPE_AT_THIS_LOCATION),
                                 &[],
                             ));
                         }
@@ -3885,26 +3885,26 @@ impl Checker {
         // - they are public properties with identical names, optionality, and types,
         // - they are private or protected properties originating in the same declaration and having identical types
         if source_prop == target_prop {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         let source_prop_accessibility = get_declaration_modifier_flags_from_symbol(source_prop)
             & ModifierFlags::NonPublicAccessibilityModifier;
         let target_prop_accessibility = get_declaration_modifier_flags_from_symbol(target_prop)
             & ModifierFlags::NonPublicAccessibilityModifier;
         if source_prop_accessibility != target_prop_accessibility {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         if source_prop_accessibility != ModifierFlags::None {
             if self.get_target_symbol(source_prop) != self.get_target_symbol(target_prop) {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         } else if (source_prop.flags() & SymbolFlags::Optional)
             != (target_prop.flags() & SymbolFlags::Optional)
         {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         if self.is_readonly_symbol(source_prop) != self.is_readonly_symbol(target_prop) {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         let s = self.get_non_missing_type_of_symbol(source_prop);
         let t = self.get_non_missing_type_of_symbol(target_prop);
@@ -3915,9 +3915,9 @@ impl Checker {
 // checker.go:28169
 pub(crate) fn compare_types_equal(s: P<Type>, t: P<Type>) -> Ternary {
     if s == t {
-        return Ternary::True;
+        return Ternary::TRUE;
     }
-    Ternary::False
+    Ternary::FALSE
 }
 
 impl Checker {

@@ -120,7 +120,7 @@ impl LanguageService {
                     closing_element = Some(grandparent.as_jsx_element().closing_element);
                 }
                 let mut highlights: Vec<lsproto::DocumentHighlight> = Vec::new();
-                let kind = lsproto::DocumentHighlightKind::Read;
+                let kind = lsproto::DocumentHighlightKind::READ;
                 if let Some(opening_element) = opening_element {
                     let (lsp_range, fidelity) = self.create_lsp_range_from_node_for_feature(
                         opening_element,
@@ -276,7 +276,7 @@ impl LanguageService {
         let entry = self.resolve_entry(entry);
         let file_name = entry.source_file.get().unwrap().original_file_name().to_string();
 
-        let mut kind = lsproto::DocumentHighlightKind::Read;
+        let mut kind = lsproto::DocumentHighlightKind::READ;
         let Some(lsp_range) =
             self.get_range_of_entry_for_feature(entry, Feature::DocumentHighlights)
         else {
@@ -291,7 +291,7 @@ impl LanguageService {
 
         // Determine write access for node references.
         if ast::is_write_access_for_reference(entry.node.unwrap()) {
-            kind = lsproto::DocumentHighlightKind::Write;
+            kind = lsproto::DocumentHighlightKind::WRITE;
         }
 
         let dh = lsproto::DocumentHighlight { range: lsp_range, kind: Some(kind) };
@@ -432,7 +432,7 @@ impl LanguageService {
             return Vec::new();
         }
         let mut highlights: Vec<lsproto::DocumentHighlight> = Vec::new();
-        let kind = lsproto::DocumentHighlightKind::Read;
+        let kind = lsproto::DocumentHighlightKind::READ;
         highlights.extend(nodes.iter().filter_map(|&node| {
             let (lsp_range, fidelity) = self.create_lsp_range_from_node_for_feature(
                 node,
@@ -486,7 +486,7 @@ impl LanguageService {
         source_file: P<SourceFile>,
     ) -> Vec<lsproto::DocumentHighlight> {
         let keywords = get_if_else_keywords(if_statement, source_file);
-        let kind = lsproto::DocumentHighlightKind::Read;
+        let kind = lsproto::DocumentHighlightKind::READ;
         let mut highlights: Vec<lsproto::DocumentHighlight> = Vec::new();
 
         // We'd like to highlight else/ifs together if they are only separated by whitespace

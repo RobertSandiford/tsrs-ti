@@ -155,7 +155,7 @@ fn test_process_spawner_runs_header_mapper() {
             virtual_end: header_len + content_len,
             original_start: 0,
             original_end: content_len,
-            kind: Kind::Verbatim,
+            kind: Kind::VERBATIM,
             features: Feature::All,
         }]
     );

@@ -834,7 +834,7 @@ impl NodeBuilderImpl {
                 {
                     pt = Some(pseudochecker::new_pseudo_type_union(&[
                         pt.unwrap(),
-                        *pseudochecker::PseudoTypeUndefined,
+                        *pseudochecker::PSEUDO_TYPE_UNDEFINED,
                     ]));
                 }
                 result = self.pseudo_type_to_node_with_checker_fallback(c, pt.unwrap(), t);
@@ -858,7 +858,7 @@ impl NodeBuilderImpl {
                 if should_add_undefined {
                     pt = Some(pseudochecker::new_pseudo_type_union(&[
                         pt.unwrap(),
-                        *pseudochecker::PseudoTypeUndefined,
+                        *pseudochecker::PSEUDO_TYPE_UNDEFINED,
                     ]));
                     if self.pseudo_type_equivalent_to_type(c, pt, Some(t), false, report_errors) {
                         result = self.pseudo_type_to_node_with_checker_fallback(c, pt.unwrap(), t);
@@ -1004,17 +1004,17 @@ pub(crate) fn classify_property_name(
     name: &str,
     string_named: bool,
     is_method: bool,
-) -> propertyNameNodeKind {
+) -> PropertyNameNodeKind {
     if is_method && name == "new" {
-        return propertyNameNodeKind::StringLiteral;
+        return PropertyNameNodeKind::StringLiteral;
     }
     if tsrs_scanner::is_identifier_text(name, LanguageVariant::Standard) {
-        return propertyNameNodeKind::Identifier;
+        return PropertyNameNodeKind::Identifier;
     }
     if !string_named && is_numeric_literal_name(name) && jsnum::from_string(name).0 >= 0.0 {
-        propertyNameNodeKind::NumericLiteral
+        PropertyNameNodeKind::NumericLiteral
     } else {
-        propertyNameNodeKind::StringLiteral
+        PropertyNameNodeKind::StringLiteral
     }
 }
 
@@ -1030,11 +1030,11 @@ impl NodeBuilderImpl {
         symbol: P<Symbol>,
     ) -> P<Node> {
         match classify_property_name(name, string_named, is_method) {
-            propertyNameNodeKind::Identifier => self.new_identifier(c, name, Some(symbol)),
-            propertyNameNodeKind::NumericLiteral => {
+            PropertyNameNodeKind::Identifier => self.new_identifier(c, name, Some(symbol)),
+            PropertyNameNodeKind::NumericLiteral => {
                 self.f.new_numeric_literal(self.f.alloc_text(name), TokenFlags::None)
             }
-            propertyNameNodeKind::StringLiteral => self.f.new_string_literal(
+            PropertyNameNodeKind::StringLiteral => self.f.new_string_literal(
                 self.f.alloc_text(name),
                 if single_quote { TokenFlags::SingleQuote } else { TokenFlags::None },
             ),
@@ -1099,7 +1099,7 @@ impl NodeBuilderImpl {
         }
 
         let mut name: String = symbol.name().to_string();
-        let private_name_prefix = format!("{InternalSymbolNamePrefix}#");
+        let private_name_prefix = format!("{INTERNAL_SYMBOL_NAME_PREFIX}#");
         if name.starts_with(&private_name_prefix) {
             // symbol IDs are unstable - replace #nnn# with #private#
             name = name[private_name_prefix.len()..].to_string();
@@ -3028,7 +3028,7 @@ impl NodeBuilderImpl {
     pub(crate) fn mark_symbol_name_literal(&self, node: P<Node>) -> P<Node> {
         if ast::is_string_literal(node)
             && node.text().len() > 1
-            && node.text().as_bytes()[0] == InternalSymbolNamePrefixByte
+            && node.text().as_bytes()[0] == INTERNAL_SYMBOL_NAME_PREFIX_BYTE
         {
             self.e.add_emit_flags(node, EmitFlags::InternalSymbolName);
         }

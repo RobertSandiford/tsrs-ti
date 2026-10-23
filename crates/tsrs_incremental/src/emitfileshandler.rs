@@ -20,13 +20,13 @@ use crate::snapshot::{
     get_pending_emit_kind, get_text_handling_source_map_for_signature,
 };
 
-struct emitUpdate {
+struct EmitUpdate {
     pending_kind: FileEmitKind,
     result: Option<EmitResult>,
     dts_errors_from_cache: bool,
 }
 
-struct emitFilesHandler<'a> {
+struct EmitFilesHandler<'a> {
     ctx: &'a Context,
     program: P<Program>,
     is_for_dts_errors: bool,
@@ -34,11 +34,11 @@ struct emitFilesHandler<'a> {
     emit_signatures: Mutex<FxHashMap<Path, EmitSignature>>,
     latest_changed_dts_files: Mutex<FxHashMap<Path, String>>,
     deleted_pending_kinds: Mutex<FxHashSet<Path>>,
-    emit_updates: Mutex<FxHashMap<Path, emitUpdate>>,
+    emit_updates: Mutex<FxHashMap<Path, EmitUpdate>>,
     has_emit_diagnostics: AtomicBool,
 }
 
-impl<'a> emitFilesHandler<'a> {
+impl<'a> EmitFilesHandler<'a> {
     // Determining what all is pending to be emitted based on previous options or previous file emit flags
     // emitfileshandler.go:33
     fn get_pending_emit_kind_for_emit_options(
@@ -204,7 +204,7 @@ impl<'a> emitFilesHandler<'a> {
             // Update the pendingEmit for the file
             self.emit_updates.lock().unwrap().insert(
                 path,
-                emitUpdate {
+                EmitUpdate {
                     pending_kind: get_pending_emit_kind(emit_kind, pending_kind),
                     result,
                     dts_errors_from_cache: false,
@@ -238,7 +238,7 @@ impl<'a> emitFilesHandler<'a> {
                 self.program.snapshot.affected_files_pending_emit.load(&path).unwrap_or_default();
             self.emit_updates.lock().unwrap().insert(
                 path,
-                emitUpdate {
+                EmitUpdate {
                     pending_kind,
                     result: Some(EmitResult {
                         emit_skipped: true,
@@ -551,7 +551,7 @@ pub(crate) fn emit_files(
     options: &EmitOptions,
     is_for_dts_errors: bool,
 ) -> Option<EmitResult> {
-    let emit_handler = emitFilesHandler {
+    let emit_handler = EmitFilesHandler {
         ctx,
         program,
         is_for_dts_errors,

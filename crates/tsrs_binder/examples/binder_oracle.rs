@@ -25,7 +25,7 @@ fn binder_node_flags() -> NodeFlags {
 }
 
 fn printed_name(s: &str) -> String {
-    s.replace(tsrs_ast::InternalSymbolNamePrefix, "@@")
+    s.replace(tsrs_ast::INTERNAL_SYMBOL_NAME_PREFIX, "@@")
 }
 
 fn escape(sb: &mut String, s: &str) {

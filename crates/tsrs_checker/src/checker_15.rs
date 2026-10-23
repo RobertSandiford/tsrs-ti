@@ -1961,7 +1961,7 @@ impl Checker {
         if t.flags().intersects(TypeFlags::Union) {
             if self.awaited_type_stack.contains(&t) {
                 if error_node.is_some() {
-                    self.error(error_node, &diagnostics::Type_is_referenced_directly_or_indirectly_in_the_fulfillment_callback_of_its_own_then_method, &[]);
+                    self.error(error_node, &diagnostics::TYPE_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_THE_FULFILLMENT_CALLBACK_OF_ITS_OWN_THEN_METHOD, &[]);
                 }
                 return None;
             }
@@ -2028,7 +2028,7 @@ impl Checker {
                 //  }
                 //
                 if error_node.is_some() {
-                    self.error(error_node, &diagnostics::Type_is_referenced_directly_or_indirectly_in_the_fulfillment_callback_of_its_own_then_method, &[]);
+                    self.error(error_node, &diagnostics::TYPE_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_THE_FULFILLMENT_CALLBACK_OF_ITS_OWN_THEN_METHOD, &[]);
                 }
                 return None;
             }
@@ -2067,7 +2067,7 @@ impl Checker {
                 if let Some(this_type_for_error) = this_type_for_error {
                     let t_str = self.type_to_string_exported(t);
                     let this_str = self.type_to_string_exported(this_type_for_error);
-                    diagnostic = Some(new_diagnostic_for_node(Some(error_node), Some(&diagnostics::The_this_context_of_type_0_is_not_assignable_to_method_s_this_of_type_1), &[&t_str, &this_str]));
+                    diagnostic = Some(new_diagnostic_for_node(Some(error_node), Some(&diagnostics::THE_THIS_CONTEXT_OF_TYPE_0_IS_NOT_ASSIGNABLE_TO_METHOD_S_THIS_OF_TYPE_1), &[&t_str, &this_str]));
                 }
                 self.add_diagnostic(new_diagnostic_chain_for_node(
                     diagnostic,
@@ -3127,7 +3127,7 @@ impl Checker {
                     }
                     if !declarations.is_empty() {
                         let symbol =
-                            self.new_symbol(SymbolFlags::Property, InternalSymbolNameIndex);
+                            self.new_symbol(SymbolFlags::Property, INTERNAL_SYMBOL_NAME_INDEX);
                         symbol.set_check_flags(symbol.check_flags() | CheckFlags::IndexSymbol);
                         symbol.set_value_declaration(Some(declarations[0]));
                         symbol.set_declarations(&declarations);

@@ -64,13 +64,13 @@ pub enum OperatorPrecedence {
 }
 
 impl OperatorPrecedence {
-    pub const Lowest: OperatorPrecedence = OperatorPrecedence::Comma;
-    pub const Highest: OperatorPrecedence = OperatorPrecedence::Parentheses;
-    pub const DisallowComma: OperatorPrecedence = OperatorPrecedence::Yield;
+    pub const LOWEST: OperatorPrecedence = OperatorPrecedence::Comma;
+    pub const HIGHEST: OperatorPrecedence = OperatorPrecedence::Parentheses;
+    pub const DISALLOW_COMMA: OperatorPrecedence = OperatorPrecedence::Yield;
     // ShortCircuitExpression:
     //     LogicalORExpression
     //     CoalesceExpression
-    pub const Coalesce: OperatorPrecedence = OperatorPrecedence::LogicalOR;
+    pub const COALESCE: OperatorPrecedence = OperatorPrecedence::LogicalOR;
 }
 
 pub(crate) fn get_operator(expression: P<Node>) -> Kind {
@@ -201,7 +201,7 @@ pub fn get_operator_precedence(
 // Gets the precedence of a binary operator
 pub fn get_binary_operator_precedence(operator_kind: Kind) -> OperatorPrecedence {
     match operator_kind {
-        Kind::QuestionQuestionToken => OperatorPrecedence::Coalesce,
+        Kind::QuestionQuestionToken => OperatorPrecedence::COALESCE,
         Kind::BarBarToken => OperatorPrecedence::LogicalOR,
         Kind::AmpersandAmpersandToken => OperatorPrecedence::LogicalAND,
         Kind::BarToken => OperatorPrecedence::BitwiseOR,
@@ -294,8 +294,8 @@ pub enum TypePrecedence {
 }
 
 impl TypePrecedence {
-    pub const Lowest: TypePrecedence = TypePrecedence::Conditional;
-    pub const Highest: TypePrecedence = TypePrecedence::NonArray;
+    pub const LOWEST: TypePrecedence = TypePrecedence::Conditional;
+    pub const HIGHEST: TypePrecedence = TypePrecedence::NonArray;
 }
 
 // Gets the precedence of a TypeNode

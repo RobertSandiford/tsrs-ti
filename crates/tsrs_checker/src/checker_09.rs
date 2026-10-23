@@ -459,7 +459,7 @@ impl CacheHashKey {
     }
 }
 
-impl keyBuilder {
+impl KeyBuilder {
     // checker.go:17713
     #[inline]
     pub(crate) fn hash(&mut self) -> CacheHashKey {
@@ -613,7 +613,7 @@ impl keyBuilder {
         let mut constrained = false;
         let mut type_parameters: Vec<P<Type>> = Vec::with_capacity(8);
         fn write_type_reference(
-            b: &mut keyBuilder,
+            b: &mut KeyBuilder,
             c: &mut Checker,
             ref_: P<Type>,
             depth: u32,
@@ -695,14 +695,14 @@ impl keyBuilder {
 
 // checker.go:17836
 pub(crate) fn get_type_list_key(types: &[P<Type>]) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     b.write_types(types);
     b.hash()
 }
 
 // checker.go:17842
 pub(crate) fn get_alias_key(alias: AliasArg<'_>) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     b.write_alias_arg(alias);
     b.hash()
 }
@@ -713,7 +713,7 @@ pub(crate) fn get_union_key(
     origin: Option<P<Type>>,
     alias: AliasArg<'_>,
 ) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     match origin {
         None => b.write_types(types),
         Some(origin) if origin.flags().intersects(TypeFlags::Union) => {
@@ -743,7 +743,7 @@ pub(crate) fn get_intersection_key(
     flags: IntersectionFlags,
     alias: AliasArg<'_>,
 ) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     b.write_types(types);
     if !flags.intersects(IntersectionFlags::NoConstraintReduction) {
         b.write_alias_arg(alias);
@@ -755,7 +755,7 @@ pub(crate) fn get_intersection_key(
 
 // checker.go:17883
 pub(crate) fn get_tuple_key(element_infos: &[TupleElementInfo], readonly: bool) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     for e in element_infos {
         if e.flags.intersects(ElementFlags::Required) {
             b.write_byte(b'#');
@@ -831,7 +831,7 @@ fn get_type_instantiation_key_hashed(
     alias: AliasArg<'_>,
     single_signature: bool,
 ) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     b.write_types(type_arguments);
     b.write_alias_arg(alias);
     if single_signature {
@@ -847,7 +847,7 @@ pub(crate) fn get_indexed_access_key(
     access_flags: AccessFlags,
     alias: AliasArg<'_>,
 ) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     b.write_type(object_type);
     b.write_type(index_type);
     b.write_uint32(access_flags.bits());
@@ -857,7 +857,7 @@ pub(crate) fn get_indexed_access_key(
 
 // checker.go:17929
 pub(crate) fn get_template_type_key(texts: &[&str], types: &[P<Type>]) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     b.write_types(types);
     b.write_byte(b'|');
     for s in texts {
@@ -893,7 +893,7 @@ fn get_conditional_type_key_hashed(
     alias: Option<P<TypeAlias>>,
     for_constraint: bool,
 ) -> CacheHashKey {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
     b.write_types(type_arguments);
     b.write_alias(alias);
     if for_constraint {
@@ -932,7 +932,7 @@ fn get_relation_key_worker(
     intersection_state: IntersectionState,
     ignore_constraints: bool,
 ) -> (RelationKey, bool) {
-    let mut b = keyBuilder::default();
+    let mut b = KeyBuilder::default();
 
     let constrained = if is_type_reference_with_generic_arguments(c, source)
         && is_type_reference_with_generic_arguments(c, target)
@@ -1081,7 +1081,7 @@ impl Checker {
                     {
                         self.error(
                             Some(declaration),
-                            &diagnostics::Rest_types_may_only_be_created_from_object_types,
+                            &diagnostics::REST_TYPES_MAY_ONLY_BE_CREATED_FROM_OBJECT_TYPES,
                             &[],
                         );
                         return self.error_type;
@@ -1577,13 +1577,13 @@ impl Checker {
         let mut t: Option<P<Type>> = None;
         let (kind, location) = self.is_constructor_declared_this_property(symbol);
         match kind {
-            thisAssignmentDeclarationKind::Typed => {
+            ThisAssignmentDeclarationKind::Typed => {
                 let Some(location) = location else {
                     panic!("location should not be nil when this assignment has a type.");
                 };
                 t = Some(self.get_type_from_type_node(location));
             }
-            thisAssignmentDeclarationKind::Constructor => {
+            ThisAssignmentDeclarationKind::Constructor => {
                 let Some(location) = location else {
                     panic!(
                         "constructor should not be nil when this assignment is in a constructor."
@@ -1591,10 +1591,10 @@ impl Checker {
                 };
                 t = self.get_flow_type_in_constructor(symbol, location);
             }
-            thisAssignmentDeclarationKind::Method => {
+            ThisAssignmentDeclarationKind::Method => {
                 t = self.get_type_of_property_in_base_class(symbol);
             }
-            thisAssignmentDeclarationKind::None => {}
+            ThisAssignmentDeclarationKind::None => {}
         }
         if t.is_none() {
             let mut types: Vec<P<Type>> = Vec::new();
@@ -1618,7 +1618,7 @@ impl Checker {
                     }
                 }
             }
-            if kind == thisAssignmentDeclarationKind::Method && !types.is_empty() {
+            if kind == ThisAssignmentDeclarationKind::Method && !types.is_empty() {
                 if self.strict_null_checks {
                     append_if_unique(&mut types, self.undefined_or_missing_type);
                 }
@@ -1753,10 +1753,10 @@ impl Checker {
     pub(crate) fn is_constructor_declared_this_property(
         &mut self,
         symbol: P<Symbol>,
-    ) -> (thisAssignmentDeclarationKind, Option<P<Node>>) {
+    ) -> (ThisAssignmentDeclarationKind, Option<P<Node>>) {
         match symbol.value_declaration() {
             Some(value_declaration) if is_binary_expression(value_declaration) => {}
-            _ => return (thisAssignmentDeclarationKind::None, None),
+            _ => return (ThisAssignmentDeclarationKind::None, None),
         }
         if let Some(&kind) = self.this_expando_kinds.get(&symbol) {
             let Some(&location) = self.this_expando_locations.get(&symbol) else {
@@ -1788,17 +1788,17 @@ impl Checker {
             }
         }
         let mut location: Option<P<Node>> = None;
-        let mut kind = thisAssignmentDeclarationKind::None;
+        let mut kind = ThisAssignmentDeclarationKind::None;
         if all_this {
             if type_annotation.is_some() {
                 location = type_annotation;
-                kind = thisAssignmentDeclarationKind::Typed;
+                kind = ThisAssignmentDeclarationKind::Typed;
             } else {
                 location = Self::get_declaring_constructor(symbol);
                 kind = if location.is_none() {
-                    thisAssignmentDeclarationKind::Method
+                    ThisAssignmentDeclarationKind::Method
                 } else {
-                    thisAssignmentDeclarationKind::Constructor
+                    ThisAssignmentDeclarationKind::Constructor
                 };
             }
         }
@@ -1882,9 +1882,9 @@ impl Checker {
         match declaration.kind() {
             Kind::BinaryExpression | Kind::PropertyDeclaration | Kind::PropertySignature => {
                 diagnostic = if self.no_implicit_any {
-                    &diagnostics::Member_0_implicitly_has_an_1_type
+                    &diagnostics::MEMBER_0_IMPLICITLY_HAS_AN_1_TYPE
                 } else {
-                    &diagnostics::Member_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage
+                    &diagnostics::MEMBER_0_IMPLICITLY_HAS_AN_1_TYPE_BUT_A_BETTER_TYPE_MAY_BE_INFERRED_FROM_USAGE
                 };
             }
             Kind::Parameter => {
@@ -1921,7 +1921,7 @@ impl Checker {
                         self.error_or_suggestion(
                             self.no_implicit_any,
                             Some(declaration),
-                            &diagnostics::Parameter_has_a_name_but_no_type_Did_you_mean_0_Colon_1,
+                            &diagnostics::PARAMETER_HAS_A_NAME_BUT_NO_TYPE_DID_YOU_MEAN_0_COLON_1,
                             &[&new_name, &type_name],
                         );
                         return;
@@ -1929,18 +1929,18 @@ impl Checker {
                 }
                 if param.dot_dot_dot_token().is_some() {
                     if self.no_implicit_any {
-                        diagnostic = &diagnostics::Rest_parameter_0_implicitly_has_an_any_type;
+                        diagnostic = &diagnostics::REST_PARAMETER_0_IMPLICITLY_HAS_AN_ANY_TYPE;
                     } else {
-                        diagnostic = &diagnostics::Rest_parameter_0_implicitly_has_an_any_type_but_a_better_type_may_be_inferred_from_usage;
+                        diagnostic = &diagnostics::REST_PARAMETER_0_IMPLICITLY_HAS_AN_ANY_TYPE_BUT_A_BETTER_TYPE_MAY_BE_INFERRED_FROM_USAGE;
                     }
                 } else if self.no_implicit_any {
-                    diagnostic = &diagnostics::Parameter_0_implicitly_has_an_1_type;
+                    diagnostic = &diagnostics::PARAMETER_0_IMPLICITLY_HAS_AN_1_TYPE;
                 } else {
-                    diagnostic = &diagnostics::Parameter_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage;
+                    diagnostic = &diagnostics::PARAMETER_0_IMPLICITLY_HAS_AN_1_TYPE_BUT_A_BETTER_TYPE_MAY_BE_INFERRED_FROM_USAGE;
                 }
             }
             Kind::BindingElement => {
-                diagnostic = &diagnostics::Binding_element_0_implicitly_has_an_1_type;
+                diagnostic = &diagnostics::BINDING_ELEMENT_0_IMPLICITLY_HAS_AN_1_TYPE;
                 if !self.no_implicit_any {
                     // Don't issue a suggestion for binding elements since the codefix doesn't yet support them.
                     return;
@@ -1957,20 +1957,20 @@ impl Checker {
                     if widening_kind == WideningKind::GeneratorYield {
                         self.error(
                             Some(declaration),
-                            &diagnostics::Generator_implicitly_has_yield_type_0_Consider_supplying_a_return_type_annotation,
+                            &diagnostics::GENERATOR_IMPLICITLY_HAS_YIELD_TYPE_0_CONSIDER_SUPPLYING_A_RETURN_TYPE_ANNOTATION,
                             &[&type_as_string],
                         );
                     } else {
                         self.error(
                             Some(declaration),
-                            &diagnostics::Function_expression_which_lacks_return_type_annotation_implicitly_has_an_0_return_type,
+                            &diagnostics::FUNCTION_EXPRESSION_WHICH_LACKS_RETURN_TYPE_ANNOTATION_IMPLICITLY_HAS_AN_0_RETURN_TYPE,
                             &[&type_as_string],
                         );
                     }
                     return;
                 }
                 if !self.no_implicit_any {
-                    diagnostic = &diagnostics::X_0_implicitly_has_an_1_return_type_but_a_better_type_may_be_inferred_from_usage;
+                    diagnostic = &diagnostics::X_0_IMPLICITLY_HAS_AN_1_RETURN_TYPE_BUT_A_BETTER_TYPE_MAY_BE_INFERRED_FROM_USAGE;
                 } else if declaration.flags().intersects(NodeFlags::Reparsed) {
                     let name = tsrs_scanner::declaration_name_to_string(get_name_of_declaration(
                         declaration,
@@ -1978,28 +1978,28 @@ impl Checker {
                     if !name.is_empty() {
                         self.error(
                             Some(declaration),
-                            &diagnostics::X_0_which_lacks_return_type_annotation_implicitly_has_an_1_return_type,
+                            &diagnostics::X_0_WHICH_LACKS_RETURN_TYPE_ANNOTATION_IMPLICITLY_HAS_AN_1_RETURN_TYPE,
                             &[&name, &type_as_string],
                         );
                     } else {
                         self.error(
                             Some(declaration),
-                            &diagnostics::This_overload_implicitly_returns_the_type_0_because_it_lacks_a_return_type_annotation,
+                            &diagnostics::THIS_OVERLOAD_IMPLICITLY_RETURNS_THE_TYPE_0_BECAUSE_IT_LACKS_A_RETURN_TYPE_ANNOTATION,
                             &[&type_as_string],
                         );
                     }
                     return;
                 } else if widening_kind == WideningKind::GeneratorYield {
-                    diagnostic = &diagnostics::X_0_which_lacks_return_type_annotation_implicitly_has_an_1_yield_type;
+                    diagnostic = &diagnostics::X_0_WHICH_LACKS_RETURN_TYPE_ANNOTATION_IMPLICITLY_HAS_AN_1_YIELD_TYPE;
                 } else {
-                    diagnostic = &diagnostics::X_0_which_lacks_return_type_annotation_implicitly_has_an_1_return_type;
+                    diagnostic = &diagnostics::X_0_WHICH_LACKS_RETURN_TYPE_ANNOTATION_IMPLICITLY_HAS_AN_1_RETURN_TYPE;
                 }
             }
             Kind::MappedType => {
                 if self.no_implicit_any {
                     self.error(
                         Some(declaration),
-                        &diagnostics::Mapped_object_type_implicitly_has_an_any_template_type,
+                        &diagnostics::MAPPED_OBJECT_TYPE_IMPLICITLY_HAS_AN_ANY_TEMPLATE_TYPE,
                         &[],
                     );
                 }
@@ -2007,9 +2007,9 @@ impl Checker {
             }
             _ => {
                 if self.no_implicit_any {
-                    diagnostic = &diagnostics::Variable_0_implicitly_has_an_1_type;
+                    diagnostic = &diagnostics::VARIABLE_0_IMPLICITLY_HAS_AN_1_TYPE;
                 } else {
-                    diagnostic = &diagnostics::Variable_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage;
+                    diagnostic = &diagnostics::VARIABLE_0_IMPLICITLY_HAS_AN_1_TYPE_BUT_A_BETTER_TYPE_MAY_BE_INFERRED_FROM_USAGE;
                 }
             }
         }
@@ -2320,7 +2320,7 @@ impl Checker {
                     self.error_or_suggestion(
                         self.no_implicit_any,
                         setter,
-                        &diagnostics::Property_0_implicitly_has_type_any_because_its_set_accessor_lacks_a_parameter_type_annotation,
+                        &diagnostics::PROPERTY_0_IMPLICITLY_HAS_TYPE_ANY_BECAUSE_ITS_SET_ACCESSOR_LACKS_A_PARAMETER_TYPE_ANNOTATION,
                         &[&s],
                     );
                 } else if getter.is_some() && !is_private_within_ambient(getter.unwrap()) {
@@ -2328,7 +2328,7 @@ impl Checker {
                     self.error_or_suggestion(
                         self.no_implicit_any,
                         getter,
-                        &diagnostics::Property_0_implicitly_has_type_any_because_its_get_accessor_lacks_a_return_type_annotation,
+                        &diagnostics::PROPERTY_0_IMPLICITLY_HAS_TYPE_ANY_BECAUSE_ITS_GET_ACCESSOR_LACKS_A_RETURN_TYPE_ANNOTATION,
                         &[&s],
                     );
                 } else if accessor.is_some() && !is_private_within_ambient(accessor.unwrap()) {
@@ -2336,7 +2336,7 @@ impl Checker {
                     self.error_or_suggestion(
                         self.no_implicit_any,
                         accessor,
-                        &diagnostics::Member_0_implicitly_has_an_1_type,
+                        &diagnostics::MEMBER_0_IMPLICITLY_HAS_AN_1_TYPE,
                         &[&s, &"any"],
                     );
                 }
@@ -2345,17 +2345,17 @@ impl Checker {
             if !self.pop_type_resolution() {
                 if Self::get_annotated_accessor_type_node(getter).is_some() {
                     let s = self.symbol_to_string(symbol);
-                    self.error(getter, &diagnostics::X_0_is_referenced_directly_or_indirectly_in_its_own_type_annotation, &[&s]);
+                    self.error(getter, &diagnostics::X_0_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ITS_OWN_TYPE_ANNOTATION, &[&s]);
                 } else if (Self::get_annotated_accessor_type_node(setter).is_some())
                     || (Self::get_annotated_accessor_type_node(accessor).is_some())
                 {
                     let s = self.symbol_to_string(symbol);
-                    self.error(setter, &diagnostics::X_0_is_referenced_directly_or_indirectly_in_its_own_type_annotation, &[&s]);
+                    self.error(setter, &diagnostics::X_0_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ITS_OWN_TYPE_ANNOTATION, &[&s]);
                 } else if getter.is_some() && self.no_implicit_any {
                     let s = self.symbol_to_string(symbol);
                     self.error(
                         getter,
-                        &diagnostics::X_0_implicitly_has_return_type_any_because_it_does_not_have_a_return_type_annotation_and_is_referenced_directly_or_indirectly_in_one_of_its_return_expressions,
+                        &diagnostics::X_0_IMPLICITLY_HAS_RETURN_TYPE_ANY_BECAUSE_IT_DOES_NOT_HAVE_A_RETURN_TYPE_ANNOTATION_AND_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ONE_OF_ITS_RETURN_EXPRESSIONS,
                         &[&s],
                     );
                 }
@@ -2388,7 +2388,7 @@ impl Checker {
             if !self.pop_type_resolution() {
                 if Self::get_annotated_accessor_type_node(setter).is_some() {
                     let s = self.symbol_to_string(symbol);
-                    self.error(setter, &diagnostics::X_0_is_referenced_directly_or_indirectly_in_its_own_type_annotation, &[&s]);
+                    self.error(setter, &diagnostics::X_0_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ITS_OWN_TYPE_ANNOTATION, &[&s]);
                 }
                 write_type = Some(self.any_type);
             }
@@ -2539,7 +2539,7 @@ impl Checker {
         node: P<Node>,
     ) -> (String, bool) {
         let name = get_property_name_for_property_name_node(node);
-        if name != InternalSymbolNameMissing {
+        if name != INTERNAL_SYMBOL_NAME_MISSING {
             return (name.into_owned(), true);
         }
         if is_computed_property_name(node) {
@@ -2692,7 +2692,7 @@ impl Checker {
         if let Some(declaration) = declaration {
             if declaration.type_node().is_some() {
                 let s = self.symbol_to_string(symbol);
-                self.error(symbol.value_declaration(), &diagnostics::X_0_is_referenced_directly_or_indirectly_in_its_own_type_annotation, &[&s]);
+                self.error(symbol.value_declaration(), &diagnostics::X_0_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ITS_OWN_TYPE_ANNOTATION, &[&s]);
                 return self.error_type;
             }
             // Check if variable has initializer that circularly references the variable itself
@@ -2702,7 +2702,7 @@ impl Checker {
                 let s = self.symbol_to_string(symbol);
                 self.error(
                     symbol.value_declaration(),
-                    &diagnostics::X_0_implicitly_has_type_any_because_it_does_not_have_a_type_annotation_and_is_referenced_directly_or_indirectly_in_its_own_initializer,
+                    &diagnostics::X_0_IMPLICITLY_HAS_TYPE_ANY_BECAUSE_IT_DOES_NOT_HAVE_A_TYPE_ANNOTATION_AND_IS_REFERENCED_DIRECTLY_OR_INDIRECTLY_IN_ITS_OWN_INITIALIZER,
                     &[&s],
                 );
             }
@@ -2710,7 +2710,7 @@ impl Checker {
             let node = Self::get_declaration_of_alias_symbol(symbol);
             if node.is_some() {
                 let s = self.symbol_to_string(symbol);
-                self.error(node, &diagnostics::Circular_definition_of_import_alias_0, &[&s]);
+                self.error(node, &diagnostics::CIRCULAR_DEFINITION_OF_IMPORT_ALIAS_0, &[&s]);
             }
         }
         // Circularities could also result from parameters in function expressions that end up
@@ -4247,7 +4247,7 @@ impl Checker {
             if constructors.is_empty() {
                 self.error(
                     base_type_node.expression(),
-                    &diagnostics::No_base_constructor_has_the_specified_number_of_type_arguments,
+                    &diagnostics::NO_BASE_CONSTRUCTOR_HAS_THE_SPECIFIED_NUMBER_OF_TYPE_ARGUMENTS,
                     &[],
                 );
                 return;
@@ -4265,7 +4265,7 @@ impl Checker {
             let diagnostic = new_diagnostic_chain_for_node(
                 diagnostic,
                 error_node,
-                Some(&diagnostics::Base_constructor_return_type_0_is_not_an_object_type_or_intersection_of_object_types_with_statically_known_members),
+                Some(&diagnostics::BASE_CONSTRUCTOR_RETURN_TYPE_0_IS_NOT_AN_OBJECT_TYPE_OR_INTERSECTION_OF_OBJECT_TYPES_WITH_STATICALLY_KNOWN_MEMBERS),
                 &[&type_string],
             );
             self.add_diagnostic(diagnostic);
@@ -4275,7 +4275,7 @@ impl Checker {
             let type_string = self.type_to_string(t, None);
             self.error(
                 t.symbol().unwrap().value_declaration(),
-                &diagnostics::Type_0_recursively_references_itself_as_a_base_type,
+                &diagnostics::TYPE_0_RECURSIVELY_REFERENCES_ITSELF_AS_A_BASE_TYPE,
                 &[&type_string],
             );
             return;
@@ -4322,7 +4322,7 @@ mod key_builder_tests {
             }
             expected.extend_from_slice(b"suffix");
 
-            let mut builder = keyBuilder::default();
+            let mut builder = KeyBuilder::default();
             builder.write_string(&prefix);
             builder.write_byte(17);
             builder.write_uint32(123);
@@ -4343,7 +4343,7 @@ mod key_builder_tests {
         for count in [0, 1, 8, 46, 47, 256, 4096] {
             let types = types(count);
             let size = 8 + 4 * count;
-            let mut builder = keyBuilder::default();
+            let mut builder = KeyBuilder::default();
             builder.write_types(&types);
             assert_eq!(builder.overflow_buffer.is_some(), size > builder.inline_buffer.len());
             let pointer = builder.overflow_buffer.as_ref().map(Vec::as_ptr);

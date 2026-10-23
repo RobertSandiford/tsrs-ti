@@ -534,13 +534,13 @@ fn merge_expandos(symbols: Vec<DocSym>) -> Vec<DocSym> {
         if is_anonymous_name(&symbol.name) {
             continue;
         }
-        if symbol.kind == lsproto::SymbolKind::Class
-            || symbol.kind == lsproto::SymbolKind::Function
-            || symbol.kind == lsproto::SymbolKind::Variable
+        if symbol.kind == lsproto::SymbolKind::CLASS
+            || symbol.kind == lsproto::SymbolKind::FUNCTION
+            || symbol.kind == lsproto::SymbolKind::VARIABLE
         {
             name_to_expando_target_index.add(symbol.name.clone(), i);
         }
-        if symbol.kind == lsproto::SymbolKind::Namespace {
+        if symbol.kind == lsproto::SymbolKind::NAMESPACE {
             name_to_namespace_index.entry(symbol.name.clone()).or_insert(i);
         }
     }
@@ -565,7 +565,7 @@ fn merge_expandos(symbols: Vec<DocSym>) -> Vec<DocSym> {
         }
 
         // Merge expandos.
-        if kind == lsproto::SymbolKind::Property {
+        if kind == lsproto::SymbolKind::PROPERTY {
             let symbols_with_same_name = name_to_expando_target_index.get(&name).to_vec();
             for &target_index in symbols_with_same_name.iter().rev() {
                 // Go reads symbols[targetIndex], which a namespace merge may have set to nil (never a
@@ -577,7 +577,7 @@ fn merge_expandos(symbols: Vec<DocSym>) -> Vec<DocSym> {
             }
         }
         // Merge namespaces.
-        if kind == lsproto::SymbolKind::Namespace {
+        if kind == lsproto::SymbolKind::NAMESPACE {
             if let Some(&target_index) = name_to_namespace_index.get(&name) {
                 if target_index != i {
                     let target_symbol = symbols[target_index].clone().unwrap();
@@ -945,41 +945,41 @@ pub(crate) fn get_symbol_kind_from_node(node: P<Node>) -> lsproto::SymbolKind {
     match node.kind() {
         Kind::SourceFile => {
             if ast::is_external_module(node.as_source_file_p()) {
-                return lsproto::SymbolKind::Module;
+                return lsproto::SymbolKind::MODULE;
             }
-            return lsproto::SymbolKind::File;
+            return lsproto::SymbolKind::FILE;
         }
-        Kind::ModuleDeclaration => return lsproto::SymbolKind::Namespace,
-        Kind::ClassDeclaration | Kind::ClassExpression => return lsproto::SymbolKind::Class,
-        Kind::InterfaceDeclaration => return lsproto::SymbolKind::Interface,
+        Kind::ModuleDeclaration => return lsproto::SymbolKind::NAMESPACE,
+        Kind::ClassDeclaration | Kind::ClassExpression => return lsproto::SymbolKind::CLASS,
+        Kind::InterfaceDeclaration => return lsproto::SymbolKind::INTERFACE,
         Kind::TypeAliasDeclaration | Kind::JSDocTypedefTag | Kind::JSDocCallbackTag => {
-            return lsproto::SymbolKind::Class;
+            return lsproto::SymbolKind::CLASS;
         }
-        Kind::EnumDeclaration => return lsproto::SymbolKind::Enum,
-        Kind::VariableDeclaration => return lsproto::SymbolKind::Variable,
+        Kind::EnumDeclaration => return lsproto::SymbolKind::ENUM,
+        Kind::VariableDeclaration => return lsproto::SymbolKind::VARIABLE,
         Kind::ArrowFunction | Kind::FunctionDeclaration | Kind::FunctionExpression => {
-            return lsproto::SymbolKind::Function;
+            return lsproto::SymbolKind::FUNCTION;
         }
-        Kind::GetAccessor | Kind::SetAccessor => return lsproto::SymbolKind::Property,
-        Kind::MethodDeclaration | Kind::MethodSignature => return lsproto::SymbolKind::Method,
+        Kind::GetAccessor | Kind::SetAccessor => return lsproto::SymbolKind::PROPERTY,
+        Kind::MethodDeclaration | Kind::MethodSignature => return lsproto::SymbolKind::METHOD,
         Kind::PropertyDeclaration
         | Kind::PropertySignature
         | Kind::PropertyAssignment
         | Kind::ShorthandPropertyAssignment
         | Kind::SpreadAssignment
-        | Kind::IndexSignature => return lsproto::SymbolKind::Property,
-        Kind::CallSignature => return lsproto::SymbolKind::Method,
-        Kind::ConstructSignature => return lsproto::SymbolKind::Constructor,
+        | Kind::IndexSignature => return lsproto::SymbolKind::PROPERTY,
+        Kind::CallSignature => return lsproto::SymbolKind::METHOD,
+        Kind::ConstructSignature => return lsproto::SymbolKind::CONSTRUCTOR,
         Kind::Constructor | Kind::ClassStaticBlockDeclaration => {
-            return lsproto::SymbolKind::Constructor;
+            return lsproto::SymbolKind::CONSTRUCTOR;
         }
-        Kind::TypeParameter => return lsproto::SymbolKind::TypeParameter,
-        Kind::EnumMember => return lsproto::SymbolKind::EnumMember,
+        Kind::TypeParameter => return lsproto::SymbolKind::TYPE_PARAMETER,
+        Kind::EnumMember => return lsproto::SymbolKind::ENUM_MEMBER,
         Kind::Parameter => {
             if ast::has_syntactic_modifier(node, ModifierFlags::ParameterPropertyModifier) {
-                return lsproto::SymbolKind::Property;
+                return lsproto::SymbolKind::PROPERTY;
             }
-            return lsproto::SymbolKind::Variable;
+            return lsproto::SymbolKind::VARIABLE;
         }
         Kind::BinaryExpression | Kind::CallExpression => {
             let kind = ast::get_assignment_declaration_kind(node);
@@ -989,14 +989,14 @@ pub(crate) fn get_symbol_kind_from_node(node: P<Node>) -> lsproto::SymbolKind {
                     | JSDeclarationKind::Property
                     | JSDeclarationKind::ObjectDefinePropertyValue
             ) {
-                return lsproto::SymbolKind::Property;
+                return lsproto::SymbolKind::PROPERTY;
             }
         }
         Kind::StringLiteral | Kind::NoSubstitutionTemplateLiteral | Kind::NumericLiteral => {
             // String literals used as property names (e.g., in Object.defineProperty)
-            return lsproto::SymbolKind::Property;
+            return lsproto::SymbolKind::PROPERTY;
         }
         _ => {}
     }
-    lsproto::SymbolKind::Variable
+    lsproto::SymbolKind::VARIABLE
 }

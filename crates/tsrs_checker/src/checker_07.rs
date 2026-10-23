@@ -110,7 +110,7 @@ impl Checker {
         if t.flags().intersects(TypeFlags::Void) {
             self.error(
                 Some(node),
-                &diagnostics::An_expression_of_type_void_cannot_be_tested_for_truthiness,
+                &diagnostics::AN_EXPRESSION_OF_TYPE_VOID_CANNOT_BE_TESTED_FOR_TRUTHINESS,
                 &[],
             );
             return t;
@@ -120,9 +120,9 @@ impl Checker {
             self.error(
                 Some(node),
                 if semantics == PredicateSemantics::Always {
-                    &diagnostics::This_kind_of_expression_is_always_truthy
+                    &diagnostics::THIS_KIND_OF_EXPRESSION_IS_ALWAYS_TRUTHY
                 } else {
-                    &diagnostics::This_kind_of_expression_is_always_falsy
+                    &diagnostics::THIS_KIND_OF_EXPRESSION_IS_ALWAYS_FALSY
                 },
                 &[],
             );
@@ -185,7 +185,7 @@ impl Checker {
             {
                 self.grammar_error_on_node(
                     grandparent_left,
-                    &diagnostics::X_0_and_1_operations_cannot_be_mixed_without_parentheses,
+                    &diagnostics::X_0_AND_1_OPERATIONS_CANNOT_BE_MIXED_WITHOUT_PARENTHESES,
                     &[
                         &tsrs_scanner::token_to_string(Kind::QuestionQuestionToken),
                         &tsrs_scanner::token_to_string(grandparent_operator_token.kind()),
@@ -199,7 +199,7 @@ impl Checker {
             {
                 self.grammar_error_on_node(
                     left,
-                    &diagnostics::X_0_and_1_operations_cannot_be_mixed_without_parentheses,
+                    &diagnostics::X_0_AND_1_OPERATIONS_CANNOT_BE_MIXED_WITHOUT_PARENTHESES,
                     &[
                         &tsrs_scanner::token_to_string(operator_token.kind()),
                         &tsrs_scanner::token_to_string(Kind::QuestionQuestionToken),
@@ -211,7 +211,7 @@ impl Checker {
             if operator_token.kind() == Kind::AmpersandAmpersandToken {
                 self.grammar_error_on_node(
                     right,
-                    &diagnostics::X_0_and_1_operations_cannot_be_mixed_without_parentheses,
+                    &diagnostics::X_0_AND_1_OPERATIONS_CANNOT_BE_MIXED_WITHOUT_PARENTHESES,
                     &[
                         &tsrs_scanner::token_to_string(Kind::QuestionQuestionToken),
                         &tsrs_scanner::token_to_string(operator_token.kind()),
@@ -228,9 +228,9 @@ impl Checker {
         let nullish_semantics = self.get_syntactic_nullishness_semantics(left_target);
         if nullish_semantics != PredicateSemantics::Sometimes {
             if nullish_semantics == PredicateSemantics::Always {
-                self.error(Some(left_target), &diagnostics::This_expression_is_always_nullish, &[]);
+                self.error(Some(left_target), &diagnostics::THIS_EXPRESSION_IS_ALWAYS_NULLISH, &[]);
             } else {
-                self.error(Some(left_target), &diagnostics::Right_operand_of_is_unreachable_because_the_left_operand_is_never_nullish, &[]);
+                self.error(Some(left_target), &diagnostics::RIGHT_OPERAND_OF_IS_UNREACHABLE_BECAUSE_THE_LEFT_OPERAND_IS_NEVER_NULLISH, &[]);
             }
         }
     }
@@ -407,7 +407,7 @@ impl Checker {
         if !is_type_any(Some(left_type))
             && self.all_types_assignable_to_kind(left_type, TypeFlags::Primitive)
         {
-            self.error(Some(left), &diagnostics::The_left_hand_side_of_an_instanceof_expression_must_be_of_type_any_an_object_type_or_a_type_parameter, &[]);
+            self.error(Some(left), &diagnostics::THE_LEFT_HAND_SIDE_OF_AN_INSTANCEOF_EXPRESSION_MUST_BE_OF_TYPE_ANY_AN_OBJECT_TYPE_OR_A_TYPE_PARAMETER, &[]);
         }
         let signature = self.get_resolved_signature(
             left.parent().unwrap(),
@@ -432,7 +432,7 @@ impl Checker {
             return_type,
             boolean_type,
             Some(right),
-            Some(&diagnostics::An_object_s_Symbol_hasInstance_method_must_return_a_boolean_value_for_it_to_be_used_on_the_right_hand_side_of_an_instanceof_expression),
+            Some(&diagnostics::AN_OBJECT_S_SYMBOL_HAS_INSTANCE_METHOD_MUST_RETURN_A_BOOLEAN_VALUE_FOR_IT_TO_BE_USED_ON_THE_RIGHT_HAND_SIDE_OF_AN_INSTANCEOF_EXPRESSION),
         );
         self.boolean_type
     }
@@ -450,9 +450,9 @@ impl Checker {
         }
         if ast::is_private_identifier(left) {
             if self.language_version
-                < LanguageFeatureMinimumTarget.private_names_and_class_static_blocks
+                < LANGUAGE_FEATURE_MINIMUM_TARGET.private_names_and_class_static_blocks
                 || self.language_version
-                    < LanguageFeatureMinimumTarget.class_and_class_element_decorators
+                    < LANGUAGE_FEATURE_MINIMUM_TARGET.class_and_class_element_decorators
                 || !self.compiler_options.get_use_define_for_class_fields()
             {
                 self.check_external_emit_helpers(left, ExternalEmitHelpers::ClassPrivateFieldIn);
@@ -485,7 +485,7 @@ impl Checker {
             // since we already checked for that).
             if self.has_empty_object_intersection(right_type) {
                 let s = self.type_to_string_exported(right_type);
-                self.error(Some(right), &diagnostics::Type_0_may_represent_a_primitive_value_which_is_not_permitted_as_the_right_operand_of_the_in_operator, &[&s]);
+                self.error(Some(right), &diagnostics::TYPE_0_MAY_REPRESENT_A_PRIMITIVE_VALUE_WHICH_IS_NOT_PERMITTED_AS_THE_RIGHT_OPERAND_OF_THE_IN_OPERATOR, &[&s]);
             }
         }
         // The result is always of the Boolean primitive type.
@@ -693,7 +693,7 @@ impl Checker {
                         if self.get_index_info_of_type(contextual_type, string_type).is_none() {
                             let a = self.symbol_to_string(member_symbol);
                             let b = self.type_to_string_exported(contextual_type);
-                            self.error(member_decl.name(), &diagnostics::Object_literal_may_only_specify_known_properties_and_0_does_not_exist_in_type_1, &[&a, &b]);
+                            self.error(member_decl.name(), &diagnostics::OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES_AND_0_DOES_NOT_EXIST_IN_TYPE_1, &[&a, &b]);
                         }
                     }
                 }
@@ -770,7 +770,7 @@ impl Checker {
                 } else {
                     self.error(
                         Some(member_decl),
-                        &diagnostics::Spread_types_may_only_be_created_from_object_types,
+                        &diagnostics::SPREAD_TYPES_MAY_ONLY_BE_CREATED_FROM_OBJECT_TYPES,
                         &[],
                     );
                     spread = self.error_type;
@@ -894,10 +894,10 @@ impl Checker {
                 && !right.check_flags().intersects(CheckFlags::Partial)
             {
                 if let Some(left) = props.and_then(|props| props.lookup(right.name())) {
-                    let diagnostic = self.error(left.value_declaration(), &diagnostics::X_0_is_specified_more_than_once_so_this_usage_will_be_overwritten, &[&left.name()]);
+                    let diagnostic = self.error(left.value_declaration(), &diagnostics::X_0_IS_SPECIFIED_MORE_THAN_ONCE_SO_THIS_USAGE_WILL_BE_OVERWRITTEN, &[&left.name()]);
                     diagnostic.add_related_info(new_diagnostic_for_node(
                         Some(spread),
-                        Some(&diagnostics::This_spread_always_overwrites_this_property),
+                        Some(&diagnostics::THIS_SPREAD_ALWAYS_OVERWRITES_THIS_PROPERTY),
                         &[],
                     ));
                 }
@@ -1890,48 +1890,48 @@ impl Checker {
         node: P<Node>,
     ) -> &'static Message {
         match node.text() {
-            "document" | "console" => &diagnostics::Cannot_find_name_0_Do_you_need_to_change_your_target_library_Try_changing_the_lib_compiler_option_to_include_dom,
+            "document" | "console" => &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_CHANGE_YOUR_TARGET_LIBRARY_TRY_CHANGING_THE_LIB_COMPILER_OPTION_TO_INCLUDE_DOM,
             "$" => {
                 if self.compiler_options.uses_wildcard_types() {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_jQuery_Try_npm_i_save_dev_types_Slashjquery
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_J_QUERY_TRY_NPM_I_SAVE_DEV_TYPES_SLASHJQUERY
                 } else {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_jQuery_Try_npm_i_save_dev_types_Slashjquery_and_then_add_jquery_to_the_types_field_in_your_tsconfig
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_J_QUERY_TRY_NPM_I_SAVE_DEV_TYPES_SLASHJQUERY_AND_THEN_ADD_JQUERY_TO_THE_TYPES_FIELD_IN_YOUR_TSCONFIG
                 }
             }
             "beforeEach" | "describe" | "suite" | "it" | "test" => {
                 if self.compiler_options.uses_wildcard_types() {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_a_test_runner_Try_npm_i_save_dev_types_Slashjest_or_npm_i_save_dev_types_Slashmocha
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_A_TEST_RUNNER_TRY_NPM_I_SAVE_DEV_TYPES_SLASHJEST_OR_NPM_I_SAVE_DEV_TYPES_SLASHMOCHA
                 } else {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_a_test_runner_Try_npm_i_save_dev_types_Slashjest_or_npm_i_save_dev_types_Slashmocha_and_then_add_jest_or_mocha_to_the_types_field_in_your_tsconfig
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_A_TEST_RUNNER_TRY_NPM_I_SAVE_DEV_TYPES_SLASHJEST_OR_NPM_I_SAVE_DEV_TYPES_SLASHMOCHA_AND_THEN_ADD_JEST_OR_MOCHA_TO_THE_TYPES_FIELD_IN_YOUR_TSCONFIG
                 }
             }
             "process" | "require" | "Buffer" | "module" | "NodeJS" => {
                 if self.compiler_options.uses_wildcard_types() {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_NODE_TRY_NPM_I_SAVE_DEV_TYPES_SLASHNODE
                 } else {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_node_Try_npm_i_save_dev_types_Slashnode_and_then_add_node_to_the_types_field_in_your_tsconfig
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_NODE_TRY_NPM_I_SAVE_DEV_TYPES_SLASHNODE_AND_THEN_ADD_NODE_TO_THE_TYPES_FIELD_IN_YOUR_TSCONFIG
                 }
             }
             "Bun" => {
                 if self.compiler_options.uses_wildcard_types() {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_Bun_Try_npm_i_save_dev_types_Slashbun
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_BUN_TRY_NPM_I_SAVE_DEV_TYPES_SLASHBUN
                 } else {
-                    &diagnostics::Cannot_find_name_0_Do_you_need_to_install_type_definitions_for_Bun_Try_npm_i_save_dev_types_Slashbun_and_then_add_bun_to_the_types_field_in_your_tsconfig
+                    &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_INSTALL_TYPE_DEFINITIONS_FOR_BUN_TRY_NPM_I_SAVE_DEV_TYPES_SLASHBUN_AND_THEN_ADD_BUN_TO_THE_TYPES_FIELD_IN_YOUR_TSCONFIG
                 }
             }
             "Map" | "Set" | "Promise" | "ast.Symbol" | "WeakMap" | "WeakSet" | "Iterator" | "AsyncIterator" | "SharedArrayBuffer" | "Atomics" | "AsyncIterable"
             | "AsyncIterableIterator" | "AsyncGenerator" | "AsyncGeneratorFunction" | "BigInt" | "Reflect" | "BigInt64Array" | "BigUint64Array" => {
-                &diagnostics::Cannot_find_name_0_Do_you_need_to_change_your_target_library_Try_changing_the_lib_compiler_option_to_1_or_later
+                &diagnostics::CANNOT_FIND_NAME_0_DO_YOU_NEED_TO_CHANGE_YOUR_TARGET_LIBRARY_TRY_CHANGING_THE_LIB_COMPILER_OPTION_TO_1_OR_LATER
             }
             text => {
                 if text == "await" && ast::is_call_expression(node.parent().unwrap()) {
-                    return &diagnostics::Cannot_find_name_0_Did_you_mean_to_write_this_in_an_async_function;
+                    return &diagnostics::CANNOT_FIND_NAME_0_DID_YOU_MEAN_TO_WRITE_THIS_IN_AN_ASYNC_FUNCTION;
                 }
                 // fallthrough
                 if node.parent().unwrap().kind() == Kind::ShorthandPropertyAssignment {
-                    return &diagnostics::No_value_exists_in_scope_for_the_shorthand_property_0_Either_declare_one_or_provide_an_initializer;
+                    return &diagnostics::NO_VALUE_EXISTS_IN_SCOPE_FOR_THE_SHORTHAND_PROPERTY_0_EITHER_DECLARE_ONE_OR_PROVIDE_AN_INITIALIZER;
                 }
-                &diagnostics::Cannot_find_name_0
+                &diagnostics::CANNOT_FIND_NAME_0
             }
         }
     }
@@ -2010,7 +2010,7 @@ impl Checker {
     pub(crate) fn add_diagnostic(&mut self, diagnostic: P<Diagnostic>) -> P<Diagnostic> {
         self.diagnostic_adds = self.diagnostic_adds.wrapping_add(1);
         // Discard diagnostics created while at the maximum number of recursive TypeToString invocations.
-        if self.serialization_level < maxSerializationLevel {
+        if self.serialization_level < MAX_SERIALIZATION_LEVEL {
             return self.diagnostics.add(diagnostic);
         }
         diagnostic
@@ -2020,7 +2020,7 @@ impl Checker {
     pub(crate) fn add_suggestion_diagnostic(&mut self, diagnostic: P<Diagnostic>) -> P<Diagnostic> {
         self.diagnostic_adds = self.diagnostic_adds.wrapping_add(1);
         // Discard diagnostics created while at the maximum number of recursive TypeToString invocations.
-        if self.serialization_level < maxSerializationLevel {
+        if self.serialization_level < MAX_SERIALIZATION_LEVEL {
             return self.suggestion_diagnostics.add(diagnostic);
         }
         diagnostic
@@ -2074,7 +2074,7 @@ impl Checker {
         if maybe_missing_await {
             diagnostic.add_related_info(create_diagnostic_for_node(
                 location,
-                &diagnostics::Did_you_forget_to_use_await,
+                &diagnostics::DID_YOU_FORGET_TO_USE_AWAIT,
                 &[],
             ));
         }
@@ -2107,7 +2107,7 @@ impl Checker {
     ) -> P<Diagnostic> {
         let diagnostic = new_diagnostic_for_node(
             Some(location),
-            Some(&diagnostics::X_0_is_deprecated),
+            Some(&diagnostics::X_0_IS_DEPRECATED),
             &[&deprecated_entity],
         );
         self.add_deprecated_suggestion_worker(declarations, diagnostic)
@@ -2124,7 +2124,7 @@ impl Checker {
             if let Some(deprecated_tag) = deprecated_tag {
                 diagnostic.add_related_info(new_diagnostic_for_node(
                     Some(deprecated_tag),
-                    Some(&diagnostics::The_declaration_was_marked_as_deprecated_here),
+                    Some(&diagnostics::THE_DECLARATION_WAS_MARKED_AS_DEPRECATED_HERE),
                     &[],
                 ));
                 break;
@@ -2348,7 +2348,7 @@ impl Checker {
                 let s = self.symbol_to_string(target);
                 self.error(
                     ast::get_name_of_declaration(get_first_declaration(source)),
-                    &diagnostics::Cannot_augment_module_0_with_value_exports_because_it_resolves_to_a_non_module_entity,
+                    &diagnostics::CANNOT_AUGMENT_MODULE_0_WITH_VALUE_EXPORTS_BECAUSE_IT_RESOLVES_TO_A_NON_MODULE_ENTITY,
                     &[&s],
                 );
             }
@@ -2365,11 +2365,11 @@ impl Checker {
         let is_either_block_scoped = target.flags().intersects(SymbolFlags::BlockScopedVariable)
             || source.flags().intersects(SymbolFlags::BlockScopedVariable);
         let message: &'static Message = if is_either_enum {
-            &diagnostics::Enum_declarations_can_only_merge_with_namespace_or_other_enum_declarations
+            &diagnostics::ENUM_DECLARATIONS_CAN_ONLY_MERGE_WITH_NAMESPACE_OR_OTHER_ENUM_DECLARATIONS
         } else if is_either_block_scoped {
-            &diagnostics::Cannot_redeclare_block_scoped_variable_0
+            &diagnostics::CANNOT_REDECLARE_BLOCK_SCOPED_VARIABLE_0
         } else {
-            &diagnostics::Duplicate_identifier_0
+            &diagnostics::DUPLICATE_IDENTIFIER_0
         };
         let source_symbol_file = ast::get_source_file_of_node(get_first_declaration(source));
         let target_symbol_file = ast::get_source_file_of_node(get_first_declaration(target));
@@ -2428,11 +2428,11 @@ impl Checker {
             }
             let leading_message = create_diagnostic_for_node(
                 Some(adjusted_node),
-                &diagnostics::X_0_was_also_declared_here,
+                &diagnostics::X_0_WAS_ALSO_DECLARED_HERE,
                 &[&symbol_name],
             );
             let follow_on_message =
-                create_diagnostic_for_node(Some(adjusted_node), &diagnostics::X_and_here, &[]);
+                create_diagnostic_for_node(Some(adjusted_node), &diagnostics::X_AND_HERE, &[]);
             if err.related_information().len() >= 5
                 || err.related_information().iter().any(|&d| {
                     ast::compare_diagnostics(d, follow_on_message) == std::cmp::Ordering::Equal
@@ -2644,7 +2644,7 @@ impl Checker {
     #[inline]
     pub(crate) fn get_late_bound_symbol(&mut self, symbol: P<Symbol>) -> P<Symbol> {
         if !symbol.flags().intersects(SymbolFlags::ClassMember)
-            || symbol.name() != InternalSymbolNameComputed
+            || symbol.name() != INTERNAL_SYMBOL_NAME_COMPUTED
         {
             return symbol;
         }
@@ -2720,12 +2720,12 @@ impl Checker {
                 self.resolve_external_module_symbol(immediate, true /*dontResolveAlias*/)
             });
             if let Some(resolved) = resolved {
-                if ModuleKind::Node20 <= self.module_kind
-                    && self.module_kind <= ModuleKind::NodeNext
+                if ModuleKind::NODE20 <= self.module_kind
+                    && self.module_kind <= ModuleKind::NODE_NEXT
                 {
                     let module_exports = self.get_export_of_module(
                         resolved,
-                        InternalSymbolNameModuleExports,
+                        INTERNAL_SYMBOL_NAME_MODULE_EXPORTS,
                         node,
                         true, /*dontResolveAlias*/
                     );
@@ -2821,14 +2821,14 @@ impl Checker {
                     &[Kind::ExportSpecifier, Kind::ExportDeclaration],
                 );
                 let message: &'static Message = if is_export {
-                    &diagnostics::An_import_alias_cannot_reference_a_declaration_that_was_exported_using_export_type
+                    &diagnostics::AN_IMPORT_ALIAS_CANNOT_REFERENCE_A_DECLARATION_THAT_WAS_EXPORTED_USING_EXPORT_TYPE
                 } else {
-                    &diagnostics::An_import_alias_cannot_reference_a_declaration_that_was_imported_using_import_type
+                    &diagnostics::AN_IMPORT_ALIAS_CANNOT_REFERENCE_A_DECLARATION_THAT_WAS_IMPORTED_USING_IMPORT_TYPE
                 };
                 let related_message: &'static Message = if is_export {
-                    &diagnostics::X_0_was_exported_here
+                    &diagnostics::X_0_WAS_EXPORTED_HERE
                 } else {
-                    &diagnostics::X_0_was_imported_here
+                    &diagnostics::X_0_WAS_IMPORTED_HERE
                 };
                 // TODO: how to get name for export *?
                 let mut name = "*";
@@ -2919,16 +2919,16 @@ impl Checker {
             // Does nothing?
         } else if file.is_some()
             && specifier.is_some()
-            && ModuleKind::Node20 <= self.module_kind
-            && self.module_kind <= ModuleKind::NodeNext
+            && ModuleKind::NODE20 <= self.module_kind
+            && self.module_kind <= ModuleKind::NODE_NEXT
             && self.get_emit_syntax_for_module_specifier_expression(specifier.unwrap())
-                == ModuleKind::CommonJS
+                == ModuleKind::COMMON_JS
             && self.program.get_implied_node_format_for_emit(file.unwrap().as_source_file_p())
-                == ModuleKind::ESNext
+                == ModuleKind::ES_NEXT
         {
             export_module_dot_exports_symbol = self.resolve_export_by_name(
                 module_symbol,
-                InternalSymbolNameModuleExports,
+                INTERNAL_SYMBOL_NAME_MODULE_EXPORTS,
                 Some(node),
                 dont_resolve_alias,
             );
@@ -2945,7 +2945,7 @@ impl Checker {
         } else {
             self.resolve_export_by_name(
                 module_symbol,
-                InternalSymbolNameDefault,
+                INTERNAL_SYMBOL_NAME_DEFAULT,
                 Some(node),
                 dont_resolve_alias,
             )
@@ -3006,14 +3006,14 @@ impl Checker {
         {
             let a = self.symbol_to_string(module_symbol);
             let b = self.symbol_to_string(node.symbol().unwrap());
-            self.error(Some(node), &diagnostics::Module_0_has_no_default_export_Did_you_mean_to_use_import_1_from_0_instead, &[&a, &b]);
+            self.error(Some(node), &diagnostics::MODULE_0_HAS_NO_DEFAULT_EXPORT_DID_YOU_MEAN_TO_USE_IMPORT_1_FROM_0_INSTEAD, &[&a, &b]);
         } else {
             let a = self.symbol_to_string(module_symbol);
             let diagnostic =
-                self.error(node.name(), &diagnostics::Module_0_has_no_default_export, &[&a]);
+                self.error(node.name(), &diagnostics::MODULE_0_HAS_NO_DEFAULT_EXPORT, &[&a]);
             let mut export_star: Option<P<Symbol>> = None;
             if module_symbol.exports().is_some() {
-                export_star = lookup_export(module_symbol, InternalSymbolNameExportStar);
+                export_star = lookup_export(module_symbol, INTERNAL_SYMBOL_NAME_EXPORT_STAR);
             }
             if let Some(export_star) = export_star {
                 let declarations = export_star.declarations();
@@ -3031,7 +3031,7 @@ impl Checker {
                         attributes_type,
                     );
                     if resolved_external_module_name
-                        .is_some_and(|m| lookup_export(m, InternalSymbolNameDefault).is_some())
+                        .is_some_and(|m| lookup_export(m, INTERNAL_SYMBOL_NAME_DEFAULT).is_some())
                     {
                         default_export = Some(decl);
                         break;
@@ -3040,7 +3040,7 @@ impl Checker {
                 if let Some(default_export) = default_export {
                     diagnostic.add_related_info(create_diagnostic_for_node(
                         Some(default_export),
-                        &diagnostics::X_export_Asterisk_does_not_re_export_a_default,
+                        &diagnostics::X_EXPORT_ASTERISK_DOES_NOT_RE_EXPORT_A_DEFAULT,
                         &[],
                     ));
                 }
@@ -3057,7 +3057,7 @@ impl Checker {
         source_node: Option<P<Node>>,
         dont_resolve_alias: bool,
     ) -> Option<P<Symbol>> {
-        let export_value = lookup_export(module_symbol, InternalSymbolNameExportEquals);
+        let export_value = lookup_export(module_symbol, INTERNAL_SYMBOL_NAME_EXPORT_EQUALS);
         let export_symbol = if let Some(export_value) = export_value {
             let t = self.get_type_of_symbol(export_value);
             self.get_property_of_type_ex(
@@ -3197,7 +3197,7 @@ impl Checker {
                 }
                 // First check if module was specified with "export=". If so, get the member from the resolved type
                 let mut symbol_from_variable = if module_symbol.is_some()
-                    && lookup_export(module_symbol_, InternalSymbolNameExportEquals).is_some()
+                    && lookup_export(module_symbol_, INTERNAL_SYMBOL_NAME_EXPORT_EQUALS).is_some()
                 {
                     let t = self.get_type_of_symbol(target_symbol);
                     self.get_property_of_type_ex(
@@ -3212,7 +3212,7 @@ impl Checker {
                     symbol_from_variable.map(|s| self.resolve_symbol_ex(s, dont_resolve_alias));
                 let mut export_container = target_symbol;
                 if module_symbol.is_some()
-                    && lookup_export(module_symbol_, InternalSymbolNameExportEquals).is_some()
+                    && lookup_export(module_symbol_, INTERNAL_SYMBOL_NAME_EXPORT_EQUALS).is_some()
                 {
                     // For `export =` modules, supplemental type/namespace exports live on the original module symbol.
                     export_container = module_symbol_;
@@ -3223,7 +3223,7 @@ impl Checker {
                     specifier,
                     dont_resolve_alias,
                 );
-                if symbol_from_module.is_none() && name_text == InternalSymbolNameDefault {
+                if symbol_from_module.is_none() && name_text == INTERNAL_SYMBOL_NAME_DEFAULT {
                     let file = module_symbol_
                         .declarations()
                         .iter()
@@ -3264,10 +3264,10 @@ impl Checker {
                         module_symbol,
                         import_attributes_type,
                     )
-                    && name_text != InternalSymbolNameDefault
+                    && name_text != INTERNAL_SYMBOL_NAME_DEFAULT
                 {
                     let module_kind = self.module_kind.to_string();
-                    self.error(Some(name), &diagnostics::Named_imports_from_a_JSON_file_into_an_ECMAScript_module_are_not_allowed_when_module_is_set_to_0, &[&module_kind]);
+                    self.error(Some(name), &diagnostics::NAMED_IMPORTS_FROM_A_JSON_FILE_INTO_AN_ECMA_SCRIPT_MODULE_ARE_NOT_ALLOWED_WHEN_MODULE_IS_SET_TO_0, &[&module_kind]);
                 } else if symbol.is_none() {
                     self.error_no_module_member_symbol(module_symbol_, target_symbol, node, name);
                 }
@@ -3375,9 +3375,9 @@ impl Checker {
         import_attributes_type: Option<P<Type>>,
     ) -> bool {
         // In Node.js, JSON modules don't get named exports
-        if ModuleKind::Node16 <= self.module_kind && self.module_kind <= ModuleKind::NodeNext {
+        if ModuleKind::NODE16 <= self.module_kind && self.module_kind <= ModuleKind::NODE_NEXT {
             let usage_mode = self.get_emit_syntax_for_module_specifier_expression(usage);
-            if usage_mode == ModuleKind::ESNext {
+            if usage_mode == ModuleKind::ES_NEXT {
                 let mut resolved_module = resolved_module;
                 if resolved_module.is_none() {
                     resolved_module = self.resolve_external_module_name(
@@ -3409,30 +3409,30 @@ impl Checker {
         dont_resolve_alias: bool,
         usage: P<Node>,
     ) -> bool {
-        let mut usage_mode = ModuleKind::None;
+        let mut usage_mode = ModuleKind::NONE;
         if file.is_some() {
             usage_mode = self.get_emit_syntax_for_module_specifier_expression(usage);
         }
         if let Some(file) = file {
-            if usage_mode != ModuleKind::None {
+            if usage_mode != ModuleKind::NONE {
                 let target_mode =
                     self.program.get_implied_node_format_for_emit(file.as_source_file_p());
-                if usage_mode == ModuleKind::ESNext
-                    && target_mode == ModuleKind::CommonJS
-                    && ModuleKind::Node16 <= self.module_kind
-                    && self.module_kind <= ModuleKind::NodeNext
+                if usage_mode == ModuleKind::ES_NEXT
+                    && target_mode == ModuleKind::COMMON_JS
+                    && ModuleKind::NODE16 <= self.module_kind
+                    && self.module_kind <= ModuleKind::NODE_NEXT
                 {
                     // In Node.js, CommonJS modules always have a synthetic default when imported into ESM
                     return true;
                 }
-                if usage_mode == ModuleKind::ESNext && target_mode == ModuleKind::ESNext {
+                if usage_mode == ModuleKind::ES_NEXT && target_mode == ModuleKind::ES_NEXT {
                     // No matter what the `module` setting is, if we're confident that both files
                     // are ESM, there cannot be a synthetic default.
                     return false;
                 }
                 // For other files (not node16/nodenext with impliedNodeFormat), check if we can determine
                 // the module format from project references
-                if target_mode == ModuleKind::None && file.as_source_file().is_declaration_file() {
+                if target_mode == ModuleKind::NONE && file.as_source_file().is_declaration_file() {
                     // Try to get the project reference - try both source file mapping and output file mapping
                     // since declaration files can be mapped either way depending on how they're resolved
                     if self.program.get_redirect_for_resolution(file.as_source_file_p()).is_some()
@@ -3445,9 +3445,9 @@ impl Checker {
                         // its module format from the referenced project's options
                         let target_module_kind =
                             self.emit_module_format_of_file(file.as_source_file_p());
-                        if usage_mode == ModuleKind::ESNext
+                        if usage_mode == ModuleKind::ES_NEXT
                             && ModuleKind::ES2015 <= target_module_kind
-                            && target_module_kind <= ModuleKind::ESNext
+                            && target_module_kind <= ModuleKind::ES_NEXT
                         {
                             return false;
                         }
@@ -3460,7 +3460,7 @@ impl Checker {
             // Definitely cannot have a synthetic default if they have a syntactic default member specified
             let default_export_symbol = self.resolve_export_by_name(
                 module_symbol,
-                InternalSymbolNameDefault,
+                INTERNAL_SYMBOL_NAME_DEFAULT,
                 None, /*sourceNode*/
                 true, /*dontResolveAlias*/
             ); // Dont resolve alias because we want the immediately exported symbol's declaration
@@ -3519,7 +3519,7 @@ impl Checker {
                 usage,
             );
         }
-        ModuleKind::None
+        ModuleKind::NONE
     }
 
     // checker.go:15127
@@ -3543,18 +3543,18 @@ impl Checker {
             let suggestion_name = self.symbol_to_string(suggestion);
             let diagnostic = self.error(
                 Some(name),
-                &diagnostics::X_0_has_no_exported_member_named_1_Did_you_mean_2,
+                &diagnostics::X_0_HAS_NO_EXPORTED_MEMBER_NAMED_1_DID_YOU_MEAN_2,
                 &[&module_name, &declaration_name, &suggestion_name],
             );
             if let Some(value_declaration) = suggestion.value_declaration() {
                 diagnostic.add_related_info(create_diagnostic_for_node(
                     Some(value_declaration),
-                    &diagnostics::X_0_is_declared_here,
+                    &diagnostics::X_0_IS_DECLARED_HERE,
                     &[&suggestion_name],
                 ));
             }
-        } else if lookup_export(module_symbol, InternalSymbolNameDefault).is_some() {
-            self.error(Some(name), &diagnostics::Module_0_has_no_exported_member_1_Did_you_mean_to_use_import_1_from_0_instead, &[&module_name, &declaration_name]);
+        } else if lookup_export(module_symbol, INTERNAL_SYMBOL_NAME_DEFAULT).is_some() {
+            self.error(Some(name), &diagnostics::MODULE_0_HAS_NO_EXPORTED_MEMBER_1_DID_YOU_MEAN_TO_USE_IMPORT_1_FROM_0_INSTEAD, &[&module_name, &declaration_name]);
         } else {
             self.report_non_exported_member(name, &declaration_name, module_symbol, &module_name);
         }
@@ -3575,7 +3575,7 @@ impl Checker {
         let exports = module_symbol.exports();
         if let Some(local_symbol) = local_symbol {
             if let Some(exported_equals_symbol) =
-                exports.and_then(|e| e.lookup(InternalSymbolNameExportEquals))
+                exports.and_then(|e| e.lookup(INTERNAL_SYMBOL_NAME_EXPORT_EQUALS))
             {
                 if self.get_symbol_if_same_reference(exported_equals_symbol, local_symbol).is_some()
                 {
@@ -3587,7 +3587,7 @@ impl Checker {
                 } else {
                     self.error(
                         Some(name),
-                        &diagnostics::Module_0_has_no_exported_member_1,
+                        &diagnostics::MODULE_0_HAS_NO_EXPORTED_MEMBER_1,
                         &[&module_name, &declaration_name],
                     );
                 }
@@ -3605,13 +3605,13 @@ impl Checker {
                     let s = self.symbol_to_string(exported_symbol);
                     self.error(
                         Some(name),
-                        &diagnostics::Module_0_declares_1_locally_but_it_is_exported_as_2,
+                        &diagnostics::MODULE_0_DECLARES_1_LOCALLY_BUT_IT_IS_EXPORTED_AS_2,
                         &[&module_name, &declaration_name, &s],
                     )
                 } else {
                     self.error(
                         Some(name),
-                        &diagnostics::Module_0_declares_1_locally_but_it_is_not_exported,
+                        &diagnostics::MODULE_0_DECLARES_1_LOCALLY_BUT_IT_IS_NOT_EXPORTED,
                         &[&module_name, &declaration_name],
                     )
                 };
@@ -3620,9 +3620,9 @@ impl Checker {
                     diagnostic.add_related_info(create_diagnostic_for_node(
                         Some(decl),
                         if i == 0 {
-                            &diagnostics::X_0_is_declared_here
+                            &diagnostics::X_0_IS_DECLARED_HERE
                         } else {
-                            &diagnostics::X_and_here
+                            &diagnostics::X_AND_HERE
                         },
                         &[&declaration_name],
                     ));
@@ -3631,7 +3631,7 @@ impl Checker {
         } else {
             self.error(
                 Some(name),
-                &diagnostics::Module_0_has_no_exported_member_1,
+                &diagnostics::MODULE_0_HAS_NO_EXPORTED_MEMBER_1,
                 &[&module_name, &declaration_name],
             );
         }
@@ -3647,15 +3647,15 @@ impl Checker {
         if self.module_kind >= ModuleKind::ES2015 {
             self.error(
                 Some(name),
-                &diagnostics::X_0_can_only_be_imported_by_using_a_default_import,
+                &diagnostics::X_0_CAN_ONLY_BE_IMPORTED_BY_USING_A_DEFAULT_IMPORT,
                 &[&declaration_name],
             );
         } else if ast::is_in_js_file(name) {
-            self.error(Some(name), &diagnostics::X_0_can_only_be_imported_by_using_a_require_call_or_by_using_a_default_import, &[&declaration_name]);
+            self.error(Some(name), &diagnostics::X_0_CAN_ONLY_BE_IMPORTED_BY_USING_A_REQUIRE_CALL_OR_BY_USING_A_DEFAULT_IMPORT, &[&declaration_name]);
         } else {
             self.error(
                 Some(name),
-                &diagnostics::X_0_can_only_be_imported_by_using_import_1_require_2_or_a_default_import,
+                &diagnostics::X_0_CAN_ONLY_BE_IMPORTED_BY_USING_IMPORT_1_REQUIRE_2_OR_A_DEFAULT_IMPORT,
                 &[&declaration_name, &declaration_name, &module_name],
             );
         }

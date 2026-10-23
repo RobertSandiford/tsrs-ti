@@ -60,7 +60,7 @@ impl Checker {
                             if ast::get_declaration_of_kind(symbol, Kind::ExportSpecifier).is_none()
                                 && ast::get_declaration_of_kind(symbol, Kind::NamespaceExport)
                                     .is_none()
-                                && symbol.name() != InternalSymbolNameDefault
+                                && symbol.name() != INTERNAL_SYMBOL_NAME_DEFAULT
                             {
                                 copy_symbol(symbol, meaning);
                             }
@@ -143,7 +143,7 @@ impl Checker {
 
         copy_symbols(Some(self.globals), meaning);
 
-        symbols.delete(InternalSymbolNameThis); // Not a symbol, a keyword
+        symbols.delete(INTERNAL_SYMBOL_NAME_THIS); // Not a symbol, a keyword
         symbols_to_array(Some(symbols))
     }
 
@@ -1172,7 +1172,7 @@ impl Checker {
     // services.go:858
     // Returns all the properties of the Jsx.IntrinsicElements interface.
     pub fn get_jsx_intrinsic_tag_names_at(&mut self, location: P<Node>) -> &'static [P<Symbol>] {
-        let intrinsics = self.get_jsx_type(JsxNames.intrinsic_elements, location);
+        let intrinsics = self.get_jsx_type(JSX_NAMES.intrinsic_elements, location);
         self.get_properties_of_type_exported(intrinsics)
     }
 
@@ -1323,7 +1323,7 @@ impl Checker {
 }
 
 // services.go:981
-pub(crate) static knownGenericTypeNames: [&str; 20] = [
+pub(crate) static KNOWN_GENERIC_TYPE_NAMES: [&str; 20] = [
     "Array",
     "ArrayLike",
     "ReadonlyArray",
@@ -1348,7 +1348,7 @@ pub(crate) static knownGenericTypeNames: [&str; 20] = [
 
 // services.go:1004
 pub(crate) fn is_known_generic_type_name(name: &str) -> bool {
-    knownGenericTypeNames.contains(&name)
+    KNOWN_GENERIC_TYPE_NAMES.contains(&name)
 }
 
 impl Checker {

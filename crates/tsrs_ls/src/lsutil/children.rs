@@ -49,7 +49,7 @@ pub fn get_last_token(node: Option<P<Node>>, source_file: P<SourceFile>) -> Opti
 
     let last_child = get_last_child(node, source_file)?;
 
-    if last_child.kind() < Kind::FirstNode {
+    if last_child.kind() < Kind::FIRST_NODE {
         Some(last_child)
     } else {
         get_last_token(Some(last_child), source_file)
@@ -133,7 +133,7 @@ pub fn get_first_token(node: P<Node>, source_file: P<SourceFile>) -> Option<P<No
         return first_token;
     }
     let first_child = first_child?;
-    if first_child.kind() < Kind::FirstNode {
+    if first_child.kind() < Kind::FIRST_NODE {
         return Some(first_child);
     }
     get_first_token(first_child, source_file)

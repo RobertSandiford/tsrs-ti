@@ -141,7 +141,7 @@ pub(crate) fn build_vs_hover_raw_content(
     }
 
     let display_line = lsproto::VSContainerElement {
-        style: lsproto::VSContainerElementStyle::Wrapped,
+        style: lsproto::VSContainerElementStyle::WRAPPED,
         elements: vec![
             lsproto::VSImageElementOrClassifiedTextElementOrContainerElement {
                 image_element: Some(lsproto::VSImageElement { image_id, ..Default::default() }),
@@ -163,7 +163,7 @@ pub(crate) fn build_vs_hover_raw_content(
     }
 
     Some(lsproto::VSContainerElement {
-        style: lsproto::VSContainerElementStyle::Stacked,
+        style: lsproto::VSContainerElementStyle::STACKED,
         elements: vec![
             lsproto::VSImageElementOrClassifiedTextElementOrContainerElement {
                 container_element: Some(display_line),

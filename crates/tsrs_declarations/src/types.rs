@@ -37,7 +37,7 @@ pub trait DeclarationEmitHost: ModuleSpecifierGenerationHost {
 
 // transform.go:46
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct thisPropertyAssignmentKey {
+pub struct ThisPropertyAssignmentKey {
     pub name: String,
     pub node: Option<P<Node>>,
     pub is_static: bool,
@@ -68,7 +68,7 @@ pub struct DeclarationTransformer {
     pub expando_hosts: RefCell<FxHashMap<NodeId, Option<P<Node>>>>, // store the result of transforming expando hosts so they can be inserted later if the host is actually referenced
     pub expando_members: RefCell<FxHashMap<NodeId, Vec<P<Node>>>>, // store any found expando _members_ after transforming them so *if* the host is referenced, they can be emitted alongside it
     pub deferred_expando_assignments: RefCell<FxHashMap<NodeId, Vec<P<Node>>>>, // expando assignments whose host wasn't visible when collected, processed if the host is late-marked visible
-    pub seen_properties: RefCell<Set<thisPropertyAssignmentKey>>,
+    pub seen_properties: RefCell<Set<ThisPropertyAssignmentKey>>,
     pub this_property_assignments_collected: RefCell<Vec<P<Node>>>,
     pub raw_referenced_files: RefCell<Vec<ReferencedFilePair>>,
     pub raw_type_reference_directives: RefCell<Vec<P<FileReference>>>,
@@ -136,7 +136,7 @@ impl DeclarationTransformer {
 }
 
 // transform.go:215
-pub const declarationEmitNodeBuilderFlags: nodebuilder::Flags =
+pub const DECLARATION_EMIT_NODE_BUILDER_FLAGS: nodebuilder::Flags =
     nodebuilder::Flags::MultilineObjectLiterals
         .union(nodebuilder::Flags::WriteClassExpressionAsTypeLiteral)
         .union(nodebuilder::Flags::UseTypeOfFunction)
@@ -146,7 +146,7 @@ pub const declarationEmitNodeBuilderFlags: nodebuilder::Flags =
         .union(nodebuilder::Flags::NoTruncation);
 
 // transform.go:223
-pub const declarationEmitInternalNodeBuilderFlags: nodebuilder::InternalFlags =
+pub const DECLARATION_EMIT_INTERNAL_NODE_BUILDER_FLAGS: nodebuilder::InternalFlags =
     nodebuilder::InternalFlags::AllowUnresolvedNames
         .union(nodebuilder::InternalFlags::RewriteModuleSpecifiers);
 

@@ -8,7 +8,7 @@ use super::*;
 // esdecorator.go:48
 // lexicalEntryKind discriminates the kind of lexical scope entry.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum lexicalEntryKind {
+pub enum LexicalEntryKind {
     Class,
     ClassElement,
     Name,
@@ -18,10 +18,10 @@ pub enum lexicalEntryKind {
 // esdecorator.go:59
 // lexicalEntry represents a single entry in the lexical scope stack used to track
 // nested class declarations and their state during transformation.
-pub struct lexicalEntry {
-    pub kind: lexicalEntryKind,
-    pub next: Option<P<lexicalEntry>>,
-    pub class_info_data: Option<P<classInfo>>,
+pub struct LexicalEntry {
+    pub kind: LexicalEntryKind,
+    pub next: Option<P<LexicalEntry>>,
+    pub class_info_data: Option<P<ClassInfo>>,
     pub saved_pending_expressions: RefCell<Option<Vec<P<Node>>>>,
     pub class_this_data: Cell<Option<P<Node>>>,
     pub class_super_data: Cell<Option<P<Node>>>,
@@ -31,7 +31,7 @@ pub struct lexicalEntry {
 // esdecorator.go:70
 // memberInfo stores decoration-related data for a single class element.
 #[derive(Default)]
-pub struct memberInfo {
+pub struct MemberInfo {
     pub member_decorators_name: Cell<Option<P<Node>>>, // used in class definition step 4.a
     pub member_initializers_name: Cell<Option<P<Node>>>, // used in class definition step 12 and constructor evaluation step 2.a
     pub member_extra_initializers_name: Cell<Option<P<Node>>>, // used in class definition step 12 and constructor evaluation step 2.b
@@ -40,7 +40,7 @@ pub struct memberInfo {
 
 // esdecorator.go:78
 // classInfo stores all transformation data for a single decorated class.
-pub struct classInfo {
+pub struct ClassInfo {
     pub class: P<Node>,
     pub class_decorators_name: Cell<Option<P<Node>>>, // used in class definition step 2
     pub class_descriptor_name: Cell<Option<P<Node>>>, // used in class definition step 10
@@ -48,7 +48,7 @@ pub struct classInfo {
     pub class_this: Cell<Option<P<Node>>>,            // `_classThis`, if needed.
     pub class_super: Cell<Option<P<Node>>>,           // `_classSuper`, if needed.
     pub metadata_reference: Cell<Option<P<Node>>>,
-    pub member_infos: RefCell<OrderedMap<P<Node>, P<memberInfo>>>, // used in class definition step 4.a, 12, and constructor evaluation
+    pub member_infos: RefCell<OrderedMap<P<Node>, P<MemberInfo>>>, // used in class definition step 4.a, 12, and constructor evaluation
     pub instance_method_extra_initializers_name: Cell<Option<P<Node>>>, // used in constructor evaluation step 1
     pub static_method_extra_initializers_name: Cell<Option<P<Node>>>, // used in class definition step 11
     pub static_non_field_decoration_statements: RefCell<Vec<P<Node>>>,
@@ -63,11 +63,11 @@ pub struct classInfo {
 }
 
 // esdecorator.go:100
-pub struct esDecoratorTransformer {
+pub struct EsDecoratorTransformer {
     pub base: Transformer,
     pub compiler_options: P<CompilerOptions>,
-    pub top: Cell<Option<P<lexicalEntry>>>,
-    pub class_info_stack: Cell<Option<P<classInfo>>>,
+    pub top: Cell<Option<P<LexicalEntry>>>,
+    pub class_info_stack: Cell<Option<P<ClassInfo>>>,
     pub class_this: Cell<Option<P<Node>>>,
     pub class_super: Cell<Option<P<Node>>>,
     pub pending_expressions: RefCell<Option<Vec<P<Node>>>>,
@@ -93,12 +93,12 @@ pub fn new_es_decorator_transformer(opts: &TransformOptions) -> Option<P<Transfo
     // decorators. When targeting ESNext with useDefineForClassFields, there's nothing to
     // transform. In either case every node would be returned unchanged, so skip entirely.
     if opts.compiler_options.experimental_decorators.is_true()
-        || (opts.compiler_options.get_emit_script_target() >= ScriptTarget::ESNext
+        || (opts.compiler_options.get_emit_script_target() >= ScriptTarget::ES_NEXT
             && opts.compiler_options.get_use_define_for_class_fields())
     {
         return None;
     }
-    let tx = P::new(esDecoratorTransformer {
+    let tx = P::new(EsDecoratorTransformer {
         base: Transformer::default(),
         compiler_options: opts.compiler_options,
         top: Cell::new(None),
@@ -126,27 +126,27 @@ pub fn new_es_decorator_transformer(opts: &TransformOptions) -> Option<P<Transfo
         Some(opts.context),
     );
     let ec = tx.base.emit_context();
-    let mk = |f: fn(&esDecoratorTransformer, P<Node>) -> Option<P<Node>>| {
+    let mk = |f: fn(&EsDecoratorTransformer, P<Node>) -> Option<P<Node>>| {
         ec.new_node_visitor(Rc::new(move |_: &mut NodeVisitor, n: P<Node>| f(&tx, n)))
     };
-    let _ = tx.outer_this_visitor.set(mk(esDecoratorTransformer::outer_this_visit));
-    let _ = tx.discarded_visitor.set(mk(esDecoratorTransformer::discarded_value_visit));
-    let _ = tx.modifier_visitor.set(mk(esDecoratorTransformer::modifier_visitor_visit));
+    let _ = tx.outer_this_visitor.set(mk(EsDecoratorTransformer::outer_this_visit));
+    let _ = tx.discarded_visitor.set(mk(EsDecoratorTransformer::discarded_value_visit));
+    let _ = tx.modifier_visitor.set(mk(EsDecoratorTransformer::modifier_visitor_visit));
     let _ = tx
         .export_stripping_modifier_visitor
-        .set(mk(esDecoratorTransformer::export_stripping_modifier_visit));
-    let _ = tx.class_element_visitor.set(mk(esDecoratorTransformer::class_element_visitor_visit));
+        .set(mk(EsDecoratorTransformer::export_stripping_modifier_visit));
+    let _ = tx.class_element_visitor.set(mk(EsDecoratorTransformer::class_element_visitor_visit));
     let _ = tx
         .non_constructor_class_element_visitor
-        .set(mk(esDecoratorTransformer::non_constructor_class_element_visit));
+        .set(mk(EsDecoratorTransformer::non_constructor_class_element_visit));
     let _ = tx
         .constructor_class_element_visitor
-        .set(mk(esDecoratorTransformer::constructor_class_element_visit));
+        .set(mk(EsDecoratorTransformer::constructor_class_element_visit));
     let _ =
-        tx.array_assignment_visitor.set(mk(esDecoratorTransformer::visit_array_assignment_element));
+        tx.array_assignment_visitor.set(mk(EsDecoratorTransformer::visit_array_assignment_element));
     let _ = tx
         .object_assignment_visitor
-        .set(mk(esDecoratorTransformer::visit_object_assignment_element));
+        .set(mk(EsDecoratorTransformer::visit_object_assignment_element));
     let _ = tx.static_only_modifier_visitor.set(ec.new_node_visitor(Rc::new(
         |_: &mut NodeVisitor, node: P<Node>| {
             if node.kind() == Kind::StaticKeyword { Some(node) } else { None }
@@ -165,14 +165,14 @@ pub fn new_es_decorator_transformer(opts: &TransformOptions) -> Option<P<Transfo
     Some(result)
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     fn new_entry(
         &self,
-        kind: lexicalEntryKind,
-        class_info_data: Option<P<classInfo>>,
+        kind: LexicalEntryKind,
+        class_info_data: Option<P<ClassInfo>>,
         saved_pending_expressions: Option<Vec<P<Node>>>,
-    ) -> P<lexicalEntry> {
-        P::new(lexicalEntry {
+    ) -> P<LexicalEntry> {
+        P::new(LexicalEntry {
             kind,
             next: self.top.get(),
             class_info_data,
@@ -192,30 +192,30 @@ impl esDecoratorTransformer {
             return;
         };
         match top.kind {
-            lexicalEntryKind::Class => self.class_info_stack.set(top.class_info_data),
-            lexicalEntryKind::ClassElement => {
+            LexicalEntryKind::Class => self.class_info_stack.set(top.class_info_data),
+            LexicalEntryKind::ClassElement => {
                 self.class_info_stack.set(top.next.unwrap().class_info_data);
                 self.class_this.set(top.class_this_data.get());
                 self.class_super.set(top.class_super_data.get());
             }
-            lexicalEntryKind::Name => {
+            LexicalEntryKind::Name => {
                 let grandparent = top.next.unwrap().next.unwrap().next;
                 if let Some(grandparent) =
-                    grandparent.filter(|g| g.kind == lexicalEntryKind::ClassElement)
+                    grandparent.filter(|g| g.kind == LexicalEntryKind::ClassElement)
                 {
                     self.class_info_stack.set(grandparent.next.unwrap().class_info_data);
                     self.class_this.set(grandparent.class_this_data.get());
                     self.class_super.set(grandparent.class_super_data.get());
                 }
             }
-            lexicalEntryKind::Other => {}
+            LexicalEntryKind::Other => {}
         }
     }
 
     // esdecorator.go:189
-    pub(crate) fn enter_class(&self, ci: Option<P<classInfo>>) {
+    pub(crate) fn enter_class(&self, ci: Option<P<ClassInfo>>) {
         let saved = self.pending_expressions.borrow_mut().take();
-        self.top.set(Some(self.new_entry(lexicalEntryKind::Class, ci, saved)));
+        self.top.set(Some(self.new_entry(LexicalEntryKind::Class, ci, saved)));
         self.update_state();
     }
 
@@ -223,7 +223,7 @@ impl esDecoratorTransformer {
     pub(crate) fn exit_class(&self) {
         let top = self.top.get();
         assert!(
-            top.is_some_and(|t| t.kind == lexicalEntryKind::Class),
+            top.is_some_and(|t| t.kind == LexicalEntryKind::Class),
             "Incorrect value for top.kind. Expected top.kind to be 'class'"
         );
         let top = top.unwrap();
@@ -235,10 +235,10 @@ impl esDecoratorTransformer {
     // esdecorator.go:207
     pub(crate) fn enter_class_element(&self, node: P<Node>) {
         assert!(
-            self.top.get().is_some_and(|t| t.kind == lexicalEntryKind::Class),
+            self.top.get().is_some_and(|t| t.kind == LexicalEntryKind::Class),
             "Incorrect value for top.kind. Expected top.kind to be 'class'"
         );
-        let top = self.new_entry(lexicalEntryKind::ClassElement, None, None);
+        let top = self.new_entry(LexicalEntryKind::ClassElement, None, None);
         self.top.set(Some(top));
         if ast::is_class_static_block_declaration(node)
             || ast::is_property_declaration(node) && ast::has_static_modifier(node)
@@ -255,12 +255,12 @@ impl esDecoratorTransformer {
     pub(crate) fn exit_class_element(&self) {
         let top = self.top.get();
         assert!(
-            top.is_some_and(|t| t.kind == lexicalEntryKind::ClassElement),
+            top.is_some_and(|t| t.kind == LexicalEntryKind::ClassElement),
             "Incorrect value for top.kind. Expected top.kind to be 'class-element'"
         );
         let top = top.unwrap();
         assert!(
-            top.next.is_some_and(|t| t.kind == lexicalEntryKind::Class),
+            top.next.is_some_and(|t| t.kind == LexicalEntryKind::Class),
             "Incorrect value for top.next.kind. Expected top.next.kind to be 'class'"
         );
         self.top.set(top.next);
@@ -270,10 +270,10 @@ impl esDecoratorTransformer {
     // esdecorator.go:229
     pub(crate) fn enter_name(&self) {
         assert!(
-            self.top.get().is_some_and(|t| t.kind == lexicalEntryKind::ClassElement),
+            self.top.get().is_some_and(|t| t.kind == LexicalEntryKind::ClassElement),
             "Incorrect value for top.kind. Expected top.kind to be 'class-element'"
         );
-        self.top.set(Some(self.new_entry(lexicalEntryKind::Name, None, None)));
+        self.top.set(Some(self.new_entry(LexicalEntryKind::Name, None, None)));
         self.update_state();
     }
 
@@ -281,7 +281,7 @@ impl esDecoratorTransformer {
     pub(crate) fn exit_name(&self) {
         let top = self.top.get();
         assert!(
-            top.is_some_and(|t| t.kind == lexicalEntryKind::Name),
+            top.is_some_and(|t| t.kind == LexicalEntryKind::Name),
             "Incorrect value for top.kind. Expected top.kind to be 'name'"
         );
         self.top.set(top.unwrap().next);
@@ -290,12 +290,12 @@ impl esDecoratorTransformer {
 
     // esdecorator.go:244
     pub(crate) fn enter_other(&self) {
-        if let Some(top) = self.top.get().filter(|t| t.kind == lexicalEntryKind::Other) {
+        if let Some(top) = self.top.get().filter(|t| t.kind == LexicalEntryKind::Other) {
             assert_eq!(self.pending_expressions.borrow().as_ref().map_or(0, std::vec::Vec::len), 0);
             top.depth.set(top.depth.get() + 1);
         } else {
             let saved = self.pending_expressions.borrow_mut().take();
-            self.top.set(Some(self.new_entry(lexicalEntryKind::Other, None, saved)));
+            self.top.set(Some(self.new_entry(LexicalEntryKind::Other, None, saved)));
             self.update_state();
         }
     }
@@ -304,7 +304,7 @@ impl esDecoratorTransformer {
     pub(crate) fn exit_other(&self) {
         let top = self.top.get();
         assert!(
-            top.is_some_and(|t| t.kind == lexicalEntryKind::Other),
+            top.is_some_and(|t| t.kind == LexicalEntryKind::Other),
             "Incorrect value for top.kind. Expected top.kind to be 'other'"
         );
         let top = top.unwrap();
@@ -366,7 +366,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:304
     pub(crate) fn visit(&self, node: P<Node>) -> Option<P<Node>> {
         if node.kind() == Kind::SourceFile {
@@ -528,7 +528,7 @@ pub(crate) fn get_helper_variable_name(ec: P<EmitContext>, node: P<Node>) -> Str
     format!("_{declaration_name}")
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:464
     pub(crate) fn create_helper_variable(&self, node: P<Node>, suffix: &str) -> P<Node> {
         self.base.factory().new_unique_name_ex(
@@ -554,9 +554,9 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:483
-    pub(crate) fn create_class_info(&self, node: P<Node>) -> P<classInfo> {
+    pub(crate) fn create_class_info(&self, node: P<Node>) -> P<ClassInfo> {
         let f = self.base.factory();
         let ec = self.base.emit_context();
         let file_level = printer::AutoGenerateOptions {
@@ -564,7 +564,7 @@ impl esDecoratorTransformer {
                 | printer::GeneratedIdentifierFlags::FileLevel,
             ..Default::default()
         };
-        let ci = P::new(classInfo {
+        let ci = P::new(ClassInfo {
             class: node,
             class_decorators_name: Cell::new(None),
             class_descriptor_name: Cell::new(None),
@@ -692,7 +692,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:577
     pub(crate) fn transform_class_like(&self, node: P<Node>) -> P<Node> {
         let f = self.base.factory();
@@ -1194,12 +1194,12 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:993
     // Generates let declarations for member decorator info variables, filtered by static/non-static.
     pub(crate) fn emit_member_info_declarations(
         &self,
-        ci: P<classInfo>,
+        ci: P<ClassInfo>,
         is_static: bool,
     ) -> Vec<P<Node>> {
         let f = self.base.factory();
@@ -1208,7 +1208,7 @@ impl esDecoratorTransformer {
             clippy::needless_collect,
             reason = "release the member-info borrow before constructing declarations, as in the original traversal"
         )]
-        let entries: Vec<(P<Node>, P<memberInfo>)> =
+        let entries: Vec<(P<Node>, P<MemberInfo>)> =
             ci.member_infos.borrow().iter().map(|(k, v)| (*k, *v)).collect();
         stmts = entries.into_iter().fold(stmts, |mut stmts, (member, mi)| {
             if ast::is_static(member) != is_static {
@@ -1243,7 +1243,7 @@ pub(crate) fn is_decorated_class_like(node: P<Node>) -> bool {
         || ast::child_is_decorated(false, node, None)
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1019
     fn visit_class_declaration(&self, node: P<Node>) -> Option<P<Node>> {
         let f = self.base.factory();
@@ -1396,7 +1396,7 @@ impl esDecoratorTransformer {
     }
 
     // esdecorator.go:1122
-    pub(crate) fn prepare_constructor(&self, ci: P<classInfo>) -> Vec<P<Node>> {
+    pub(crate) fn prepare_constructor(&self, ci: P<ClassInfo>) -> Vec<P<Node>> {
         // Decorated instance members can add "extra" initializers to the instance. If a class contains any instance
         // fields, we'll inject the `__runInitializers()` call for these extra initializers into the initializer of
         // the first class member that will be initialized. However, if the class does not contain any fields that
@@ -1410,7 +1410,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1138
     pub(crate) fn transform_constructor_body_worker(
         &self,

@@ -741,8 +741,8 @@ impl Scanner {
     }
 
     pub(crate) fn language_version(&self) -> ScriptTarget {
-        if self.script_target == ScriptTarget::None {
-            return ScriptTarget::Latest;
+        if self.script_target == ScriptTarget::NONE {
+            return ScriptTarget::LATEST;
         }
         self.script_target
     }
@@ -1219,7 +1219,7 @@ impl Scanner {
             self.process_comment_directive(last_line_start, self.state.pos, true);
 
             if !comment_closed {
-                self.error(&diagnostics::Asterisk_Slash_expected);
+                self.error(&diagnostics::ASTERISK_SLASH_EXPECTED);
             }
 
             if self.skip_trivia {
@@ -1289,7 +1289,7 @@ impl Scanner {
                     self.state.pos += 2;
                     let mut digits = self.scan_hex_digits(1, true, true);
                     if digits.is_empty() {
-                        self.error(&diagnostics::Hexadecimal_digit_expected);
+                        self.error(&diagnostics::HEXADECIMAL_DIGIT_EXPECTED);
                         digits = "0";
                     }
                     let raw_text = self.slice(start, self.state.pos);
@@ -1312,7 +1312,7 @@ impl Scanner {
                     self.state.pos += 2;
                     let (value, has_digits) = self.scan_binary_or_octal_digits(2, "0b");
                     if !has_digits {
-                        self.error(&diagnostics::Binary_digit_expected);
+                        self.error(&diagnostics::BINARY_DIGIT_EXPECTED);
                         self.state.token_value = "0b0";
                     } else {
                         self.state.token_value = value;
@@ -1324,7 +1324,7 @@ impl Scanner {
                     self.state.pos += 2;
                     let (value, has_digits) = self.scan_binary_or_octal_digits(8, "0o");
                     if !has_digits {
-                        self.error(&diagnostics::Octal_digit_expected);
+                        self.error(&diagnostics::OCTAL_DIGIT_EXPECTED);
                         self.state.token_value = "0o0";
                     } else {
                         self.state.token_value = value;
@@ -1590,7 +1590,7 @@ impl Scanner {
                     return None;
                 }
                 self.error_at(
-                    &diagnostics::X_can_only_be_used_at_the_start_of_a_file,
+                    &diagnostics::X_CAN_ONLY_BE_USED_AT_THE_START_OF_A_FILE,
                     self.state.pos,
                     2,
                     &[],
@@ -1599,7 +1599,7 @@ impl Scanner {
                 break 'hash Kind::Unknown;
             }
             if !self.scan_identifier(1, IdentifierVariant::Standard) {
-                self.error_at(&diagnostics::Invalid_character, self.state.pos - 1, 1, &[]);
+                self.error_at(&diagnostics::INVALID_CHARACTER, self.state.pos - 1, 1, &[]);
                 self.state.token_value = "#";
             }
             Kind::PrivateIdentifier
@@ -1614,7 +1614,7 @@ impl Scanner {
             }
             let (mut ch, mut size) = self.char_and_size();
             if ch == RUNE_ERROR {
-                self.error_at(&diagnostics::File_appears_to_be_binary, 0, 0, &[]);
+                self.error_at(&diagnostics::FILE_APPEARS_TO_BE_BINARY, 0, 0, &[]);
                 self.state.pos = self.text.len() as u32;
                 break 'default Kind::NonTextFileMarkerTrivia;
             }
@@ -1861,7 +1861,7 @@ impl Scanner {
                     }
                 }
                 self.error_at(
-                    &diagnostics::Unterminated_regular_expression_literal,
+                    &diagnostics::UNTERMINATED_REGULAR_EXPRESSION_LITERAL,
                     self.state.token_start,
                     p - self.state.token_start,
                     &[],
@@ -1879,14 +1879,14 @@ impl Scanner {
                     if should_report_errors {
                         match char_code_to_reg_exp_flag(ch) {
                             None => self.error_at(
-                                &diagnostics::Unknown_regular_expression_flag,
+                                &diagnostics::UNKNOWN_REGULAR_EXPRESSION_FLAG,
                                 p,
                                 size,
                                 &[],
                             ),
                             Some(flag) if reg_exp_flags.intersects(flag) => {
                                 self.error_at(
-                                    &diagnostics::Duplicate_regular_expression_flag,
+                                    &diagnostics::DUPLICATE_REGULAR_EXPRESSION_FLAG,
                                     p,
                                     size,
                                     &[],
@@ -1897,7 +1897,7 @@ impl Scanner {
                                     .contains(RegularExpressionFlags::AnyUnicodeMode) =>
                             {
                                 self.error_at(
-                                    &diagnostics::The_Unicode_u_flag_and_the_Unicode_Sets_v_flag_cannot_be_set_simultaneously,
+                                    &diagnostics::THE_UNICODE_U_FLAG_AND_THE_UNICODE_SETS_V_FLAG_CANNOT_BE_SET_SIMULTANEOUSLY,
                                     p,
                                     size,
                                     &[],
@@ -2011,14 +2011,14 @@ impl Scanner {
                 }
                 if ch == '>' as Rune {
                     self.error_at(
-                        &diagnostics::Unexpected_token_Did_you_mean_or_gt,
+                        &diagnostics::UNEXPECTED_TOKEN_DID_YOU_MEAN_OR_GT,
                         self.state.pos,
                         1,
                         &[],
                     );
                 } else if ch == '}' as Rune {
                     self.error_at(
-                        &diagnostics::Unexpected_token_Did_you_mean_or_rbrace,
+                        &diagnostics::UNEXPECTED_TOKEN_DID_YOU_MEAN_OR_RBRACE,
                         self.state.pos,
                         1,
                         &[],
@@ -2409,7 +2409,7 @@ impl Scanner {
             sb.push_str(self.slice(start, self.state.pos));
             let Some(ch) = self.char() else {
                 self.state.token_flags |= TokenFlags::Unterminated;
-                self.error(&diagnostics::Unterminated_string_literal);
+                self.error(&diagnostics::UNTERMINATED_STRING_LITERAL);
                 break;
             };
             if ch == quote {
@@ -2427,7 +2427,7 @@ impl Scanner {
             }
             debug_assert!(ch == b'\n' || ch == b'\r');
             self.state.token_flags |= TokenFlags::Unterminated;
-            self.error(&diagnostics::Unterminated_string_literal);
+            self.error(&diagnostics::UNTERMINATED_STRING_LITERAL);
             break;
         }
         sb.into_str()
@@ -2452,7 +2452,7 @@ impl Scanner {
                     self.state.pos += 1;
                 } else {
                     self.state.token_flags |= TokenFlags::Unterminated;
-                    self.error(&diagnostics::Unterminated_template_literal);
+                    self.error(&diagnostics::UNTERMINATED_TEMPLATE_LITERAL);
                 }
                 self.finish_template_parts(&mut parts, start, part_end);
                 token = if started_with_backtick {
@@ -2528,7 +2528,7 @@ impl Scanner {
         let start = self.state.pos;
         self.state.pos += 1;
         let Some(ch) = self.char() else {
-            self.error(&diagnostics::Unexpected_end_of_text);
+            self.error(&diagnostics::UNEXPECTED_END_OF_TEXT);
             return Cow::Borrowed("");
         };
         self.state.pos += 1;
@@ -2563,13 +2563,13 @@ impl Scanner {
                         && ch != b'0'
                     {
                         self.error_at(
-                            &diagnostics::Octal_escape_sequences_and_backreferences_are_not_allowed_in_a_character_class_If_this_was_intended_as_an_escape_sequence_use_the_syntax_0_instead,
+                            &diagnostics::OCTAL_ESCAPE_SEQUENCES_AND_BACKREFERENCES_ARE_NOT_ALLOWED_IN_A_CHARACTER_CLASS_IF_THIS_WAS_INTENDED_AS_AN_ESCAPE_SEQUENCE_USE_THE_SYNTAX_0_INSTEAD,
                             start,
                             self.state.pos - start,
                             &[&arg],
                         );
                     } else {
-                        self.error_at(&diagnostics::Octal_escape_sequences_are_not_allowed_Use_the_syntax_0, start, self.state.pos - start, &[&arg]);
+                        self.error_at(&diagnostics::OCTAL_ESCAPE_SEQUENCES_ARE_NOT_ALLOWED_USE_THE_SYNTAX_0, start, self.state.pos - start, &[&arg]);
                     }
                     return Cow::Owned(rune_string(code));
                 }
@@ -2581,14 +2581,14 @@ impl Scanner {
                 if flags.intersects(EscapeSequenceScanningFlags::ReportInvalidEscapeErrors) {
                     if flags.intersects(EscapeSequenceScanningFlags::RegularExpression) && !flags.intersects(EscapeSequenceScanningFlags::AtomEscape) {
                         self.error_at(
-                            &diagnostics::Decimal_escape_sequences_and_backreferences_are_not_allowed_in_a_character_class,
+                            &diagnostics::DECIMAL_ESCAPE_SEQUENCES_AND_BACKREFERENCES_ARE_NOT_ALLOWED_IN_A_CHARACTER_CLASS,
                             start,
                             self.state.pos - start,
                             &[],
                         );
                     } else {
                         let text = self.slice(start, self.state.pos);
-                        self.error_at(&diagnostics::Escape_sequence_0_is_not_allowed, start, self.state.pos - start, &[&text]);
+                        self.error_at(&diagnostics::ESCAPE_SEQUENCE_0_IS_NOT_ALLOWED, start, self.state.pos - start, &[&text]);
                     }
                     return Cow::Owned(rune_string(u32::from(ch)));
                 }
@@ -2612,7 +2612,7 @@ impl Scanner {
                         self.state.token_flags |= TokenFlags::ContainsInvalidEscape;
                         if flags.intersects(EscapeSequenceScanningFlags::ReportInvalidEscapeErrors) {
                             self.error_at(
-                                &diagnostics::Unicode_escape_sequences_are_only_available_when_the_Unicode_u_flag_or_the_Unicode_Sets_v_flag_is_set,
+                                &diagnostics::UNICODE_ESCAPE_SEQUENCES_ARE_ONLY_AVAILABLE_WHEN_THE_UNICODE_U_FLAG_OR_THE_UNICODE_SETS_V_FLAG_IS_SET,
                                 start,
                                 self.state.pos - start,
                                 &[],
@@ -2669,7 +2669,7 @@ impl Scanner {
                     if !self.char().is_some_and(|ch| stringutil::is_hex_digit(u32::from(ch))) {
                         self.state.token_flags |= TokenFlags::ContainsInvalidEscape;
                         if flags.intersects(EscapeSequenceScanningFlags::ReportInvalidEscapeErrors) {
-                            self.error(&diagnostics::Hexadecimal_digit_expected);
+                            self.error(&diagnostics::HEXADECIMAL_DIGIT_EXPECTED);
                         }
                         return Cow::Borrowed(self.slice(start, self.state.pos));
                     }
@@ -2707,7 +2707,7 @@ impl Scanner {
                         && !flags.intersects(EscapeSequenceScanningFlags::AnnexB)
                         && is_identifier_part(ch)
                 {
-                    self.error_at(&diagnostics::This_character_cannot_be_escaped_in_a_regular_expression, start, self.state.pos - start, &[]);
+                    self.error_at(&diagnostics::THIS_CHARACTER_CANNOT_BE_ESCAPED_IN_A_REGULAR_EXPRESSION, start, self.state.pos - start, &[]);
                 }
                 if ch < RUNE_SELF {
                     // Single ASCII characters are always slices of the text.
@@ -2737,7 +2737,7 @@ impl Scanner {
         if hex_digits.is_empty() {
             self.state.token_flags |= TokenFlags::ContainsInvalidEscape;
             if should_emit_invalid_escape_error {
-                self.error(&diagnostics::Hexadecimal_digit_expected);
+                self.error(&diagnostics::HEXADECIMAL_DIGIT_EXPECTED);
             }
             return None;
         }
@@ -2747,7 +2747,7 @@ impl Scanner {
             if hex_value > 0x0010_FFFF {
                 if should_emit_invalid_escape_error {
                     self.error_at(
-                        &diagnostics::An_extended_Unicode_escape_value_must_be_between_0x0_and_0x10FFFF_inclusive,
+                        &diagnostics::AN_EXTENDED_UNICODE_ESCAPE_VALUE_MUST_BE_BETWEEN_0X0_AND_0X10_FFFF_INCLUSIVE,
                         start + 1,
                         self.state.pos - start - 1,
                         &[],
@@ -2757,14 +2757,14 @@ impl Scanner {
             }
             if self.state.pos >= self.end {
                 if should_emit_invalid_escape_error {
-                    self.error(&diagnostics::Unexpected_end_of_text);
+                    self.error(&diagnostics::UNEXPECTED_END_OF_TEXT);
                 }
                 is_invalid_extended_escape = true;
             } else if self.char() == Some(b'}') {
                 self.state.pos += 1;
             } else {
                 if should_emit_invalid_escape_error {
-                    self.error(&diagnostics::Unterminated_Unicode_escape_sequence);
+                    self.error(&diagnostics::UNTERMINATED_UNICODE_ESCAPE_SEQUENCE);
                 }
                 is_invalid_extended_escape = true;
             }
@@ -2825,7 +2825,7 @@ impl Scanner {
                 self.state.token_flags |=
                     TokenFlags::ContainsSeparator | TokenFlags::ContainsInvalidSeparator;
                 self.error_at(
-                    &diagnostics::Numeric_separators_are_not_allowed_here,
+                    &diagnostics::NUMERIC_SEPARATORS_ARE_NOT_ALLOWED_HERE,
                     self.state.pos,
                     1,
                     &[],
@@ -2851,7 +2851,7 @@ impl Scanner {
                         start -= 1;
                     }
                     self.error_at(
-                        &diagnostics::Octal_literals_are_not_allowed_Use_the_syntax_0,
+                        &diagnostics::OCTAL_LITERALS_ARE_NOT_ALLOWED_USE_THE_SYNTAX_0,
                         start,
                         self.state.pos - start,
                         &[&literal],
@@ -2880,7 +2880,7 @@ impl Scanner {
             let start_numeric_part = self.state.pos;
             exponent_part = self.scan_number_fragment();
             if exponent_part.is_empty() {
-                self.error(&diagnostics::Digit_expected);
+                self.error(&diagnostics::DIGIT_EXPECTED);
             } else {
                 exponent_preamble = self.slice(end, start_numeric_part);
                 end = self.state.pos;
@@ -2908,7 +2908,7 @@ impl Scanner {
         }
         if self.state.token_flags.intersects(TokenFlags::ContainsLeadingZero) {
             self.error_at(
-                &diagnostics::Decimals_with_leading_zeros_are_not_allowed,
+                &diagnostics::DECIMALS_WITH_LEADING_ZEROS_ARE_NOT_ALLOWED,
                 start,
                 self.state.pos - start,
                 &[],
@@ -2933,7 +2933,7 @@ impl Scanner {
             {
                 if self.state.token_flags.intersects(TokenFlags::Scientific) {
                     self.error_at(
-                        &diagnostics::A_bigint_literal_cannot_use_exponential_notation,
+                        &diagnostics::A_BIGINT_LITERAL_CANNOT_USE_EXPONENTIAL_NOTATION,
                         start,
                         self.state.pos - start,
                         &[],
@@ -2942,7 +2942,7 @@ impl Scanner {
                 }
                 if fixed_part_end < id_start {
                     self.error_at(
-                        &diagnostics::A_bigint_literal_must_be_an_integer,
+                        &diagnostics::A_BIGINT_LITERAL_MUST_BE_AN_INTEGER,
                         start,
                         self.state.pos - start,
                         &[],
@@ -2951,7 +2951,7 @@ impl Scanner {
                 }
             }
             self.error_at(
-                &diagnostics::An_identifier_or_keyword_cannot_immediately_follow_a_numeric_literal,
+                &diagnostics::AN_IDENTIFIER_OR_KEYWORD_CANNOT_IMMEDIATELY_FOLLOW_A_NUMERIC_LITERAL,
                 id_start,
                 self.state.pos - id_start,
                 &[],
@@ -3004,14 +3004,14 @@ impl Scanner {
                     self.state.token_flags |= TokenFlags::ContainsInvalidSeparator;
                     if is_previous_token_separator {
                         self.error_at(
-                            &diagnostics::Multiple_consecutive_numeric_separators_are_not_permitted,
+                            &diagnostics::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_ARE_NOT_PERMITTED,
                             self.state.pos,
                             1,
                             &[],
                         );
                     } else {
                         self.error_at(
-                            &diagnostics::Numeric_separators_are_not_allowed_here,
+                            &diagnostics::NUMERIC_SEPARATORS_ARE_NOT_ALLOWED_HERE,
                             self.state.pos,
                             1,
                             &[],
@@ -3027,7 +3027,7 @@ impl Scanner {
         if is_previous_token_separator {
             self.state.token_flags |= TokenFlags::ContainsInvalidSeparator;
             self.error_at(
-                &diagnostics::Numeric_separators_are_not_allowed_here,
+                &diagnostics::NUMERIC_SEPARATORS_ARE_NOT_ALLOWED_HERE,
                 self.state.pos - 1,
                 1,
                 &[],
@@ -3075,14 +3075,14 @@ impl Scanner {
                     is_previous_token_separator = true;
                 } else if is_previous_token_separator {
                     self.error_at(
-                        &diagnostics::Multiple_consecutive_numeric_separators_are_not_permitted,
+                        &diagnostics::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_ARE_NOT_PERMITTED,
                         self.state.pos,
                         1,
                         &[],
                     );
                 } else {
                     self.error_at(
-                        &diagnostics::Numeric_separators_are_not_allowed_here,
+                        &diagnostics::NUMERIC_SEPARATORS_ARE_NOT_ALLOWED_HERE,
                         self.state.pos,
                         1,
                         &[],
@@ -3095,7 +3095,7 @@ impl Scanner {
         }
         if is_previous_token_separator {
             self.error_at(
-                &diagnostics::Numeric_separators_are_not_allowed_here,
+                &diagnostics::NUMERIC_SEPARATORS_ARE_NOT_ALLOWED_HERE,
                 self.state.pos - 1,
                 1,
                 &[],
@@ -3153,14 +3153,14 @@ impl Scanner {
                     is_previous_token_separator = true;
                 } else if is_previous_token_separator {
                     self.error_at(
-                        &diagnostics::Multiple_consecutive_numeric_separators_are_not_permitted,
+                        &diagnostics::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_ARE_NOT_PERMITTED,
                         self.state.pos,
                         1,
                         &[],
                     );
                 } else {
                     self.error_at(
-                        &diagnostics::Numeric_separators_are_not_allowed_here,
+                        &diagnostics::NUMERIC_SEPARATORS_ARE_NOT_ALLOWED_HERE,
                         self.state.pos,
                         1,
                         &[],
@@ -3173,7 +3173,7 @@ impl Scanner {
         }
         if is_previous_token_separator {
             self.error_at(
-                &diagnostics::Numeric_separators_are_not_allowed_here,
+                &diagnostics::NUMERIC_SEPARATORS_ARE_NOT_ALLOWED_HERE,
                 self.state.pos - 1,
                 1,
                 &[],
@@ -3211,7 +3211,7 @@ impl Scanner {
 
     fn scan_invalid_character(&mut self) {
         let (_, size) = self.char_and_size();
-        self.error_at(&diagnostics::Invalid_character, self.state.pos, size, &[]);
+        self.error_at(&diagnostics::INVALID_CHARACTER, self.state.pos, size, &[]);
         self.state.pos += size;
         self.state.token = Kind::Unknown;
     }
@@ -3491,7 +3491,7 @@ pub(crate) fn scan_conflict_marker_trivia(
 ) -> u32 {
     if let Some(report_error) = report_error {
         report_error(
-            &diagnostics::Merge_conflict_marker_encountered,
+            &diagnostics::MERGE_CONFLICT_MARKER_ENCOUNTERED,
             pos,
             MERGE_CONFLICT_MARKER_LENGTH,
         );

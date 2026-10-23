@@ -7,6 +7,7 @@ use crate::*;
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Default)]
+    #[expect(non_camel_case_types, reason = "Keep the upstream bitflags type name.")]
     pub(crate) struct getLiteralTextFlags: u32 {
         const None = 0;
         const NeverAsciiEscape = 1 << 0;
@@ -82,7 +83,7 @@ pub(crate) fn escape_string_worker(
     while i < bytes.len() {
         let (mut ch, mut size) = if i == 0
             && flags.intersects(getLiteralTextFlags::InternalSymbolName)
-            && bytes[0] == InternalSymbolNamePrefixByte
+            && bytes[0] == INTERNAL_SYMBOL_NAME_PREFIX_BYTE
         {
             // An internal symbol name the node builder put into a string literal (`(typeof E)["�missing"]`):
             // Go's prefix is the invalid byte 0xFE, which it decodes as a stray RuneError. Any other U+007F is user
@@ -1071,7 +1072,7 @@ pub(crate) fn calculate_indent(text: &str, pos: u32, end: u32) -> i32 {
 //
 // Character offsets are measured in UTF-16 code units per the source map specification.
 #[derive(Clone, Copy)]
-pub(crate) struct lineCharacterCache {
+pub(crate) struct LineCharacterCache {
     pub(crate) line_map: &'static [u32],
     pub(crate) text: &'static str,
     pub(crate) cached_line: usize,
@@ -1083,8 +1084,8 @@ pub(crate) struct lineCharacterCache {
 // utilities.go:903
 pub(crate) fn new_line_character_cache(
     source: &'static dyn tsrs_sourcemap::Source,
-) -> lineCharacterCache {
-    lineCharacterCache {
+) -> LineCharacterCache {
+    LineCharacterCache {
         line_map: source.ecma_line_map(),
         text: source.text(),
         cached_line: 0,
@@ -1094,7 +1095,7 @@ pub(crate) fn new_line_character_cache(
     }
 }
 
-impl lineCharacterCache {
+impl LineCharacterCache {
     // utilities.go:912
     // getLineAndCharacter returns the 0-based line number and UTF-16 code unit
     // offset from the start of that line for the given byte position.

@@ -437,51 +437,51 @@ pub(crate) fn generate_identifier_for_arbitrary_string(text: &str) -> String {
 pub(crate) fn get_completions_symbol_kind(kind: ScriptElementKind) -> lsproto::CompletionItemKind {
     match kind {
         ScriptElementKind::PrimitiveType | ScriptElementKind::Keyword => {
-            lsproto::CompletionItemKind::Keyword
+            lsproto::CompletionItemKind::KEYWORD
         }
         ScriptElementKind::ConstElement
         | ScriptElementKind::LetElement
         | ScriptElementKind::VariableElement
         | ScriptElementKind::LocalVariableElement
         | ScriptElementKind::Alias
-        | ScriptElementKind::ParameterElement => lsproto::CompletionItemKind::Variable,
+        | ScriptElementKind::ParameterElement => lsproto::CompletionItemKind::VARIABLE,
 
         ScriptElementKind::MemberVariableElement
         | ScriptElementKind::MemberGetAccessorElement
-        | ScriptElementKind::MemberSetAccessorElement => lsproto::CompletionItemKind::Field,
+        | ScriptElementKind::MemberSetAccessorElement => lsproto::CompletionItemKind::FIELD,
 
         ScriptElementKind::FunctionElement | ScriptElementKind::LocalFunctionElement => {
-            lsproto::CompletionItemKind::Function
+            lsproto::CompletionItemKind::FUNCTION
         }
 
         ScriptElementKind::MemberFunctionElement
         | ScriptElementKind::ConstructSignatureElement
         | ScriptElementKind::CallSignatureElement
-        | ScriptElementKind::IndexSignatureElement => lsproto::CompletionItemKind::Method,
+        | ScriptElementKind::IndexSignatureElement => lsproto::CompletionItemKind::METHOD,
 
-        ScriptElementKind::EnumElement => lsproto::CompletionItemKind::Enum,
+        ScriptElementKind::EnumElement => lsproto::CompletionItemKind::ENUM,
 
-        ScriptElementKind::EnumMemberElement => lsproto::CompletionItemKind::EnumMember,
+        ScriptElementKind::EnumMemberElement => lsproto::CompletionItemKind::ENUM_MEMBER,
 
         ScriptElementKind::ModuleElement | ScriptElementKind::ExternalModuleName => {
-            lsproto::CompletionItemKind::Module
+            lsproto::CompletionItemKind::MODULE
         }
 
         ScriptElementKind::ClassElement | ScriptElementKind::TypeElement => {
-            lsproto::CompletionItemKind::Class
+            lsproto::CompletionItemKind::CLASS
         }
 
-        ScriptElementKind::InterfaceElement => lsproto::CompletionItemKind::Interface,
+        ScriptElementKind::InterfaceElement => lsproto::CompletionItemKind::INTERFACE,
 
-        ScriptElementKind::Warning => lsproto::CompletionItemKind::Text,
+        ScriptElementKind::Warning => lsproto::CompletionItemKind::TEXT,
 
-        ScriptElementKind::ScriptElement => lsproto::CompletionItemKind::File,
+        ScriptElementKind::ScriptElement => lsproto::CompletionItemKind::FILE,
 
-        ScriptElementKind::Directory => lsproto::CompletionItemKind::Folder,
+        ScriptElementKind::Directory => lsproto::CompletionItemKind::FOLDER,
 
-        ScriptElementKind::String => lsproto::CompletionItemKind::Constant,
+        ScriptElementKind::String => lsproto::CompletionItemKind::CONSTANT,
 
-        _ => lsproto::CompletionItemKind::Property,
+        _ => lsproto::CompletionItemKind::PROPERTY,
     }
 }
 
@@ -514,12 +514,13 @@ fn keyword_completions_cache() -> &'static Mutex<FxHashMap<u32, Vec<lsproto::Com
 pub(crate) fn all_keyword_completions() -> &'static [lsproto::CompletionItem] {
     static ALL_KEYWORD_COMPLETIONS: OnceLock<Vec<lsproto::CompletionItem>> = OnceLock::new();
     ALL_KEYWORD_COMPLETIONS.get_or_init(|| {
-        let mut result =
-            Vec::with_capacity((Kind::LastKeyword as i16 - Kind::FirstKeyword as i16 + 1) as usize);
-        result.extend((Kind::FirstKeyword as i16..=Kind::LastKeyword as i16).map(|i| {
+        let mut result = Vec::with_capacity(
+            (Kind::LAST_KEYWORD as i16 - Kind::FIRST_KEYWORD as i16 + 1) as usize,
+        );
+        result.extend((Kind::FIRST_KEYWORD as i16..=Kind::LAST_KEYWORD as i16).map(|i| {
             lsproto::CompletionItem {
                 label: scanner::token_to_string(Kind::from_i16(i)).to_string(),
-                kind: Some(lsproto::CompletionItemKind::Keyword),
+                kind: Some(lsproto::CompletionItemKind::KEYWORD),
                 sort_text: Some(SORT_TEXT_GLOBALS_OR_KEYWORDS.to_string()),
                 ..Default::default()
             }
@@ -542,7 +543,7 @@ pub(crate) fn get_keyword_completions(
         return clone_items(&get_typescript_keyword_completions(keyword_filter));
     }
 
-    let index = keyword_filter as u32 + KeywordCompletionFilters::Last as u32 + 1;
+    let index = keyword_filter as u32 + KeywordCompletionFilters::LAST as u32 + 1;
     if let Some(cached) = keyword_completions_cache().lock().unwrap().get(&index) {
         return clone_items(cached);
     }
@@ -709,7 +710,7 @@ pub(crate) fn get_contextual_keywords(
         {
             entries.push(lsproto::CompletionItem {
                 label: scanner::token_to_string(Kind::AssertKeyword).to_string(),
-                kind: Some(lsproto::CompletionItemKind::Keyword),
+                kind: Some(lsproto::CompletionItemKind::KEYWORD),
                 sort_text: Some(SORT_TEXT_GLOBALS_OR_KEYWORDS.to_string()),
                 ..Default::default()
             });
@@ -739,7 +740,7 @@ impl LanguageService {
                 unique_names.insert(name.to_string());
                 Some(CompletionItem::new(lsproto::CompletionItem {
                     label: name.to_string(),
-                    kind: Some(lsproto::CompletionItemKind::Text),
+                    kind: Some(lsproto::CompletionItemKind::TEXT),
                     sort_text: Some(SORT_TEXT_JAVASCRIPT_IDENTIFIERS.to_string()),
                     commit_characters: Some(Vec::new()),
                     ..Default::default()
@@ -2016,7 +2017,7 @@ impl LanguageService {
             name += "?";
         }
         if kind_modifiers.intersects(ScriptElementKindModifier::Deprecated) {
-            tags = Some(vec![lsproto::CompletionItemTag::Deprecated]);
+            tags = Some(vec![lsproto::CompletionItemTag::DEPRECATED]);
         }
 
         if has_action && !source.is_empty() {
@@ -2026,7 +2027,7 @@ impl LanguageService {
         // Client assumes plain text by default.
         let mut insert_text_format: Option<lsproto::InsertTextFormat> = None;
         if is_snippet {
-            insert_text_format = Some(lsproto::InsertTextFormat::Snippet);
+            insert_text_format = Some(lsproto::InsertTextFormat::SNIPPET);
         }
 
         lsproto::CompletionItem {
@@ -2489,7 +2490,7 @@ pub(crate) fn client_supports_default_edit_range(ctx: &Context) -> bool {
 
 // completions.go:5447
 #[derive(Clone, Copy)]
-pub(crate) struct argumentInfoForCompletions {
+pub(crate) struct ArgumentInfoForCompletions {
     pub(crate) invocation: P<Node>,
     pub(crate) argument_index: usize,
     pub(crate) argument_count: usize,
@@ -2501,12 +2502,12 @@ pub(crate) fn get_argument_info_for_completions(
     position: u32,
     file: P<SourceFile>,
     type_checker: &mut Checker,
-) -> Option<argumentInfoForCompletions> {
+) -> Option<ArgumentInfoForCompletions> {
     let info = get_immediately_containing_argument_info(node, position, file, type_checker)?;
     if info.is_type_parameter_list || info.invocation.call_invocation.is_none() {
         return None;
     }
-    Some(argumentInfoForCompletions {
+    Some(ArgumentInfoForCompletions {
         invocation: info.invocation.call_invocation.unwrap().node,
         argument_index: info.argument_index,
         argument_count: info.argument_count,

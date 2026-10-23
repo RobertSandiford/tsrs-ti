@@ -1171,29 +1171,29 @@ impl SymbolTable {
 // (DEL): a single byte, so `name.as_bytes()[0]` / `name.as_bytes()[1]` checks translate one to one, and it
 // cannot occur in an IdentifierName. Translate Go `name[0] == '\xFE'` to
 // `name.as_bytes().first() == Some(&InternalSymbolNamePrefixByte)`.
-pub const InternalSymbolNamePrefix: &str = "\u{7f}";
-pub const InternalSymbolNamePrefixByte: u8 = 0x7f;
+pub const INTERNAL_SYMBOL_NAME_PREFIX: &str = "\u{7f}";
+pub const INTERNAL_SYMBOL_NAME_PREFIX_BYTE: u8 = 0x7f;
 
-pub const InternalSymbolNameCall: &str = "\u{7f}call"; // Call signatures
-pub const InternalSymbolNameConstructor: &str = "\u{7f}constructor"; // Constructor implementations
-pub const InternalSymbolNameNew: &str = "\u{7f}new"; // Constructor signatures
-pub const InternalSymbolNameIndex: &str = "\u{7f}index"; // Index signatures
-pub const InternalSymbolNameExportStar: &str = "\u{7f}export"; // Module export * declarations
-pub const InternalSymbolNameGlobal: &str = "\u{7f}global"; // Global self-reference
-pub const InternalSymbolNameMissing: &str = "\u{7f}missing"; // Indicates missing symbol
-pub const InternalSymbolNameType: &str = "\u{7f}type"; // Anonymous type literal symbol
-pub const InternalSymbolNameObject: &str = "\u{7f}object"; // Anonymous object literal declaration
-pub const InternalSymbolNameJSXAttributes: &str = "\u{7f}jsxAttributes"; // Anonymous JSX attributes object literal declaration
-pub const InternalSymbolNameClass: &str = "\u{7f}class"; // Unnamed class expression
-pub const InternalSymbolNameFunction: &str = "\u{7f}function"; // Unnamed function expression
-pub const InternalSymbolNameComputed: &str = "\u{7f}computed"; // Computed property name declaration with dynamic name
-pub const InternalSymbolNameAssignmentDeclaration: &str = "\u{7f}assignment"; // Assignment declarations
-pub const InternalSymbolNameInstantiationExpression: &str = "\u{7f}instantiationExpression"; // Instantiation expressions
-pub const InternalSymbolNameImportAttributes: &str = "\u{7f}importAttributes";
-pub const InternalSymbolNameExportEquals: &str = "export="; // Export assignment symbol
-pub const InternalSymbolNameDefault: &str = "default"; // Default export symbol (technically not wholly internal, but included here for usability)
-pub const InternalSymbolNameThis: &str = "this";
-pub const InternalSymbolNameModuleExports: &str = "module.exports";
+pub const INTERNAL_SYMBOL_NAME_CALL: &str = "\u{7f}call"; // Call signatures
+pub const INTERNAL_SYMBOL_NAME_CONSTRUCTOR: &str = "\u{7f}constructor"; // Constructor implementations
+pub const INTERNAL_SYMBOL_NAME_NEW: &str = "\u{7f}new"; // Constructor signatures
+pub const INTERNAL_SYMBOL_NAME_INDEX: &str = "\u{7f}index"; // Index signatures
+pub const INTERNAL_SYMBOL_NAME_EXPORT_STAR: &str = "\u{7f}export"; // Module export * declarations
+pub const INTERNAL_SYMBOL_NAME_GLOBAL: &str = "\u{7f}global"; // Global self-reference
+pub const INTERNAL_SYMBOL_NAME_MISSING: &str = "\u{7f}missing"; // Indicates missing symbol
+pub const INTERNAL_SYMBOL_NAME_TYPE: &str = "\u{7f}type"; // Anonymous type literal symbol
+pub const INTERNAL_SYMBOL_NAME_OBJECT: &str = "\u{7f}object"; // Anonymous object literal declaration
+pub const INTERNAL_SYMBOL_NAME_JSX_ATTRIBUTES: &str = "\u{7f}jsxAttributes"; // Anonymous JSX attributes object literal declaration
+pub const INTERNAL_SYMBOL_NAME_CLASS: &str = "\u{7f}class"; // Unnamed class expression
+pub const INTERNAL_SYMBOL_NAME_FUNCTION: &str = "\u{7f}function"; // Unnamed function expression
+pub const INTERNAL_SYMBOL_NAME_COMPUTED: &str = "\u{7f}computed"; // Computed property name declaration with dynamic name
+pub const INTERNAL_SYMBOL_NAME_ASSIGNMENT_DECLARATION: &str = "\u{7f}assignment"; // Assignment declarations
+pub const INTERNAL_SYMBOL_NAME_INSTANTIATION_EXPRESSION: &str = "\u{7f}instantiationExpression"; // Instantiation expressions
+pub const INTERNAL_SYMBOL_NAME_IMPORT_ATTRIBUTES: &str = "\u{7f}importAttributes";
+pub const INTERNAL_SYMBOL_NAME_EXPORT_EQUALS: &str = "export="; // Export assignment symbol
+pub const INTERNAL_SYMBOL_NAME_DEFAULT: &str = "default"; // Default export symbol (technically not wholly internal, but included here for usability)
+pub const INTERNAL_SYMBOL_NAME_THIS: &str = "this";
+pub const INTERNAL_SYMBOL_NAME_MODULE_EXPORTS: &str = "module.exports";
 
 pub fn symbol_name(symbol: P<Symbol>) -> &'static str {
     if let Some(value_declaration) = symbol.value_declaration() {
@@ -1206,11 +1206,11 @@ pub fn symbol_name(symbol: P<Symbol>) -> &'static str {
 
 // EscapeAllInternalSymbolNames replaces internal symbol name markers with "__".
 pub fn escape_all_internal_symbol_names(name: &str) -> String {
-    name.replace(InternalSymbolNamePrefix, "__")
+    name.replace(INTERNAL_SYMBOL_NAME_PREFIX, "__")
 }
 
 pub fn escape_internal_symbol_name(name: &str) -> String {
-    if let Some(rest) = name.strip_prefix(InternalSymbolNamePrefix) {
+    if let Some(rest) = name.strip_prefix(INTERNAL_SYMBOL_NAME_PREFIX) {
         return format!("__{rest}");
     }
     name.to_string()
@@ -1221,7 +1221,7 @@ pub fn escape_internal_symbol_name(name: &str) -> String {
 // and user names that already begin with "__" gain an extra leading underscore
 // so they can be distinguished from internal names.
 pub fn escape_symbol_name(name: &str) -> String {
-    if let Some(rest) = name.strip_prefix(InternalSymbolNamePrefix) {
+    if let Some(rest) = name.strip_prefix(INTERNAL_SYMBOL_NAME_PREFIX) {
         return format!("__{rest}");
     }
     let b = name.as_bytes();

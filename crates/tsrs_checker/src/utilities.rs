@@ -325,7 +325,7 @@ pub(crate) fn is_syntactic_default(node: P<Node>) -> bool {
 // utilities.go:256
 pub(crate) fn has_export_assignment_symbol(module_symbol: P<Symbol>) -> bool {
     match module_symbol.exports() {
-        Some(exports) => exports.lookup(InternalSymbolNameExportEquals).is_some(),
+        Some(exports) => exports.lookup(INTERNAL_SYMBOL_NAME_EXPORT_EQUALS).is_some(),
         None => false,
     }
 }
@@ -1279,7 +1279,7 @@ pub(crate) fn is_declaration_readonly(declaration: P<Node>) -> bool {
         && !ast::is_parameter_property_declaration(declaration, declaration.parent().unwrap())
 }
 
-impl<T: Copy + Eq + std::hash::Hash> orderedSet<T> {
+impl<T: Copy + Eq + std::hash::Hash> CheckerOrderedSet<T> {
     // utilities.go:884
     pub(crate) fn contains(&self, value: T) -> bool {
         match &self.values_by_key {
@@ -1294,7 +1294,7 @@ impl<T: Copy + Eq + std::hash::Hash> orderedSet<T> {
         // Small sets are served by a linear scan over values; only materialize the map once the set
         // grows large enough for hashing to win.
         if self.values_by_key.is_none() {
-            if self.values.len() <= orderedSetMapThreshold {
+            if self.values.len() <= ORDERED_SET_MAP_THRESHOLD {
                 return;
             }
             let mut m =
@@ -1449,14 +1449,14 @@ pub fn is_private_identifier_symbol(symbol: Option<P<Symbol>>) -> bool {
     };
     let name = symbol.name();
     name.len() >= 2
-        && name.as_bytes()[0] == InternalSymbolNamePrefixByte
+        && name.as_bytes()[0] == INTERNAL_SYMBOL_NAME_PREFIX_BYTE
         && name.as_bytes()[1] == b'#'
 }
 
 // utilities.go:1029
 pub(crate) fn is_late_bound_name(name: &str) -> bool {
     name.len() >= 2
-        && name.as_bytes()[0] == InternalSymbolNamePrefixByte
+        && name.as_bytes()[0] == INTERNAL_SYMBOL_NAME_PREFIX_BYTE
         && name.as_bytes()[1] == b'@'
 }
 
@@ -1951,7 +1951,7 @@ pub(crate) fn get_any_import_syntax(node: P<Node>) -> Option<P<Node>> {
 // utilities.go:1677
 pub(crate) fn is_reserved_member_name(name: &str) -> bool {
     let b = name.as_bytes();
-    b.len() >= 2 && b[0] == InternalSymbolNamePrefixByte && b[1] != b'@' && b[1] != b'#'
+    b.len() >= 2 && b[0] == INTERNAL_SYMBOL_NAME_PREFIX_BYTE && b[1] != b'@' && b[1] != b'#'
 }
 
 // utilities.go:1681
@@ -2143,7 +2143,7 @@ pub fn create_module_not_found_chain(
                     "@types/".to_string() + &tsrs_module::mangle_scoped_package_name(&package_name);
             }
             return DiagnosticDetails {
-                message: &diagnostics::There_are_types_at_0_but_this_result_could_not_be_resolved_when_respecting_package_json_exports_The_1_library_may_need_to_update_its_package_json_or_typings,
+                message: &diagnostics::THERE_ARE_TYPES_AT_0_BUT_THIS_RESULT_COULD_NOT_BE_RESOLVED_WHEN_RESPECTING_PACKAGE_JSON_EXPORTS_THE_1_LIBRARY_MAY_NEED_TO_UPDATE_ITS_PACKAGE_JSON_OR_TYPINGS,
                 args: vec![resolved_module.alternate_result.to_string(), package_name],
             };
         }
@@ -2152,18 +2152,18 @@ pub fn create_module_not_found_chain(
     let packages_map = program.get_packages_map();
     if packages_map.contains_key(&tsrs_module::get_types_package_name(&package_name)) {
         return DiagnosticDetails {
-            message: &diagnostics::If_the_0_package_actually_exposes_this_module_consider_sending_a_pull_request_to_amend_https_Colon_Slash_Slashgithub_com_SlashDefinitelyTyped_SlashDefinitelyTyped_Slashtree_Slashmaster_Slashtypes_Slash_1,
+            message: &diagnostics::IF_THE_0_PACKAGE_ACTUALLY_EXPOSES_THIS_MODULE_CONSIDER_SENDING_A_PULL_REQUEST_TO_AMEND_HTTPS_COLON_SLASH_SLASHGITHUB_COM_SLASH_DEFINITELY_TYPED_SLASH_DEFINITELY_TYPED_SLASHTREE_SLASHMASTER_SLASHTYPES_SLASH_1,
             args: vec![package_name.clone(), tsrs_module::mangle_scoped_package_name(&package_name)],
         };
     }
     if packages_map.get(&package_name).copied().unwrap_or(false) {
         return DiagnosticDetails {
-            message: &diagnostics::If_the_0_package_actually_exposes_this_module_try_adding_a_new_declaration_d_ts_file_containing_declare_module_1,
+            message: &diagnostics::IF_THE_0_PACKAGE_ACTUALLY_EXPOSES_THIS_MODULE_TRY_ADDING_A_NEW_DECLARATION_D_TS_FILE_CONTAINING_DECLARE_MODULE_1,
             args: vec![package_name, module_reference.to_string()],
         };
     }
     DiagnosticDetails {
-        message: &diagnostics::Try_npm_i_save_dev_types_Slash_1_if_it_exists_or_add_a_new_declaration_d_ts_file_containing_declare_module_0,
+        message: &diagnostics::TRY_NPM_I_SAVE_DEV_TYPES_SLASH_1_IF_IT_EXISTS_OR_ADD_A_NEW_DECLARATION_D_TS_FILE_CONTAINING_DECLARE_MODULE_0,
         args: vec![module_reference.to_string(), tsrs_module::mangle_scoped_package_name(&package_name)],
     }
 }
@@ -2192,23 +2192,23 @@ pub fn create_mode_mismatch_details(
     if !package_json_directory.is_empty() && package_json_type.is_empty() {
         if !target_ext.is_empty() {
             return DiagnosticDetails {
-                message: &diagnostics::To_convert_this_file_to_an_ECMAScript_module_change_its_file_extension_to_0_or_add_the_field_type_Colon_module_to_1,
+                message: &diagnostics::TO_CONVERT_THIS_FILE_TO_AN_ECMA_SCRIPT_MODULE_CHANGE_ITS_FILE_EXTENSION_TO_0_OR_ADD_THE_FIELD_TYPE_COLON_MODULE_TO_1,
                 args: vec![target_ext.to_string(), tspath::combine_paths(&package_json_directory, &["package.json"])],
             };
         }
         return DiagnosticDetails {
-            message: &diagnostics::To_convert_this_file_to_an_ECMAScript_module_add_the_field_type_Colon_module_to_0,
+            message: &diagnostics::TO_CONVERT_THIS_FILE_TO_AN_ECMA_SCRIPT_MODULE_ADD_THE_FIELD_TYPE_COLON_MODULE_TO_0,
             args: vec![tspath::combine_paths(&package_json_directory, &["package.json"])],
         };
     }
     if !target_ext.is_empty() {
         return DiagnosticDetails {
-            message: &diagnostics::To_convert_this_file_to_an_ECMAScript_module_change_its_file_extension_to_0_or_create_a_local_package_json_file_with_type_Colon_module,
+            message: &diagnostics::TO_CONVERT_THIS_FILE_TO_AN_ECMA_SCRIPT_MODULE_CHANGE_ITS_FILE_EXTENSION_TO_0_OR_CREATE_A_LOCAL_PACKAGE_JSON_FILE_WITH_TYPE_COLON_MODULE,
             args: vec![target_ext.to_string()],
         };
     }
     DiagnosticDetails {
-        message: &diagnostics::To_convert_this_file_to_an_ECMAScript_module_create_a_local_package_json_file_with_type_Colon_module,
+        message: &diagnostics::TO_CONVERT_THIS_FILE_TO_AN_ECMA_SCRIPT_MODULE_CREATE_A_LOCAL_PACKAGE_JSON_FILE_WITH_TYPE_COLON_MODULE,
         args: Vec::new(),
     }
 }

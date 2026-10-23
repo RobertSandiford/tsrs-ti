@@ -16,7 +16,7 @@ pub struct CommonJSModuleTransformer {
     pub module_kind: ModuleKind,
     pub language_version: ScriptTarget,
     pub current_source_file: Cell<Option<P<SourceFile>>>,
-    pub(crate) current_module_info: RefCell<Option<Rc<externalModuleInfo>>>,
+    pub(crate) current_module_info: RefCell<Option<Rc<ExternalModuleInfo>>>,
     pub parent_node: Cell<Option<P<Node>>>, // used for ancestor tracking via pushNode/popNode to detect expression identifiers
     pub current_node: Cell<Option<P<Node>>>, // used for ancestor tracking via pushNode/popNode to detect expression identifiers
     pub content_mapper_extension_rewrites: Vec<tspath::ExtensionRewrite>,
@@ -97,7 +97,7 @@ impl CommonJSModuleTransformer {
         self.assignment_pattern_visitor.get().unwrap().clone()
     }
 
-    pub(crate) fn module_info(&self) -> Rc<externalModuleInfo> {
+    pub(crate) fn module_info(&self) -> Rc<ExternalModuleInfo> {
         self.current_module_info.borrow().clone().unwrap()
     }
 
@@ -374,8 +374,8 @@ impl CommonJSModuleTransformer {
         // initialize all exports to `undefined`, e.g.:
         //  exports.a = exports.b = void 0;
         if !info.exported_names.is_empty() {
-            const chunkSize: usize = 50;
-            statements.extend(info.exported_names.chunks(chunkSize).map(|chunk| {
+            const CHUNK_SIZE: usize = 50;
+            statements.extend(info.exported_names.chunks(CHUNK_SIZE).map(|chunk| {
                 let mut right = f.new_void_zero_expression();
                 for &next_id in chunk {
                     let left = if next_id.kind() == Kind::StringLiteral {

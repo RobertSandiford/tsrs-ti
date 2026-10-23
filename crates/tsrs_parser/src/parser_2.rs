@@ -50,7 +50,7 @@ impl Parser {
             identifier_name = name;
         } else {
             let loc = self.skip_range_trivia(name.loc());
-            self.parse_error_at_range(loc, &diagnostics::Identifier_expected, &[]);
+            self.parse_error_at_range(loc, &diagnostics::IDENTIFIER_EXPECTED, &[]);
             identifier_name = self.new_identifier("");
             self.finish_node(
                 identifier_name,
@@ -133,7 +133,7 @@ impl Parser {
 
         if !name_ok {
             let loc = self.skip_range_trivia(name.loc());
-            self.parse_error_at_range(loc, &diagnostics::Identifier_expected, &[]);
+            self.parse_error_at_range(loc, &diagnostics::IDENTIFIER_EXPECTED, &[]);
         }
 
         (is_type_only, property_name, name)
@@ -161,7 +161,7 @@ impl Parser {
         {
             if self.token == Kind::AssertKeyword {
                 self.parse_error_at_current_token(
-                    &diagnostics::Import_assertions_have_been_replaced_by_import_attributes_Use_with_instead_of_assert,
+                    &diagnostics::IMPORT_ASSERTIONS_HAVE_BEEN_REPLACED_BY_IMPORT_ATTRIBUTES_USE_WITH_INSTEAD_OF_ASSERT,
                     &[],
                 );
             }
@@ -258,7 +258,7 @@ impl Parser {
         {
             if self.token == Kind::AssertKeyword {
                 self.parse_error_at_current_token(
-                    &diagnostics::Import_assertions_have_been_replaced_by_import_attributes_Use_with_instead_of_assert,
+                    &diagnostics::IMPORT_ASSERTIONS_HAVE_BEEN_REPLACED_BY_IMPORT_ATTRIBUTES_USE_WITH_INSTEAD_OF_ASSERT,
                     &[],
                 );
             }
@@ -710,7 +710,7 @@ impl Parser {
         self.parse_entity_name(
             true,  /*allowReservedWords*/
             false, /*allowPrivateName*/
-            Some(&diagnostics::Type_expected),
+            Some(&diagnostics::TYPE_EXPECTED),
         )
     }
 
@@ -777,7 +777,7 @@ impl Parser {
             // and not on the next token.  This is because the next token might actually
             // be an identifier and the error would be quite confusing.
             let pos = self.node_pos();
-            self.parse_error_at(pos, pos, &diagnostics::Identifier_expected, &[]);
+            self.parse_error_at(pos, pos, &diagnostics::IDENTIFIER_EXPECTED, &[]);
             return self.create_missing_identifier();
         }
         if self.token == Kind::PrivateIdentifier {
@@ -786,7 +786,7 @@ impl Parser {
                 return node;
             }
             let pos = self.node_pos();
-            self.parse_error_at(pos, pos, &diagnostics::Identifier_expected, &[]);
+            self.parse_error_at(pos, pos, &diagnostics::IDENTIFIER_EXPECTED, &[]);
             return self.create_missing_identifier();
         }
         if allow_identifier_names {
@@ -899,14 +899,14 @@ impl Parser {
             if current_token == Kind::WithKeyword || current_token == Kind::AssertKeyword {
                 if current_token == Kind::AssertKeyword {
                     self.parse_error_at_current_token(
-                        &diagnostics::Import_assertions_have_been_replaced_by_import_attributes_Use_with_instead_of_assert,
+                        &diagnostics::IMPORT_ASSERTIONS_HAVE_BEEN_REPLACED_BY_IMPORT_ATTRIBUTES_USE_WITH_INSTEAD_OF_ASSERT,
                         &[],
                     );
                 }
                 self.next_token();
             } else {
                 self.parse_error_at_current_token(
-                    &diagnostics::X_0_expected,
+                    &diagnostics::X_0_EXPECTED,
                     &[&scanner::token_to_string(Kind::WithKeyword)],
                 );
             }
@@ -915,11 +915,11 @@ impl Parser {
             self.parse_optional(Kind::CommaToken);
             if !self.parse_expected(Kind::CloseBraceToken) {
                 if let Some(&last_diagnostic) = self.diagnostics.last() {
-                    if last_diagnostic.code() == diagnostics::X_0_expected.code() {
+                    if last_diagnostic.code() == diagnostics::X_0_EXPECTED.code() {
                         let related = ast::new_diagnostic(
                             None,
                             TextRange::new(open_brace_position, open_brace_position),
-                            &diagnostics::The_parser_expected_to_find_a_1_to_match_the_0_token_here,
+                            &diagnostics::THE_PARSER_EXPECTED_TO_FIND_A_1_TO_MATCH_THE_0_TOKEN_HERE,
                             &[&"{", &"}"],
                         );
                         last_diagnostic.add_related_info(related);
@@ -955,7 +955,7 @@ impl Parser {
             self.parse_expected(Kind::ColonToken);
         } else {
             self.parse_error_at_current_token(
-                &diagnostics::Identifier_or_string_literal_expected,
+                &diagnostics::IDENTIFIER_OR_STRING_LITERAL_EXPECTED,
                 &[],
             );
         }
@@ -980,11 +980,11 @@ impl Parser {
             );
             if !self.parse_expected(Kind::CloseBraceToken) {
                 if let Some(&last_diagnostic) = self.diagnostics.last() {
-                    if last_diagnostic.code() == diagnostics::X_0_expected.code() {
+                    if last_diagnostic.code() == diagnostics::X_0_EXPECTED.code() {
                         let related = ast::new_diagnostic(
                             None,
                             TextRange::new(open_brace_position, open_brace_position),
-                            &diagnostics::The_parser_expected_to_find_a_1_to_match_the_0_token_here,
+                            &diagnostics::THE_PARSER_EXPECTED_TO_FIND_A_1_TO_MATCH_THE_0_TOKEN_HERE,
                             &[&"{", &"}"],
                         );
                         last_diagnostic.add_related_info(related);
@@ -1310,7 +1310,7 @@ impl Parser {
             if let Some(modifiers) = modifiers {
                 self.parse_error_at_range(
                     modifiers.nodes()[0].loc(),
-                    &diagnostics::Neither_decorators_nor_modifiers_may_be_applied_to_this_parameters,
+                    &diagnostics::NEITHER_DECORATORS_NOR_MODIFIERS_MAY_BE_APPLIED_TO_THIS_PARAMETERS,
                     &[],
                 );
             }
@@ -1355,7 +1355,7 @@ impl Parser {
         // FormalParameter [Yield,Await]:
         //      BindingElement[?Yield,?Await]
         let name = self.parse_identifier_or_pattern_with_diagnostic(Some(
-            &diagnostics::Private_identifiers_cannot_be_used_as_parameters,
+            &diagnostics::PRIVATE_IDENTIFIERS_CANNOT_BE_USED_AS_PARAMETERS,
         ));
         if name.loc().len() == Some(0) && modifiers.is_none() && ast::is_modifier_kind(self.token) {
             // in cases like
@@ -1395,7 +1395,7 @@ impl Parser {
         } else if is_type && self.token == Kind::EqualsGreaterThanToken {
             // This is easy to get backward, especially in type contexts, so parse the type anyway
             self.parse_error_at_current_token(
-                &diagnostics::X_0_expected,
+                &diagnostics::X_0_EXPECTED,
                 &[&scanner::token_to_string(Kind::ColonToken)],
             );
             self.next_token();
@@ -1853,7 +1853,7 @@ impl Parser {
             return self.parse_template_middle_or_tail();
         }
         self.parse_error_at_current_token(
-            &diagnostics::X_0_expected,
+            &diagnostics::X_0_EXPECTED,
             &[&scanner::token_to_string(Kind::CloseBraceToken)],
         );
         let node = self.factory.new_template_tail("", "", TokenFlags::None);
@@ -1890,15 +1890,15 @@ impl Parser {
 
             let diagnostic: &'static Message = if type_node.kind() == Kind::FunctionType {
                 if is_in_union_type {
-                    &diagnostics::Function_type_notation_must_be_parenthesized_when_used_in_a_union_type
+                    &diagnostics::FUNCTION_TYPE_NOTATION_MUST_BE_PARENTHESIZED_WHEN_USED_IN_A_UNION_TYPE
                 } else {
-                    &diagnostics::Function_type_notation_must_be_parenthesized_when_used_in_an_intersection_type
+                    &diagnostics::FUNCTION_TYPE_NOTATION_MUST_BE_PARENTHESIZED_WHEN_USED_IN_AN_INTERSECTION_TYPE
                 }
             } else {
                 if is_in_union_type {
-                    &diagnostics::Constructor_type_notation_must_be_parenthesized_when_used_in_a_union_type
+                    &diagnostics::CONSTRUCTOR_TYPE_NOTATION_MUST_BE_PARENTHESIZED_WHEN_USED_IN_A_UNION_TYPE
                 } else {
-                    &diagnostics::Constructor_type_notation_must_be_parenthesized_when_used_in_an_intersection_type
+                    &diagnostics::CONSTRUCTOR_TYPE_NOTATION_MUST_BE_PARENTHESIZED_WHEN_USED_IN_AN_INTERSECTION_TYPE
                 }
             };
             self.parse_error_at_range(type_node.loc(), diagnostic, &[]);
@@ -2102,7 +2102,7 @@ impl Parser {
             // This simply parses the missing identifier and moves on.
             let pos = self.node_pos();
             let await_expression = self
-                .parse_identifier_with_diagnostic(Some(&diagnostics::Expression_expected), None);
+                .parse_identifier_with_diagnostic(Some(&diagnostics::EXPRESSION_EXPECTED), None);
             self.next_token();
             let member_expression = self.parse_member_expression_rest(
                 pos,

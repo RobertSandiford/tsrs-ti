@@ -85,8 +85,8 @@ impl DeclarationTransformer {
                 if let Some(nodes) = self.resolver.create_type_parameters_of_signature_declaration(
                     node,
                     self.enclosing_declaration.get(),
-                    declarationEmitNodeBuilderFlags,
-                    declarationEmitInternalNodeBuilderFlags,
+                    DECLARATION_EMIT_NODE_BUILDER_FLAGS,
+                    DECLARATION_EMIT_INTERNAL_NODE_BUILDER_FLAGS,
                     self.tracker.get(),
                 ) {
                     type_parameters = Some(P::new(NodeList::new(node.loc(), alloc_vec(nodes))));
@@ -319,7 +319,7 @@ impl DeclarationTransformer {
         // Augmentation of export depends on import
         if self.resolver.is_import_required_by_augmentation(decl) {
             if self.state.isolated_declarations {
-                self.state.add_diagnostic(create_diagnostic_for_node(decl, &diagnostics::Declaration_emit_for_this_file_requires_preserving_this_import_for_augmentations_This_is_not_supported_with_isolatedDeclarations, &[]));
+                self.state.add_diagnostic(create_diagnostic_for_node(decl, &diagnostics::DECLARATION_EMIT_FOR_THIS_FILE_REQUIRES_PRESERVING_THIS_IMPORT_FOR_AUGMENTATIONS_THIS_IS_NOT_SUPPORTED_WITH_ISOLATED_DECLARATIONS, &[]));
             }
             return Some(self.factory().update_import_declaration(
                 decl,

@@ -746,7 +746,7 @@ mod tests {
             &[info],
             None,
             InferenceFlags::None,
-            &|_, _, _, _| Ternary::True,
+            &|_, _, _, _| Ternary::TRUE,
         );
         if tsrs_core::lazymembers::lazy_inference_mappers() {
             assert_eq!(context.own_mappers(), [None, None]);
@@ -777,7 +777,7 @@ mod tests {
                 &[new_inference_info(parameter)],
                 None,
                 InferenceFlags::None,
-                &|_, _, _, _| Ternary::True,
+                &|_, _, _, _| Ternary::TRUE,
             );
             InferenceContext::recycle(disposable);
         }

@@ -152,7 +152,7 @@ impl Relater {
         intersection_state: IntersectionState,
     ) -> Ternary {
         if original_source == original_target {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         // Before normalization: if `source` is type an object type, and `target` is primitive,
         // skip all the checks we don't need and just return `isSimpleTypeRelatedTo` result
@@ -169,7 +169,7 @@ impl Relater {
                     report_errors,
                 )
             {
-                return Ternary::True;
+                return Ternary::TRUE;
             }
             if report_errors {
                 self.report_error_results(
@@ -181,7 +181,7 @@ impl Relater {
                     head_message,
                 );
             }
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // Normalize the source and target types: Turn fresh literal types into regular literal types,
         // turn deferred type references into regular type references, simplify indexed access and
@@ -190,14 +190,14 @@ impl Relater {
         let source = c.get_normalized_type(original_source, false /*writing*/);
         let mut target = c.get_normalized_type(original_target, true /*writing*/);
         if source == target {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if self.rel() == c.identity_relation {
             if source.flags() != target.flags() {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             if source.flags().intersects(TypeFlags::Singleton) {
-                return Ternary::True;
+                return Ternary::TRUE;
             }
             self.trace_unions_or_intersections_too_large(c, source, target);
             return self.recursive_type_related_to(
@@ -217,7 +217,7 @@ impl Relater {
         if source.flags().intersects(TypeFlags::TypeParameter)
             && c.get_constraint_of_type(source) == Some(target)
         {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         // See if we're relating a definitely non-nullable type to a union that includes null and/or undefined
         // plus a single non-nullable type. If so, remove null and/or undefined from the target type.
@@ -238,7 +238,7 @@ impl Relater {
                 if !candidate.flags().intersects(TypeFlags::Nullable) {
                     target = c.get_normalized_type(candidate, true /*writing*/);
                     if source == target {
-                        return Ternary::True;
+                        return Ternary::TRUE;
                     }
                 }
             }
@@ -248,7 +248,7 @@ impl Relater {
             && c.is_simple_type_related_to(target, source, self.rel(), None)
             || self.is_simple_type_related_to_reporting(c, source, target, report_errors)
         {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if source.flags().intersects(TypeFlags::StructuredOrInstantiable)
             || target.flags().intersects(TypeFlags::StructuredOrInstantiable)
@@ -271,7 +271,7 @@ impl Relater {
                             },
                         );
                     }
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
             }
             let is_performing_common_property_checks = (self.rel() != c.comparable_relation
@@ -313,7 +313,7 @@ impl Relater {
                             target,
                             RecursionFlags::Source,
                             false, /*reportErrors*/
-                        ) != Ternary::False
+                        ) != Ternary::FALSE
                     } || !constructs.is_empty() && {
                         let return_type = c.get_return_type_of_signature(constructs[0]);
                         self.is_related_to(
@@ -322,18 +322,18 @@ impl Relater {
                             target,
                             RecursionFlags::Source,
                             false, /*reportErrors*/
-                        ) != Ternary::False
+                        ) != Ternary::FALSE
                     } {
-                        self.report_error(c, &diagnostics::Value_of_type_0_has_no_properties_in_common_with_type_1_Did_you_mean_to_call_it, &[&source_string, &target_string]);
+                        self.report_error(c, &diagnostics::VALUE_OF_TYPE_0_HAS_NO_PROPERTIES_IN_COMMON_WITH_TYPE_1_DID_YOU_MEAN_TO_CALL_IT, &[&source_string, &target_string]);
                     } else {
                         self.report_error(
                             c,
-                            &diagnostics::Type_0_has_no_properties_in_common_with_type_1,
+                            &diagnostics::TYPE_0_HAS_NO_PROPERTIES_IN_COMMON_WITH_TYPE_1,
                             &[&source_string, &target_string],
                         );
                     }
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             self.trace_unions_or_intersections_too_large(c, source, target);
             let skip_caching = source.flags().intersects(TypeFlags::Union)
@@ -360,7 +360,7 @@ impl Relater {
                     recursion_flags,
                 )
             };
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 return result;
             }
         }
@@ -374,7 +374,7 @@ impl Relater {
                 head_message,
             );
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:2747
@@ -452,12 +452,12 @@ impl Relater {
                             if let Some(suggestion_symbol) = suggestion_symbol {
                                 let error_target_string = c.type_to_string_exported(error_target);
                                 let suggestion_string = c.symbol_to_string(suggestion_symbol);
-                                self.report_error(c, &diagnostics::Property_0_does_not_exist_on_type_1_Did_you_mean_2, &[&prop_name, &error_target_string, &suggestion_string]);
+                                self.report_error(c, &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1_DID_YOU_MEAN_2, &[&prop_name, &error_target_string, &suggestion_string]);
                             } else {
                                 let error_target_string = c.type_to_string_exported(error_target);
                                 self.report_error(
                                     c,
-                                    &diagnostics::Property_0_does_not_exist_on_type_1,
+                                    &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                                     &[&prop_name, &error_target_string],
                                 );
                             }
@@ -491,11 +491,11 @@ impl Relater {
                             if !suggestion.is_empty() {
                                 let prop_string = c.symbol_to_string(prop);
                                 let error_target_string = c.type_to_string_exported(error_target);
-                                self.report_error(c, &diagnostics::Object_literal_may_only_specify_known_properties_but_0_does_not_exist_in_type_1_Did_you_mean_to_write_2, &[&prop_string, &error_target_string, &suggestion]);
+                                self.report_error(c, &diagnostics::OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES_BUT_0_DOES_NOT_EXIST_IN_TYPE_1_DID_YOU_MEAN_TO_WRITE_2, &[&prop_string, &error_target_string, &suggestion]);
                             } else {
                                 let prop_string = c.symbol_to_string(prop);
                                 let error_target_string = c.type_to_string_exported(error_target);
-                                self.report_error(c, &diagnostics::Object_literal_may_only_specify_known_properties_and_0_does_not_exist_in_type_1, &[&prop_string, &error_target_string]);
+                                self.report_error(c, &diagnostics::OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES_AND_0_DOES_NOT_EXIST_IN_TYPE_1, &[&prop_string, &error_target_string]);
                             }
                         }
                     }
@@ -511,13 +511,13 @@ impl Relater {
                         target_prop_type,
                         RecursionFlags::Both,
                         report_errors,
-                    ) == Ternary::False
+                    ) == Ternary::FALSE
                 } {
                     if report_errors {
                         let prop_string = c.symbol_to_string(prop);
                         self.report_error(
                             c,
-                            &diagnostics::Types_of_property_0_are_incompatible,
+                            &diagnostics::TYPES_OF_PROPERTY_0_ARE_INCOMPATIBLE,
                             &[&prop_string],
                         );
                     }
@@ -634,7 +634,7 @@ impl Relater {
                         && target.alias().is_some()
                         && source_origin.types().contains(&target)
                     {
-                        return Ternary::True;
+                        return Ternary::TRUE;
                     }
                 }
                 // Similarly, in unions of unions the we preserve the original list of unions. This original list is often
@@ -645,7 +645,7 @@ impl Relater {
                         && source.alias().is_some()
                         && target_origin.types().contains(&source)
                     {
-                        return Ternary::True;
+                        return Ternary::TRUE;
                     }
                 }
             }
@@ -715,7 +715,7 @@ impl Relater {
             if changed {
                 source = c.get_intersection_type(&constraints);
                 if source.flags().intersects(TypeFlags::Never) {
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 if !source.flags().intersects(TypeFlags::Intersection) {
                     let result = self.is_related_to(
@@ -725,7 +725,7 @@ impl Relater {
                         RecursionFlags::Source,
                         false, /*reportErrors*/
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                     return self.is_related_to(
@@ -762,7 +762,7 @@ impl Relater {
     ) -> Ternary {
         let source_types = source.types();
         if source.flags().intersects(TypeFlags::Union) && contains_type(c, source_types, target) {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if let Some(result) = source_types.iter().enumerate().find_map(|(i, &t)| {
             let related = self.is_related_to_ex(
@@ -774,7 +774,7 @@ impl Relater {
                 None, /*headMessage*/
                 intersection_state,
             );
-            if related != Ternary::False {
+            if related != Ternary::FALSE {
                 return Some(related);
             }
 
@@ -782,7 +782,7 @@ impl Relater {
         }) {
             return result;
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:2965
@@ -794,7 +794,7 @@ impl Relater {
         report_errors: bool,
         intersection_state: IntersectionState,
     ) -> Ternary {
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         let source_types = source.types();
         // We strip `undefined` from the target if the `source` trivially doesn't contain it for our correspondence-checking fastpath
         // since `undefined` is frequently added by optionality and would otherwise spoil a potentially useful correspondence
@@ -824,7 +824,7 @@ impl Relater {
                         None,  /*headMessage*/
                         intersection_state,
                     );
-                    if related != Ternary::False {
+                    if related != Ternary::FALSE {
                         result &= related;
                         return Ok(result);
                     }
@@ -838,8 +838,8 @@ impl Relater {
                     None, /*headMessage*/
                     intersection_state,
                 );
-                if related == Ternary::False {
-                    return Err(Ternary::False);
+                if related == Ternary::FALSE {
+                    return Err(Ternary::FALSE);
                 }
                 result &= related;
                 Ok(result)
@@ -930,7 +930,7 @@ impl Relater {
             || target.as_union_type().key_property_name().is_empty()
         {
             0
-        } else if target.as_union_type().key_property_name() == InternalSymbolNameMissing {
+        } else if target.as_union_type().key_property_name() == INTERNAL_SYMBOL_NAME_MISSING {
             1
         } else {
             outcome.1
@@ -940,7 +940,7 @@ impl Relater {
             1 => 1,
             2 => 2,
             _ => {
-                if r == Ternary::False {
+                if r == Ternary::FALSE {
                     6
                 } else if outcome.2 <= 1 {
                     3
@@ -958,7 +958,7 @@ impl Relater {
             timing,
             outcome.2 as u64,
             (outcome.0 == 2) as u64,
-            (r != Ternary::False) as u64,
+            (r != Ternary::FALSE) as u64,
         );
         let s = census.rel_union.entry((source_kind, key_state, exit)).or_default();
         s.count += 1;
@@ -992,7 +992,7 @@ impl Relater {
         if target.flags().intersects(TypeFlags::Union) {
             if contains_type(c, target_types, source) {
                 outcome.0 = 0;
-                return Ternary::True;
+                return Ternary::TRUE;
             }
             if self.rel() != c.comparable_relation
                 && target.object_flags().intersects(ObjectFlags::PrimitiveUnion)
@@ -1027,9 +1027,9 @@ impl Relater {
                 if primitive.is_some_and(|p| contains_type(c, target_types, p))
                     || alternate_form.is_some_and(|a| contains_type(c, target_types, a))
                 {
-                    return Ternary::True;
+                    return Ternary::TRUE;
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             let match_ = c.get_matching_union_constituent_for_type(target, source);
             outcome.1 = 4;
@@ -1044,7 +1044,7 @@ impl Relater {
                     None,  /*headMessage*/
                     intersection_state,
                 );
-                if related != Ternary::False {
+                if related != Ternary::FALSE {
                     outcome.0 = 2;
                     outcome.1 = 2;
                     return related;
@@ -1075,11 +1075,11 @@ impl Relater {
                 None,  /*headMessage*/
                 intersection_state,
             );
-            if census_on && related == Ternary::False {
+            if census_on && related == Ternary::FALSE {
                 fail_ns += c.census.as_ref().unwrap().now_ns() - t0;
                 fail_cached += cached as u64;
             }
-            if related != Ternary::False {
+            if related != Ternary::FALSE {
                 if census_on && i > 0 {
                     // Would an index on one of the source's unit-typed properties have excluded every constituent tried
                     // before this one? (census only; the lookups below may resolve members early)
@@ -1152,7 +1152,7 @@ impl Relater {
                 );
             }
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:3063
@@ -1164,7 +1164,7 @@ impl Relater {
         report_errors: bool,
         intersection_state: IntersectionState,
     ) -> Ternary {
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         let target_types = target.types();
         result = match target_types.iter().try_fold(result, |mut result, &target_type| {
             let related = self.is_related_to_ex(
@@ -1176,8 +1176,8 @@ impl Relater {
                 None, /*headMessage*/
                 intersection_state,
             );
-            if related == Ternary::False {
-                return Err(Ternary::False);
+            if related == Ternary::FALSE {
+                return Err(Ternary::FALSE);
             }
             result &= related;
             Ok(result)
@@ -1195,7 +1195,7 @@ impl Relater {
         source: P<Type>,
         target: P<Type>,
     ) -> Ternary {
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         let source_types = source.types();
         result = match source_types.iter().try_fold(result, |mut result, &source_type| {
             let related = self.type_related_to_some_type(
@@ -1205,8 +1205,8 @@ impl Relater {
                 false, /*reportErrors*/
                 IntersectionState::None,
             );
-            if related == Ternary::False {
-                return Err(Ternary::False);
+            if related == Ternary::FALSE {
+                return Err(Ternary::FALSE);
             }
             result &= related;
             Ok(result)
@@ -1235,7 +1235,7 @@ impl Relater {
         if self.overflow.get() {
             // Note that stack depth overflows can cause _any_ relation involving structured types to become false, so it is
             // important to have well-defined behavior even in cases that shouldn't normally occur.
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         let is_identity = self.rel() == c.identity_relation;
         let (id, constrained) = get_relation_key(
@@ -1278,24 +1278,24 @@ impl Relater {
                     let target_string = c.type_to_string_exported(target);
                     self.report_error(
                         c,
-                        &diagnostics::Excessive_complexity_comparing_types_0_and_1,
+                        &diagnostics::EXCESSIVE_COMPLEXITY_COMPARING_TYPES_0_AND_1,
                         &[&source_string, &target_string],
                     );
                 }
                 if entry.intersects(RelationComparisonResult::Succeeded) {
-                    return Ternary::True;
+                    return Ternary::TRUE;
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
         if self.relation_count.get() <= 0 {
             self.overflow.set(true);
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // If source and target are already being compared, consider them related with assumptions
         if self.maybe_stack_has(&id) {
             crate::sitecount::hit("relation cache (recursiveTypeRelatedTo)", "maybe stack hit");
-            return Ternary::Maybe;
+            return Ternary::MAYBE;
         }
         // A constrained key indicates that we have type references that reference constrained
         // type parameters. For such keys we also check against the key we would have gotten if all type parameters
@@ -1314,14 +1314,14 @@ impl Relater {
                     "relation cache (recursiveTypeRelatedTo)",
                     "maybe stack hit (broadest)",
                 );
-                return Ternary::Maybe;
+                return Ternary::MAYBE;
             }
         }
         if self.source_stack.borrow().len() == 100 || self.target_stack.borrow().len() == 100 {
             // We stop relating if we reach 100 levels of nesting. This is a backstop to catch infinite recursion
             // that wasn't caught by isDeeplyNestedType. It will also stop relating types that truly are over 100
             // levels deep, but those are exceedingly rare.
-            return Ternary::Maybe;
+            return Ternary::MAYBE;
         }
         let maybe_start = self.maybe_keys.borrow().len();
         self.maybe_stack_push(id);
@@ -1347,7 +1347,7 @@ impl Relater {
         c.reliability_flags = RelationComparisonResult::None;
         let too_complex_before = c.too_complex_reports;
         let result = if self.expanding_flags.get() == ExpandingFlags::Both {
-            Ternary::Maybe
+            Ternary::MAYBE
         } else {
             self.structured_type_related_to(c, source, target, report_errors, intersection_state)
         };
@@ -1363,11 +1363,11 @@ impl Relater {
         // tsrs-only: a result computed while a TS2590 was reported (a constraint that became the error type) is not
         // recorded, so that the next comparison evaluates and reports again (`Checker::too_complex_since`).
         let record = !c.too_complex_since(too_complex_before);
-        if result != Ternary::False {
-            if result == Ternary::True
+        if result != Ternary::FALSE {
+            if result == Ternary::TRUE
                 || (self.source_stack.borrow().is_empty() && self.target_stack.borrow().is_empty())
             {
-                if (result == Ternary::True || result == Ternary::Maybe) && record {
+                if (result == Ternary::TRUE || result == Ternary::MAYBE) && record {
                     // If result is definitely true, record all maybe keys as having succeeded. Also, record Ternary.Maybe
                     // results as having succeeded once we reach depth 0, but never record Ternary.Unknown results.
                     self.reset_maybe_stack(c, maybe_start, propagating_variance_flags, true);
@@ -1451,15 +1451,15 @@ impl Relater {
     }
 
     // relater.go:3212
-    pub(crate) fn get_error_state(&self, _c: &mut Checker) -> errorState {
-        errorState {
+    pub(crate) fn get_error_state(&self, _c: &mut Checker) -> ErrorState {
+        ErrorState {
             error_chain: self.error_chain.get(),
             related_info: self.related_info.borrow().clone(),
         }
     }
 
     // relater.go:3219
-    pub(crate) fn restore_error_state(&self, _c: &mut Checker, e: errorState) {
+    pub(crate) fn restore_error_state(&self, _c: &mut Checker, e: ErrorState) {
         self.error_chain.set(e.error_chain);
         *self.related_info.borrow_mut() = e.related_info;
     }
@@ -1508,7 +1508,7 @@ impl Relater {
                 crate::workcensus::Cat::Rel,
                 crate::workcensus::CKey::Rel(k, sym, label),
                 timing,
-                (r == Ternary::False) as u64,
+                (r == Ternary::FALSE) as u64,
                 0,
                 0,
             );
@@ -1547,7 +1547,7 @@ impl Relater {
             // needs to have its constraint hoisted into an intersection with said type parameter, this way
             // the type param can be compared with itself in the target (with the influence of its constraint to match other parts)
             // For example, if `T extends 1 | 2` and `U extends 2 | 3` and we compare `T & U` to `T & U & (1 | 2 | 3)`
-            if result == Ternary::False
+            if result == Ternary::FALSE
                 && (source.flags().intersects(TypeFlags::Intersection)
                     || source.flags().intersects(TypeFlags::TypeParameter)
                         && target.flags().intersects(TypeFlags::Union))
@@ -1586,7 +1586,7 @@ impl Relater {
             //   declare let wrong: { a: { y: string } };
             //   let weak: { a?: { x?: number } } & { c?: string } = wrong;  // Nested weak object type
             //
-            if result != Ternary::False
+            if result != Ternary::FALSE
                 && !intersection_state.intersects(IntersectionState::Target)
                 && target.flags().intersects(TypeFlags::Intersection)
                 && !c.is_generic_object_type(target)
@@ -1601,7 +1601,7 @@ impl Relater {
                     false, /*optionalsOnly*/
                     IntersectionState::None,
                 );
-                if result != Ternary::False
+                if result != Ternary::FALSE
                     && is_object_literal_type(source)
                     && source.object_flags().intersects(ObjectFlags::FreshLiteral)
                 {
@@ -1621,7 +1621,7 @@ impl Relater {
             //     x = y;  // Mismatched property in source intersection
             //   }
             //
-            } else if result != Ternary::False
+            } else if result != Ternary::FALSE
                 && c.is_non_generic_object_type(target)
                 && !c.is_array_or_tuple_type(target)
                 && Self::is_source_intersection_needing_extra_check(c, source, target)
@@ -1637,7 +1637,7 @@ impl Relater {
                 );
             }
         }
-        if result != Ternary::False {
+        if result != Ternary::FALSE {
             self.restore_error_state(c, save_error_state);
         }
         result
@@ -1666,7 +1666,7 @@ impl Relater {
         variances: &[VarianceFlags],
         intersection_state: IntersectionState,
         report_errors: bool,
-        save_error_state: &errorState,
+        save_error_state: &ErrorState,
         result: &mut Ternary,
         variance_check_failed: &mut bool,
         original_error_chain: &mut Option<P<ErrorChain>>,
@@ -1679,7 +1679,7 @@ impl Relater {
             report_errors,
             intersection_state,
         );
-        if *result != Ternary::False {
+        if *result != Ternary::FALSE {
             return (*result, true);
         }
         if variances.iter().any(|v| v.intersects(VarianceFlags::AllowsStructuralFallback)) {
@@ -1689,7 +1689,7 @@ impl Relater {
             // be assuming identity of the type parameter.
             *original_error_chain = None;
             self.restore_error_state(c, save_error_state.clone());
-            return (Ternary::False, false);
+            return (Ternary::FALSE, false);
         }
         let allow_structural_fallback =
             checker::Checker::has_covariant_void_argument(target_type_arguments, variances);
@@ -1716,7 +1716,7 @@ impl Relater {
                         .iter()
                         .any(|&v| (v & VarianceFlags::VarianceMask) == VarianceFlags::Invariant))
             {
-                return (Ternary::False, true);
+                return (Ternary::FALSE, true);
             }
             // We remember the original error information so we can restore it in case the structural
             // comparison unexpectedly succeeds. This can happen when the structural comparison result
@@ -1724,7 +1724,7 @@ impl Relater {
             *original_error_chain = self.error_chain.get();
             self.restore_error_state(c, save_error_state.clone());
         }
-        (Ternary::False, false)
+        (Ternary::FALSE, false)
     }
 
     // relater.go:3293
@@ -1737,7 +1737,7 @@ impl Relater {
         intersection_state: IntersectionState,
     ) -> Ternary {
         let mut source = source;
-        let mut result: Ternary = Ternary::False;
+        let mut result: Ternary = Ternary::FALSE;
         let mut variance_check_failed = false;
         let mut original_error_chain: Option<P<ErrorChain>> = None;
         let save_error_state = self.get_error_state(c);
@@ -1745,7 +1745,7 @@ impl Relater {
             // We've already checked that source.flags and target.flags are identical
             if source.flags().intersects(TypeFlags::UnionOrIntersection) {
                 let mut result = self.each_type_related_to_some_type(c, source, target);
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     result &= self.each_type_related_to_some_type(c, target, source);
                 }
                 return result;
@@ -1765,7 +1765,7 @@ impl Relater {
                     RecursionFlags::Both,
                     false, /*reportErrors*/
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     result &= self.is_related_to(
                         c,
                         source.as_indexed_access_type().index_type.get().unwrap(),
@@ -1773,7 +1773,7 @@ impl Relater {
                         RecursionFlags::Both,
                         false, /*reportErrors*/
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
@@ -1790,7 +1790,7 @@ impl Relater {
                         RecursionFlags::Both,
                         false, /*reportErrors*/
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         result &= self.is_related_to(
                             c,
                             source_conditional.extends_type.get().unwrap(),
@@ -1798,7 +1798,7 @@ impl Relater {
                             RecursionFlags::Both,
                             false, /*reportErrors*/
                         );
-                        if result != Ternary::False {
+                        if result != Ternary::FALSE {
                             let source_true = c.get_true_type_from_conditional_type(source);
                             let target_true = c.get_true_type_from_conditional_type(target);
                             result &= self.is_related_to(
@@ -1808,7 +1808,7 @@ impl Relater {
                                 RecursionFlags::Both,
                                 false, /*reportErrors*/
                             );
-                            if result != Ternary::False {
+                            if result != Ternary::FALSE {
                                 let source_false = c.get_false_type_from_conditional_type(source);
                                 let target_false = c.get_false_type_from_conditional_type(target);
                                 result &= self.is_related_to(
@@ -1818,7 +1818,7 @@ impl Relater {
                                     RecursionFlags::Both,
                                     false, /*reportErrors*/
                                 );
-                                if result != Ternary::False {
+                                if result != Ternary::FALSE {
                                     return result;
                                 }
                             }
@@ -1833,7 +1833,7 @@ impl Relater {
                     RecursionFlags::Both,
                     false, /*reportErrors*/
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     result &= self.is_related_to(
                         c,
                         source.as_substitution_type().constraint.get().unwrap(),
@@ -1841,7 +1841,7 @@ impl Relater {
                         RecursionFlags::Both,
                         false, /*reportErrors*/
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
@@ -1849,7 +1849,7 @@ impl Relater {
                 if source.as_template_literal_type().texts()
                     == target.as_template_literal_type().texts()
                 {
-                    result = Ternary::True;
+                    result = Ternary::TRUE;
                     // A measured hot loop: a recursive try_fold costs more (notes/perf-iterator-regressions.md).
                     for (i, &source_type) in
                         source.as_template_literal_type().types().iter().enumerate()
@@ -1862,7 +1862,7 @@ impl Relater {
                             RecursionFlags::Both,
                             false, /*reportErrors*/
                         );
-                        if result == Ternary::False {
+                        if result == Ternary::FALSE {
                             return result;
                         }
                     }
@@ -1880,7 +1880,7 @@ impl Relater {
                 }
             }
             if !source.flags().intersects(TypeFlags::Object) {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         } else if source.flags().intersects(TypeFlags::UnionOrIntersection)
             || target.flags().intersects(TypeFlags::UnionOrIntersection)
@@ -1892,7 +1892,7 @@ impl Relater {
                 report_errors,
                 intersection_state,
             );
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 return result;
             }
             // The ordered decomposition above doesn't handle all cases. Specifically, we also need to handle:
@@ -1909,7 +1909,7 @@ impl Relater {
                         .flags()
                         .intersects(TypeFlags::Object | TypeFlags::Union | TypeFlags::Instantiable))
             {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
         // We limit alias variance probing to only object and conditional types since their alias behavior
@@ -1925,7 +1925,7 @@ impl Relater {
             let alias_symbol = source.alias().unwrap().symbol().unwrap();
             let variances = c.get_alias_variances(alias_symbol);
             if variances.is_empty() {
-                return Ternary::Unknown;
+                return Ternary::UNKNOWN;
             }
             let params = c.type_alias_links.get(alias_symbol).type_parameters.get();
             let min_params = checker::Checker::get_min_type_argument_count(params);
@@ -1971,7 +1971,7 @@ impl Relater {
                 RecursionFlags::Source,
                 false, /*reportErrors*/
             );
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 return result;
             }
         }
@@ -1989,7 +1989,7 @@ impl Relater {
                 RecursionFlags::Target,
                 false, /*reportErrors*/
             );
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 return result;
             }
         }
@@ -2008,7 +2008,7 @@ impl Relater {
                     let index_type = c.get_index_type(target);
                     let constraint_type = c.get_constraint_type_from_mapped_type(source);
                     self.is_related_to(c, index_type, constraint_type, RecursionFlags::Both, false)
-                        != Ternary::False
+                        != Ternary::FALSE
                 }
             {
                 if !get_mapped_type_modifiers(source)
@@ -2024,7 +2024,7 @@ impl Relater {
                         RecursionFlags::Both,
                         report_errors,
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
@@ -2047,7 +2047,7 @@ impl Relater {
                         );
                     }
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         } else if target.flags().intersects(TypeFlags::IndexedAccess) {
             if source.flags().intersects(TypeFlags::IndexedAccess) {
@@ -2060,7 +2060,7 @@ impl Relater {
                     RecursionFlags::Both,
                     report_errors,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     result &= self.is_related_to(
                         c,
                         source.as_indexed_access_type().index_type.get().unwrap(),
@@ -2069,7 +2069,7 @@ impl Relater {
                         report_errors,
                     );
                 }
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     return result;
                 }
                 if report_errors {
@@ -2113,7 +2113,7 @@ impl Relater {
                             None, /*headMessage*/
                             intersection_state,
                         );
-                        if result != Ternary::False {
+                        if result != Ternary::FALSE {
                             return result;
                         }
                         // prefer the shorter chain of the constraint comparison chain, and the direct comparison chain
@@ -2144,7 +2144,7 @@ impl Relater {
                     RecursionFlags::Both,
                     false, /*reportErrors*/
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     return result;
                 }
             }
@@ -2159,7 +2159,7 @@ impl Relater {
                     RecursionFlags::Target,
                     report_errors,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     return result;
                 }
             } else {
@@ -2181,9 +2181,9 @@ impl Relater {
                         index_type,
                         RecursionFlags::Target,
                         report_errors,
-                    ) == Ternary::True
+                    ) == Ternary::TRUE
                     {
-                        return Ternary::True;
+                        return Ternary::TRUE;
                     }
                 } else if c.is_generic_mapped_type(target_type) {
                     // generic mapped types that don't simplify or have a constraint still have a very simple set of keys we can compare against
@@ -2213,9 +2213,9 @@ impl Relater {
                         target_keys,
                         RecursionFlags::Target,
                         report_errors,
-                    ) == Ternary::True
+                    ) == Ternary::TRUE
                     {
-                        return Ternary::True;
+                        return Ternary::TRUE;
                     }
                 }
             }
@@ -2223,7 +2223,7 @@ impl Relater {
             // If we reach 10 levels of nesting for the same conditional type, assume it is an infinitely expanding recursive
             // conditional type and bail out with a Ternary.Maybe result.
             if c.is_deeply_nested_on_stack(target, &self.target_stack.borrow(), 10) {
-                return Ternary::Maybe;
+                return Ternary::MAYBE;
             }
             let target_conditional = target.as_conditional_type();
             let root = target_conditional.root.get().unwrap();
@@ -2256,7 +2256,7 @@ impl Relater {
                 };
                 // TODO: Find a nice way to include potential conditional type breakdowns in error output, if they seem good (they usually don't)
                 if skip_true {
-                    result = Ternary::True;
+                    result = Ternary::TRUE;
                 } else {
                     let true_type = c.get_true_type_from_conditional_type(target);
                     result = self.is_related_to_ex(
@@ -2269,9 +2269,9 @@ impl Relater {
                         intersection_state,
                     );
                 }
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     if skip_false {
-                        result &= Ternary::True;
+                        result &= Ternary::TRUE;
                     } else {
                         let false_type = c.get_false_type_from_conditional_type(target);
                         result &= self.is_related_to_ex(
@@ -2284,7 +2284,7 @@ impl Relater {
                             intersection_state,
                         );
                     }
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
@@ -2296,9 +2296,9 @@ impl Relater {
                         source.as_template_literal_type(),
                         target.as_template_literal_type(),
                     ) {
-                        return Ternary::False;
+                        return Ternary::FALSE;
                     }
-                    return Ternary::True;
+                    return Ternary::TRUE;
                 }
                 // Report unreliable variance for type variables referenced in template literal type placeholders.
                 // For example, `foo-${number}` is related to `foo-${string}` even though number isn't related to string.
@@ -2310,12 +2310,12 @@ impl Relater {
                 target.as_template_literal_type(),
                 r.worker_comparer(),
             ) {
-                return Ternary::True;
+                return Ternary::TRUE;
             }
         } else if target.flags().intersects(TypeFlags::StringMapping) {
             if !source.flags().intersects(TypeFlags::StringMapping) {
                 if c.is_member_of_string_mapping(source, target) {
-                    return Ternary::True;
+                    return Ternary::TRUE;
                 }
             }
         } else if c.is_generic_mapped_type(target) && self.rel() != c.identity_relation {
@@ -2339,7 +2339,7 @@ impl Relater {
                     && template_type.as_indexed_access_type().index_type.get()
                         == Some(c.get_type_parameter_from_mapped_type(target))
                 {
-                    return Ternary::True;
+                    return Ternary::TRUE;
                 }
                 if !c.is_generic_mapped_type(source) {
                     // If target has shape `{ [P in Q as R]: T}`, then its keys have type `R`.
@@ -2371,7 +2371,7 @@ impl Relater {
                                 source_keys,
                                 RecursionFlags::Both,
                                 false,
-                            ) != Ternary::False
+                            ) != Ternary::FALSE
                     {
                         let template_type = c.get_template_type_from_mapped_type(target);
                         let type_parameter = c.get_type_parameter_from_mapped_type(target);
@@ -2395,7 +2395,7 @@ impl Relater {
                                 RecursionFlags::Target,
                                 report_errors,
                             );
-                            if result != Ternary::False {
+                            if result != Ternary::FALSE {
                                 return result;
                             }
                         } else {
@@ -2428,7 +2428,7 @@ impl Relater {
                                 RecursionFlags::Both,
                                 report_errors,
                             );
-                            if result != Ternary::False {
+                            if result != Ternary::FALSE {
                                 return result;
                             }
                         }
@@ -2457,7 +2457,7 @@ impl Relater {
                     None,  /*headMessage*/
                     intersection_state,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     return result;
                 }
                 let constraint_with_this = c.get_type_with_this_argument(
@@ -2476,7 +2476,7 @@ impl Relater {
                     None, /*headMessage*/
                     intersection_state,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     return result;
                 }
                 if c.is_mapped_type_generic_indexed_access(source) {
@@ -2497,7 +2497,7 @@ impl Relater {
                             RecursionFlags::Source,
                             report_errors,
                         );
-                        if result != Ternary::False {
+                        if result != Ternary::FALSE {
                             return result;
                         }
                     }
@@ -2517,7 +2517,7 @@ impl Relater {
                 RecursionFlags::Source,
                 report_errors && !is_deferred_mapped_index,
             );
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 return result;
             }
             if is_deferred_mapped_index {
@@ -2545,7 +2545,7 @@ impl Relater {
                     RecursionFlags::Source,
                     report_errors,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     return result;
                 }
             }
@@ -2553,7 +2553,7 @@ impl Relater {
             // If we reach 10 levels of nesting for the same conditional type, assume it is an infinitely expanding recursive
             // conditional type and bail out with a Ternary.Maybe result.
             if c.is_deeply_nested_on_stack(source, &self.source_stack.borrow(), 10) {
-                return Ternary::Maybe;
+                return Ternary::MAYBE;
             }
             if target.flags().intersects(TypeFlags::Conditional) {
                 // Two conditional types 'T1 extends U1 ? X1 : Y1' and 'T2 extends U2 ? X2 : Y2' are related if
@@ -2578,7 +2578,7 @@ impl Relater {
                         ctx.inferences.get(),
                         target_conditional.extends_type.get().unwrap(),
                         source_extends,
-                        InferencePriority::NoConstraints | InferencePriority::AlwaysStrict,
+                        InferencePriority::NO_CONSTRAINTS | InferencePriority::ALWAYS_STRICT,
                         false,
                     );
                     source_extends = c.instantiate_type(source_extends, ctx.mapper());
@@ -2593,14 +2593,14 @@ impl Relater {
                     target_conditional.check_type.get().unwrap(),
                     RecursionFlags::Both,
                     false,
-                ) != Ternary::False
+                ) != Ternary::FALSE
                     || self.is_related_to(
                         c,
                         target_conditional.check_type.get().unwrap(),
                         source_conditional.check_type.get().unwrap(),
                         RecursionFlags::Both,
                         false,
-                    ) != Ternary::False)
+                    ) != Ternary::FALSE)
                 {
                     let source_true = c.get_true_type_from_conditional_type(source);
                     let source_true = c.instantiate_type(source_true, mapper);
@@ -2612,7 +2612,7 @@ impl Relater {
                         RecursionFlags::Both,
                         report_errors,
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         let source_false = c.get_false_type_from_conditional_type(source);
                         let target_false = c.get_false_type_from_conditional_type(target);
                         result &= self.is_related_to(
@@ -2623,7 +2623,7 @@ impl Relater {
                             report_errors,
                         );
                     }
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
@@ -2638,7 +2638,7 @@ impl Relater {
                 RecursionFlags::Source,
                 report_errors,
             );
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 return result;
             }
             // conditionals aren't related to one another via distributive constraint as it is much too inaccurate and allows way
@@ -2657,7 +2657,7 @@ impl Relater {
                         RecursionFlags::Source,
                         report_errors,
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
@@ -2676,7 +2676,7 @@ impl Relater {
                             RecursionFlags::Source,
                             report_errors,
                         );
-                        if result != Ternary::False {
+                        if result != Ternary::FALSE {
                             return result;
                         }
                     }
@@ -2685,7 +2685,7 @@ impl Relater {
         } else if source.flags().intersects(TypeFlags::StringMapping) {
             if target.flags().intersects(TypeFlags::StringMapping) {
                 if source.symbol() != target.symbol() {
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 result = self.is_related_to(
                     c,
@@ -2694,7 +2694,7 @@ impl Relater {
                     RecursionFlags::Both,
                     report_errors,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     return result;
                 }
             } else {
@@ -2707,7 +2707,7 @@ impl Relater {
                         RecursionFlags::Source,
                         report_errors,
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
@@ -2719,22 +2719,22 @@ impl Relater {
                 && is_partial_mapped_type(target)
                 && c.is_empty_object_type(source)
             {
-                return Ternary::True;
+                return Ternary::TRUE;
             }
             if c.is_generic_mapped_type(target) {
                 if c.is_generic_mapped_type(source) {
                     result = self.mapped_type_related_to(c, source, target, report_errors);
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             let source_is_primitive = source.flags().intersects(TypeFlags::Primitive);
             if self.rel() != c.identity_relation {
                 source = c.get_apparent_type(source);
             } else if c.is_generic_mapped_type(source) {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             if source.object_flags().intersects(ObjectFlags::Reference)
                 && target.object_flags().intersects(ObjectFlags::Reference)
@@ -2746,7 +2746,7 @@ impl Relater {
                 // When strictNullChecks is disabled, the element type of the empty array literal is undefinedWideningType,
                 // and an empty array literal wouldn't be assignable to a `never[]` without this check.
                 if c.is_empty_array_literal_type(source) {
-                    return Ternary::True;
+                    return Ternary::TRUE;
                 }
                 // We have type references to the same generic type, and the type references are not marker
                 // type references (which are intended by be compared structurally). Obtain the variance
@@ -2756,7 +2756,7 @@ impl Relater {
                 // effectively means we measure variance only from type parameter occurrences that aren't nested in
                 // recursive instantiations of the generic type.
                 if variances.is_empty() {
-                    return Ternary::Unknown;
+                    return Ternary::UNKNOWN;
                 }
                 let source_type_arguments = c.get_type_arguments(source);
                 let target_type_arguments = c.get_type_arguments(target);
@@ -2795,7 +2795,7 @@ impl Relater {
                 }
                 // By flags alone, we know that the `target` is a readonly array while the source is a normal array or tuple
                 // or `target` is an array and source is a tuple - in both cases the types cannot be identical, by construction
-                return Ternary::False;
+                return Ternary::FALSE;
             } else if checker::Checker::is_generic_tuple_type(source)
                 && is_tuple_type(target)
                 && !checker::Checker::is_generic_tuple_type(target)
@@ -2815,7 +2815,7 @@ impl Relater {
                 && target.object_flags().intersects(ObjectFlags::FreshLiteral)
                 && !c.is_empty_object_type(source)
             {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             // Even if relationship doesn't hold for unions, intersections, or generic type references,
             // it may hold in a structural comparison.
@@ -2838,7 +2838,7 @@ impl Relater {
                     false, /*optionalsOnly*/
                     intersection_state,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     result &= self.signatures_related_to(
                         c,
                         source,
@@ -2847,7 +2847,7 @@ impl Relater {
                         report_structural_errors,
                         intersection_state,
                     );
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         result &= self.signatures_related_to(
                             c,
                             source,
@@ -2856,7 +2856,7 @@ impl Relater {
                             report_structural_errors,
                             intersection_state,
                         );
-                        if result != Ternary::False {
+                        if result != Ternary::FALSE {
                             result &= self.index_signatures_related_to(
                                 c,
                                 source,
@@ -2868,7 +2868,7 @@ impl Relater {
                         }
                     }
                 }
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     if !variance_check_failed {
                         return result;
                     }
@@ -2894,13 +2894,13 @@ impl Relater {
                 if object_only_target.flags().intersects(TypeFlags::Union) {
                     let result =
                         self.type_related_to_discriminated_type(c, source, object_only_target);
-                    if result != Ternary::False {
+                    if result != Ternary::FALSE {
                         return result;
                     }
                 }
             }
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:3935
@@ -2914,10 +2914,10 @@ impl Relater {
         intersection_state: IntersectionState,
     ) -> Ternary {
         if sources.len() != targets.len() && self.rel() == c.identity_relation {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         let length = sources.len().min(targets.len());
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         for i in 0..length {
             // When variance information isn't available we default to covariance. This happens
             // in the process of computing variance information for recursive types and when
@@ -2986,7 +2986,7 @@ impl Relater {
                             RecursionFlags::Both,
                             false, /*reportErrors*/
                         );
-                        if related == Ternary::False {
+                        if related == Ternary::FALSE {
                             related = self.is_related_to_ex(
                                 c,
                                 s,
@@ -3010,7 +3010,7 @@ impl Relater {
                             None, /*headMessage*/
                             intersection_state,
                         );
-                        if related != Ternary::False {
+                        if related != Ternary::FALSE {
                             related &= self.is_related_to_ex(
                                 c,
                                 t,
@@ -3023,8 +3023,8 @@ impl Relater {
                         }
                     }
                 }
-                if related == Ternary::False {
-                    return Ternary::False;
+                if related == Ternary::FALSE {
+                    return Ternary::FALSE;
                 }
                 result &= related;
             }
@@ -3066,7 +3066,7 @@ impl Relater {
                 RecursionFlags::Both,
                 report_errors,
             );
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 let source_type_parameter = c.get_type_parameter_from_mapped_type(source);
                 let target_type_parameter = c.get_type_parameter_from_mapped_type(target);
                 let mapper = new_simple_type_mapper(source_type_parameter, target_type_parameter);
@@ -3089,7 +3089,7 @@ impl Relater {
                 }
             }
         }
-        Ternary::False
+        Ternary::FALSE
     }
 
     // relater.go:4021
@@ -3111,7 +3111,7 @@ impl Relater {
         let source_properties = c.get_properties_of_type(source);
         let source_properties_filtered = c.find_discriminant_properties(source_properties, target);
         if source_properties_filtered.is_empty() {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // Though we could compute the number of combinations as we generate
         // the matrix, this would incur additional memory overhead due to
@@ -3122,10 +3122,10 @@ impl Relater {
         for &source_property in &source_properties_filtered {
             num_combinations *= count_types(c.get_non_missing_type_of_symbol(source_property));
             if num_combinations > 25 {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             if num_combinations == 0 {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
         // Compute the set of types for each discriminant property.
@@ -3181,7 +3181,7 @@ impl Relater {
                     );
                     // If the target property could not be found, or if the properties were not related,
                     // then this constituent is not a match.
-                    if related == Ternary::False {
+                    if related == Ternary::FALSE {
                         continue 'outer;
                     }
                 }
@@ -3192,11 +3192,11 @@ impl Relater {
             }
             if !has_match {
                 // We failed to match any type for this combination.
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
         // Compare the remaining non-discriminant properties of each match.
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         result = match matching_types.iter().try_fold(result, |mut result, &t| {
             result &= self.properties_related_to(
                 c,
@@ -3207,7 +3207,7 @@ impl Relater {
                 false, /*optionalsOnly*/
                 IntersectionState::None,
             );
-            if result != Ternary::False {
+            if result != Ternary::FALSE {
                 result &= self.signatures_related_to(
                     c,
                     source,
@@ -3216,7 +3216,7 @@ impl Relater {
                     false, /*reportErrors*/
                     IntersectionState::None,
                 );
-                if result != Ternary::False {
+                if result != Ternary::FALSE {
                     result &= self.signatures_related_to(
                         c,
                         source,
@@ -3225,7 +3225,7 @@ impl Relater {
                         false, /*reportErrors*/
                         IntersectionState::None,
                     );
-                    if result != Ternary::False && !(is_tuple_type(source) && is_tuple_type(t)) {
+                    if result != Ternary::FALSE && !(is_tuple_type(source) && is_tuple_type(t)) {
                         // Comparing numeric index types when both `source` and `type` are tuples is unnecessary as the
                         // element types should be sufficiently covered by `propertiesRelatedTo`. It also causes problems
                         // with index type assignability as the types for the excluded discriminants are still included
@@ -3241,7 +3241,7 @@ impl Relater {
                     }
                 }
             }
-            if result == Ternary::False {
+            if result == Ternary::FALSE {
                 return Err(result);
             }
             Ok(result)
@@ -3266,14 +3266,14 @@ impl Relater {
         if self.rel() == c.identity_relation {
             return self.properties_identical_to(c, source, target, excluded_properties);
         }
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         if is_tuple_type(target) {
             if c.is_array_or_tuple_type(source) {
                 if !target.target_tuple_type().readonly.get()
                     && (c.is_readonly_array_type(source)
                         || is_tuple_type(source) && source.target_tuple_type().readonly.get())
                 {
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 let source_arity = checker::Checker::get_type_reference_arity(source);
                 let target_arity = checker::Checker::get_type_reference_arity(target);
@@ -3299,35 +3299,35 @@ impl Relater {
                     if report_errors {
                         self.report_error(
                             c,
-                            &diagnostics::Source_has_0_element_s_but_target_requires_1,
+                            &diagnostics::SOURCE_HAS_0_ELEMENT_S_BUT_TARGET_REQUIRES_1,
                             &[&source_arity, &target_min_length],
                         );
                     }
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 if !target_has_variable_element && target_arity < source_min_length {
                     if report_errors {
                         self.report_error(
                             c,
-                            &diagnostics::Source_has_0_element_s_but_target_allows_only_1,
+                            &diagnostics::SOURCE_HAS_0_ELEMENT_S_BUT_TARGET_ALLOWS_ONLY_1,
                             &[&source_min_length, &target_arity],
                         );
                     }
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 if !target_has_variable_element && (source_rest || target_arity < source_arity) {
                     if report_errors {
                         if source_min_length < target_min_length {
                             self.report_error(
                                 c,
-                                &diagnostics::Target_requires_0_element_s_but_source_may_have_fewer,
+                                &diagnostics::TARGET_REQUIRES_0_ELEMENT_S_BUT_SOURCE_MAY_HAVE_FEWER,
                                 &[&target_min_length],
                             );
                         } else {
-                            self.report_error(c, &diagnostics::Target_allows_only_0_element_s_but_source_may_have_more, &[&target_arity]);
+                            self.report_error(c, &diagnostics::TARGET_ALLOWS_ONLY_0_ELEMENT_S_BUT_SOURCE_MAY_HAVE_MORE, &[&target_arity]);
                         }
                     }
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 let source_type_arguments = c.get_type_arguments(source);
                 let target_type_arguments = c.get_type_arguments(target);
@@ -3353,9 +3353,9 @@ impl Relater {
                     } else {
                         if source_position >= target_arity {
                             if report_errors {
-                                self.report_error(c, &diagnostics::Target_allows_only_0_element_s_but_source_may_have_more, &[&target_arity]);
+                                self.report_error(c, &diagnostics::TARGET_ALLOWS_ONLY_0_ELEMENT_S_BUT_SOURCE_MAY_HAVE_MORE, &[&target_arity]);
                             }
-                            return Ternary::False;
+                            return Ternary::FALSE;
                         }
                         source_position
                     };
@@ -3365,25 +3365,25 @@ impl Relater {
                         && !source_flags.intersects(ElementFlags::Variadic)
                     {
                         if report_errors {
-                            self.report_error(c, &diagnostics::Source_provides_no_match_for_variadic_element_at_position_0_in_target, &[&target_position]);
+                            self.report_error(c, &diagnostics::SOURCE_PROVIDES_NO_MATCH_FOR_VARIADIC_ELEMENT_AT_POSITION_0_IN_TARGET, &[&target_position]);
                         }
-                        return Ternary::False;
+                        return Ternary::FALSE;
                     }
                     if source_flags.intersects(ElementFlags::Variadic)
                         && !target_flags.intersects(ElementFlags::Variable)
                     {
                         if report_errors {
-                            self.report_error(c, &diagnostics::Variadic_element_at_position_0_in_source_does_not_match_element_at_position_1_in_target, &[&source_position, &target_position]);
+                            self.report_error(c, &diagnostics::VARIADIC_ELEMENT_AT_POSITION_0_IN_SOURCE_DOES_NOT_MATCH_ELEMENT_AT_POSITION_1_IN_TARGET, &[&source_position, &target_position]);
                         }
-                        return Ternary::False;
+                        return Ternary::FALSE;
                     }
                     if target_flags.intersects(ElementFlags::Required)
                         && !source_flags.intersects(ElementFlags::Required)
                     {
                         if report_errors {
-                            self.report_error(c, &diagnostics::Source_provides_no_match_for_required_element_at_position_0_in_target, &[&target_position]);
+                            self.report_error(c, &diagnostics::SOURCE_PROVIDES_NO_MATCH_FOR_REQUIRED_ELEMENT_AT_POSITION_0_IN_TARGET, &[&target_position]);
                         }
-                        return Ternary::False;
+                        return Ternary::FALSE;
                     }
                     // We can only exclude discriminant properties if we have not yet encountered a variable-length element.
                     if can_exclude_discriminants {
@@ -3422,26 +3422,26 @@ impl Relater {
                         None, /*headMessage*/
                         intersection_state,
                     );
-                    if related == Ternary::False {
+                    if related == Ternary::FALSE {
                         if report_errors && (target_arity > 1 || source_arity > 1) {
                             if target_has_rest_element
                                 && source_position >= target_start_count
                                 && source_position_from_end >= target_end_count
                                 && target_start_count != source_arity - target_end_count - 1
                             {
-                                self.report_error(c, &diagnostics::Type_at_positions_0_through_1_in_source_is_not_compatible_with_type_at_position_2_in_target, &[&target_start_count, &(source_arity - target_end_count - 1), &target_position]);
+                                self.report_error(c, &diagnostics::TYPE_AT_POSITIONS_0_THROUGH_1_IN_SOURCE_IS_NOT_COMPATIBLE_WITH_TYPE_AT_POSITION_2_IN_TARGET, &[&target_start_count, &(source_arity - target_end_count - 1), &target_position]);
                             } else {
-                                self.report_error(c, &diagnostics::Type_at_position_0_in_source_is_not_compatible_with_type_at_position_1_in_target, &[&source_position, &target_position]);
+                                self.report_error(c, &diagnostics::TYPE_AT_POSITION_0_IN_SOURCE_IS_NOT_COMPATIBLE_WITH_TYPE_AT_POSITION_1_IN_TARGET, &[&source_position, &target_position]);
                             }
                         }
-                        return Ternary::False;
+                        return Ternary::FALSE;
                     }
                     result &= related;
                 }
                 return result;
             }
             if target.target_tuple_type().combined_flags.get().intersects(ElementFlags::Variable) {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
         let require_optional_properties = (self.rel() == c.subtype_relation
@@ -3491,7 +3491,7 @@ impl Relater {
         unmatched_property: Option<P<Symbol>>,
         found: &[Option<Option<P<Symbol>>>],
     ) -> Ternary {
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         if let Some(unmatched_property) = unmatched_property {
             if report_errors && c.should_report_unmatched_property_error(source, target) {
                 self.report_unmatched_property(
@@ -3502,7 +3502,7 @@ impl Relater {
                     require_optional_properties,
                 );
             }
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         if is_object_literal_type(target) {
             let source_properties = c.get_properties_of_type(source);
@@ -3517,11 +3517,11 @@ impl Relater {
                             let target_string = c.type_to_string_exported(target);
                             self.report_error(
                                 c,
-                                &diagnostics::Property_0_does_not_exist_on_type_1,
+                                &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                                 &[&source_prop_string, &target_string],
                             );
                         }
-                        return Some(Ternary::False);
+                        return Some(Ternary::FALSE);
                     }
 
                     None
@@ -3570,8 +3570,8 @@ impl Relater {
                             intersection_state,
                             skip_optional,
                         );
-                        if related == Ternary::False {
-                            return Ternary::False;
+                        if related == Ternary::FALSE {
+                            return Ternary::FALSE;
                         }
                         result &= related;
                     }
@@ -3608,7 +3608,7 @@ impl Relater {
                         let target_prop_string = c.symbol_to_string(target_prop);
                         self.report_error(
                             c,
-                            &diagnostics::Types_have_separate_declarations_of_a_private_property_0,
+                            &diagnostics::TYPES_HAVE_SEPARATE_DECLARATIONS_OF_A_PRIVATE_PROPERTY_0,
                             &[&target_prop_string],
                         );
                     } else {
@@ -3629,12 +3629,12 @@ impl Relater {
                         );
                         self.report_error(
                             c,
-                            &diagnostics::Property_0_is_private_in_type_1_but_not_in_type_2,
+                            &diagnostics::PROPERTY_0_IS_PRIVATE_IN_TYPE_1_BUT_NOT_IN_TYPE_2,
                             &[&target_prop_string, &first, &second],
                         );
                     }
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         } else if target_prop_flags.intersects(ModifierFlags::Protected) {
             if !c.is_valid_override_of(source_prop, target_prop) {
@@ -3644,9 +3644,9 @@ impl Relater {
                     let target_prop_string = c.symbol_to_string(target_prop);
                     let source_type_string = c.type_to_string_exported(source_type);
                     let target_type_string = c.type_to_string_exported(target_type);
-                    self.report_error(c, &diagnostics::Property_0_is_protected_but_type_1_is_not_a_class_derived_from_2, &[&target_prop_string, &source_type_string, &target_type_string]);
+                    self.report_error(c, &diagnostics::PROPERTY_0_IS_PROTECTED_BUT_TYPE_1_IS_NOT_A_CLASS_DERIVED_FROM_2, &[&target_prop_string, &source_type_string, &target_type_string]);
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         } else if source_prop_flags.intersects(ModifierFlags::Protected) {
             if report_errors {
@@ -3655,11 +3655,11 @@ impl Relater {
                 let target_string = c.type_to_string_exported(target);
                 self.report_error(
                     c,
-                    &diagnostics::Property_0_is_protected_in_type_1_but_public_in_type_2,
+                    &diagnostics::PROPERTY_0_IS_PROTECTED_IN_TYPE_1_BUT_PUBLIC_IN_TYPE_2,
                     &[&target_prop_string, &source_string, &target_string],
                 );
             }
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // Ensure {readonly a: whatever} is not a subtype of {a: whatever},
         // while {a: whatever} is a subtype of {readonly a: whatever}.
@@ -3671,7 +3671,7 @@ impl Relater {
             && c.is_readonly_symbol(source_prop)
             && !c.is_readonly_symbol(target_prop)
         {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // If the target comes from a partial union prop, allow `undefined` in the target type
         let related = self.is_property_symbol_type_related(
@@ -3682,16 +3682,16 @@ impl Relater {
             report_errors,
             intersection_state,
         );
-        if related == Ternary::False {
+        if related == Ternary::FALSE {
             if report_errors {
                 let target_prop_string = c.symbol_to_string(target_prop);
                 self.report_error(
                     c,
-                    &diagnostics::Types_of_property_0_are_incompatible,
+                    &diagnostics::TYPES_OF_PROPERTY_0_ARE_INCOMPATIBLE,
                     &[&target_prop_string],
                 );
             }
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         // When checking for comparability, be more lenient with optional properties.
         if !skip_optional
@@ -3712,11 +3712,11 @@ impl Relater {
                 let target_string = c.type_to_string_exported(target);
                 self.report_error(
                     c,
-                    &diagnostics::Property_0_is_optional_in_type_1_but_required_in_type_2,
+                    &diagnostics::PROPERTY_0_IS_OPTIONAL_IN_TYPE_1_BUT_REQUIRED_IN_TYPE_2,
                     &[&target_prop_string, &source_string, &target_string],
                 );
             }
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         related
     }
@@ -3742,7 +3742,7 @@ impl Relater {
         } else {
             TypeFlags::AnyOrUnknown
         }) {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         let effective_source = get_type_of_source_property(c, source_prop);
         self.is_related_to_ex(
@@ -3780,7 +3780,7 @@ impl Relater {
                         c.symbol_to_string_exported(source.symbol().unwrap());
                     let target_symbol_string =
                         c.symbol_to_string_exported(target.symbol().unwrap());
-                    self.report_error(c, &diagnostics::Property_0_in_type_1_refers_to_a_different_member_that_cannot_be_accessed_from_within_type_2, &[&private_identifier_description, &source_symbol_string, &target_symbol_string]);
+                    self.report_error(c, &diagnostics::PROPERTY_0_IN_TYPE_1_REFERS_TO_A_DIFFERENT_MEMBER_THAT_CANNOT_BE_ACCESSED_FROM_WITHIN_TYPE_2, &[&private_identifier_description, &source_symbol_string, &target_symbol_string]);
                     return;
                 }
             }
@@ -3796,14 +3796,14 @@ impl Relater {
             let prop_name = c.symbol_to_string(unmatched_property);
             self.report_error(
                 c,
-                &diagnostics::Property_0_is_missing_in_type_1_but_required_in_type_2,
+                &diagnostics::PROPERTY_0_IS_MISSING_IN_TYPE_1_BUT_REQUIRED_IN_TYPE_2,
                 &[&prop_name, &source_type, &target_type],
             );
             let first_declaration = unmatched_property.declarations().first().copied();
             if let Some(first_declaration) = first_declaration {
                 let diagnostic = create_diagnostic_for_node(
                     Some(first_declaration),
-                    &diagnostics::X_0_is_declared_here,
+                    &diagnostics::X_0_IS_DECLARED_HERE,
                     &[&prop_name],
                 );
                 self.related_info.borrow_mut().push(diagnostic);
@@ -3818,13 +3818,13 @@ impl Relater {
                     .map(|&p| c.symbol_to_string(p))
                     .collect::<Vec<_>>()
                     .join(", ");
-                self.report_error(c, &diagnostics::Type_0_is_missing_the_following_properties_from_type_1_Colon_2_and_3_more, &[&source_type, &target_type, &prop_names, &(props.len() - 4)]);
+                self.report_error(c, &diagnostics::TYPE_0_IS_MISSING_THE_FOLLOWING_PROPERTIES_FROM_TYPE_1_COLON_2_AND_3_MORE, &[&source_type, &target_type, &prop_names, &(props.len() - 4)]);
             } else {
                 let prop_names =
                     props.iter().map(|&p| c.symbol_to_string(p)).collect::<Vec<_>>().join(", ");
                 self.report_error(
                     c,
-                    &diagnostics::Type_0_is_missing_the_following_properties_from_type_1_Colon_2,
+                    &diagnostics::TYPE_0_IS_MISSING_THE_FOLLOWING_PROPERTIES_FROM_TYPE_1_COLON_2,
                     &[&source_type, &target_type, &prop_names],
                 );
             }
@@ -3851,7 +3851,7 @@ impl Relater {
                 if report_errors {
                     let source_string = c.type_to_string_exported(source);
                     let target_string = c.type_to_string_exported(target);
-                    self.report_error(c, &diagnostics::The_type_0_is_readonly_and_cannot_be_assigned_to_the_mutable_type_1, &[&source_string, &target_string]);
+                    self.report_error(c, &diagnostics::THE_TYPE_0_IS_READONLY_AND_CANNOT_BE_ASSIGNED_TO_THE_MUTABLE_TYPE_1, &[&source_string, &target_string]);
                 }
                 return false;
             }
@@ -3861,7 +3861,7 @@ impl Relater {
             if report_errors {
                 let source_string = c.type_to_string_exported(source);
                 let target_string = c.type_to_string_exported(target);
-                self.report_error(c, &diagnostics::The_type_0_is_readonly_and_cannot_be_assigned_to_the_mutable_type_1, &[&source_string, &target_string]);
+                self.report_error(c, &diagnostics::THE_TYPE_0_IS_READONLY_AND_CANNOT_BE_ASSIGNED_TO_THE_MUTABLE_TYPE_1, &[&source_string, &target_string]);
             }
             return false;
         }
@@ -3885,7 +3885,7 @@ impl Relater {
         {
             let target_string = c.type_to_string_exported(target);
             let source_string = c.type_to_string_exported(source);
-            self.report_error(c, &diagnostics::X_0_is_a_primitive_but_1_is_a_wrapper_object_Prefer_using_0_when_possible, &[&target_string, &source_string]);
+            self.report_error(c, &diagnostics::X_0_IS_A_PRIMITIVE_BUT_1_IS_A_WRAPPER_OBJECT_PREFER_USING_0_WHEN_POSSIBLE, &[&target_string, &source_string]);
         }
     }
 
@@ -3900,26 +3900,26 @@ impl Relater {
         if !source.flags().intersects(TypeFlags::Object)
             || !target.flags().intersects(TypeFlags::Object)
         {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         let source_object_properties = c.get_properties_of_object_type(source);
         let source_properties = exclude_properties(source_object_properties, excluded_properties);
         let target_object_properties = c.get_properties_of_object_type(target);
         let target_properties = exclude_properties(target_object_properties, excluded_properties);
         if source_properties.len() != target_properties.len() {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         result = match source_properties.iter().try_fold(result, |mut result, &source_prop| {
             let target_prop = c.get_property_of_object_type(target, source_prop.name());
             let Some(target_prop) = target_prop else {
-                return Err(Ternary::False);
+                return Err(Ternary::FALSE);
             };
             let related = c.compare_properties(source_prop, target_prop, |c, s, t| {
                 self.is_related_to_simple(c, s, t)
             });
-            if related == Ternary::False {
-                return Err(Ternary::False);
+            if related == Ternary::FALSE {
+                return Err(Ternary::FALSE);
             }
             result &= related;
             Ok(result)
@@ -3945,10 +3945,10 @@ impl Relater {
         }
         // With respect to signatures, the anyFunctionType wildcard is a subtype of every other function type.
         if source == c.any_function_type {
-            return Ternary::True;
+            return Ternary::TRUE;
         }
         if target == c.any_function_type {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         let source_signatures = c.get_signatures_of_type(source, kind);
         let target_signatures = c.get_signatures_of_type(target, kind);
@@ -3966,9 +3966,9 @@ impl Relater {
                 // check we perform for an extends clause excludes construct signatures from the target,
                 // so this check never proceeds.
                 if report_errors {
-                    self.report_error(c, &diagnostics::Cannot_assign_an_abstract_constructor_type_to_a_non_abstract_constructor_type, &[]);
+                    self.report_error(c, &diagnostics::CANNOT_ASSIGN_AN_ABSTRACT_CONSTRUCTOR_TYPE_TO_A_NON_ABSTRACT_CONSTRUCTOR_TYPE, &[]);
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
             if !self.constructor_visibilities_are_compatible(
                 c,
@@ -3976,10 +3976,10 @@ impl Relater {
                 target_signatures[0],
                 report_errors,
             ) {
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         if source.object_flags().intersects(ObjectFlags::Instantiated)
             && target.object_flags().intersects(ObjectFlags::Instantiated)
             && source.symbol() == target.symbol()
@@ -4000,8 +4000,8 @@ impl Relater {
                     report_errors,
                     intersection_state,
                 );
-                if related == Ternary::False {
-                    return Ternary::False;
+                if related == Ternary::FALSE {
+                    return Ternary::FALSE;
                 }
                 result &= related;
             }
@@ -4034,7 +4034,7 @@ impl Relater {
                         should_elaborate_errors,
                         intersection_state,
                     );
-                    if related != Ternary::False {
+                    if related != Ternary::FALSE {
                         result &= related;
                         self.restore_error_state(c, save_error_state);
                         continue 'outer;
@@ -4046,11 +4046,11 @@ impl Relater {
                     let signature_string = c.signature_to_string(t);
                     self.report_error(
                         c,
-                        &diagnostics::Type_0_provides_no_match_for_the_signature_1,
+                        &diagnostics::TYPE_0_PROVIDES_NO_MATCH_FOR_THE_SIGNATURE_1,
                         &[&source_string, &signature_string],
                     );
                 }
-                return Ternary::False;
+                return Ternary::FALSE;
             }
         }
         result
@@ -4092,7 +4092,7 @@ impl Relater {
             let target_string = visibility_to_string(target_accessibility);
             self.report_error(
                 c,
-                &diagnostics::Cannot_assign_a_0_constructor_type_to_a_1_constructor_type,
+                &diagnostics::CANNOT_ASSIGN_A_0_CONSTRUCTOR_TYPE_TO_A_1_CONSTRUCTOR_TYPE,
                 &[&source_string, &target_string],
             );
         }
@@ -4171,9 +4171,9 @@ impl Relater {
         let source_signatures = c.get_signatures_of_type(source, kind);
         let target_signatures = c.get_signatures_of_type(target, kind);
         if source_signatures.len() != target_signatures.len() {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         for (i, element) in source_signatures.iter().enumerate() {
             let related = c.compare_signatures_identical(
                 *element,
@@ -4183,8 +4183,8 @@ impl Relater {
                 false, /*ignoreReturnTypes*/
                 |c, s, t| self.is_related_to_simple(c, s, t),
             );
-            if related == Ternary::False {
-                return Ternary::False;
+            if related == Ternary::FALSE {
+                return Ternary::FALSE;
             }
             result &= related;
         }
@@ -4207,14 +4207,14 @@ impl Relater {
         let index_infos = c.get_index_infos_of_type(target);
         let string_type = c.string_type;
         let target_has_string_index = index_infos.iter().any(|info| info.key_type() == string_type);
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         result = match index_infos.iter().try_fold(result, |mut result, &target_info| {
             let related = if self.rel() != c.strict_subtype_relation
                 && !source_is_primitive
                 && target_has_string_index
                 && target_info.value_type().flags().intersects(TypeFlags::Any)
             {
-                Ternary::True
+                Ternary::TRUE
             } else if c.is_generic_mapped_type(source) && target_has_string_index {
                 let template_type = c.get_template_type_from_mapped_type(source);
                 self.is_related_to(
@@ -4233,8 +4233,8 @@ impl Relater {
                     intersection_state,
                 )
             };
-            if related == Ternary::False {
-                return Err(Ternary::False);
+            if related == Ternary::FALSE {
+                return Err(Ternary::FALSE);
             }
             result &= related;
             Ok(result)
@@ -4285,11 +4285,11 @@ impl Relater {
             let source_string = c.type_to_string_exported(source);
             self.report_error(
                 c,
-                &diagnostics::Index_signature_for_type_0_is_missing_in_type_1,
+                &diagnostics::INDEX_SIGNATURE_FOR_TYPE_0_IS_MISSING_IN_TYPE_1,
                 &[&key_type_string, &source_string],
             );
         }
-        Ternary::False
+        Ternary::FALSE
     }
 }
 
@@ -4332,7 +4332,7 @@ impl Relater {
         report_errors: bool,
         intersection_state: IntersectionState,
     ) -> Ternary {
-        let mut result = Ternary::True;
+        let mut result = Ternary::TRUE;
         let key_type = target_info.key_type();
         let props = if source.flags().intersects(TypeFlags::Intersection) {
             c.get_properties_of_union_or_intersection_type(source)
@@ -4369,16 +4369,16 @@ impl Relater {
                     None, /*headMessage*/
                     intersection_state,
                 );
-                if related == Ternary::False {
+                if related == Ternary::FALSE {
                     if report_errors {
                         let prop_string = c.symbol_to_string(prop);
                         self.report_error(
                             c,
-                            &diagnostics::Property_0_is_incompatible_with_index_signature,
+                            &diagnostics::PROPERTY_0_IS_INCOMPATIBLE_WITH_INDEX_SIGNATURE,
                             &[&prop_string],
                         );
                     }
-                    return Ternary::False;
+                    return Ternary::FALSE;
                 }
                 result &= related;
             }
@@ -4394,8 +4394,8 @@ impl Relater {
                         report_errors,
                         intersection_state,
                     );
-                    if related == Ternary::False {
-                        return Err(Ternary::False);
+                    if related == Ternary::FALSE {
+                        return Err(Ternary::FALSE);
                     }
                     result &= related;
                 }
@@ -4426,12 +4426,12 @@ impl Relater {
             None, /*headMessage*/
             intersection_state,
         );
-        if related == Ternary::False && report_errors {
+        if related == Ternary::FALSE && report_errors {
             if source_info.key_type() == target_info.key_type() {
                 let key_type_string = c.type_to_string_exported(source_info.key_type());
                 self.report_error(
                     c,
-                    &diagnostics::X_0_index_signatures_are_incompatible,
+                    &diagnostics::X_0_INDEX_SIGNATURES_ARE_INCOMPATIBLE,
                     &[&key_type_string],
                 );
             } else {
@@ -4439,7 +4439,7 @@ impl Relater {
                 let target_key_string = c.type_to_string_exported(target_info.key_type());
                 self.report_error(
                     c,
-                    &diagnostics::X_0_and_1_index_signatures_are_incompatible,
+                    &diagnostics::X_0_AND_1_INDEX_SIGNATURES_ARE_INCOMPATIBLE,
                     &[&source_key_string, &target_key_string],
                 );
             }
@@ -4457,7 +4457,7 @@ impl Relater {
         let source_infos = c.get_index_infos_of_type(source);
         let target_infos = c.get_index_infos_of_type(target);
         if source_infos.len() != target_infos.len() {
-            return Ternary::False;
+            return Ternary::FALSE;
         }
         if let Some(result) = target_infos.iter().find_map(|&target_info| {
             let source_info = c.get_index_info_of_type(source, target_info.key_type());
@@ -4468,17 +4468,17 @@ impl Relater {
                     target_info.value_type(),
                     RecursionFlags::Both,
                     false,
-                ) != Ternary::False
+                ) != Ternary::FALSE
                 && source_info.unwrap().is_readonly() == target_info.is_readonly())
             {
-                return Some(Ternary::False);
+                return Some(Ternary::FALSE);
             }
 
             None
         }) {
             return result;
         }
-        Ternary::True
+        Ternary::TRUE
     }
 
     // relater.go:4737
@@ -4516,15 +4516,15 @@ impl Relater {
             && source.flags().intersects(TypeFlags::Object)
             && c.global_object_type == source
         {
-            self.report_error(c, &diagnostics::The_Object_type_is_assignable_to_very_few_other_types_Did_you_mean_to_use_the_any_type_instead, &[]);
+            self.report_error(c, &diagnostics::THE_OBJECT_TYPE_IS_ASSIGNABLE_TO_VERY_FEW_OTHER_TYPES_DID_YOU_MEAN_TO_USE_THE_ANY_TYPE_INSTEAD, &[]);
         } else if source.object_flags().intersects(ObjectFlags::JsxAttributes)
             && target.flags().intersects(TypeFlags::Intersection)
         {
             let target_types = target.types();
             let intrinsic_attributes =
-                c.get_jsx_type(JsxNames.intrinsic_attributes, self.error_node.get().unwrap());
-            let intrinsic_class_attributes =
-                c.get_jsx_type(JsxNames.intrinsic_class_attributes, self.error_node.get().unwrap());
+                c.get_jsx_type(JSX_NAMES.intrinsic_attributes, self.error_node.get().unwrap());
+            let intrinsic_class_attributes = c
+                .get_jsx_type(JSX_NAMES.intrinsic_class_attributes, self.error_node.get().unwrap());
             if !c.is_error_type(intrinsic_attributes)
                 && !c.is_error_type(intrinsic_class_attributes)
                 && (target_types.contains(&intrinsic_attributes)
@@ -4535,7 +4535,7 @@ impl Relater {
         } else if original_target.flags().intersects(TypeFlags::Intersection)
             && original_target.object_flags_lazy().intersects(ObjectFlags::IsNeverIntersection)
         {
-            let mut message = &diagnostics::The_intersection_0_was_reduced_to_never_because_property_1_has_conflicting_types_in_some_constituents;
+            let mut message = &diagnostics::THE_INTERSECTION_0_WAS_REDUCED_TO_NEVER_BECAUSE_PROPERTY_1_HAS_CONFLICTING_TYPES_IN_SOME_CONSTITUENTS;
             let mut prop: Option<P<Symbol>> = None;
             if let Some(p) = c
                 .get_properties_of_union_or_intersection_type(original_target)
@@ -4547,7 +4547,7 @@ impl Relater {
                 prop = Some(p);
             }
             if prop.is_none() {
-                message = &diagnostics::The_intersection_0_was_reduced_to_never_because_property_1_exists_in_multiple_constituents_and_is_private_in_some;
+                message = &diagnostics::THE_INTERSECTION_0_WAS_REDUCED_TO_NEVER_BECAUSE_PROPERTY_1_EXISTS_IN_MULTIPLE_CONSTITUENTS_AND_IS_PRIVATE_IN_SOME;
                 prop = c
                     .get_properties_of_union_or_intersection_type(original_target)
                     .iter()
@@ -4579,7 +4579,7 @@ impl Relater {
                 let first_declaration = source.symbol().unwrap().declarations()[0];
                 let diagnostic = new_diagnostic_for_node(
                     Some(first_declaration),
-                    Some(&diagnostics::This_type_parameter_might_need_an_extends_0_constraint),
+                    Some(&diagnostics::THIS_TYPE_PARAMETER_MIGHT_NEED_AN_EXTENDS_0_CONSTRAINT),
                     &[&target_constraint_string],
                 );
                 self.related_info.borrow_mut().push(diagnostic);
@@ -4626,32 +4626,32 @@ impl Relater {
                     target.as_type_parameter().constraint.get().unwrap(),
                 )
             {
-                self.report_error(c, &diagnostics::X_0_is_only_assignable_to_the_non_distributed_1_but_1_has_been_distributed_here, &[&generalized_source_type, &target_type]);
+                self.report_error(c, &diagnostics::X_0_IS_ONLY_ASSIGNABLE_TO_THE_NON_DISTRIBUTED_1_BUT_1_HAS_BEEN_DISTRIBUTED_HERE, &[&generalized_source_type, &target_type]);
             } else if let Some(constraint) = constraint
                 && c.is_type_assignable_to(generalized_source, constraint)
             {
                 let constraint_string = c.type_to_string_exported(constraint);
-                self.report_error(c, &diagnostics::X_0_is_assignable_to_the_constraint_of_type_1_but_1_could_be_instantiated_with_a_different_subtype_of_constraint_2, &[&generalized_source_type, &target_type, &constraint_string]);
+                self.report_error(c, &diagnostics::X_0_IS_ASSIGNABLE_TO_THE_CONSTRAINT_OF_TYPE_1_BUT_1_COULD_BE_INSTANTIATED_WITH_A_DIFFERENT_SUBTYPE_OF_CONSTRAINT_2, &[&generalized_source_type, &target_type, &constraint_string]);
             } else if let Some(constraint) = constraint
                 && c.is_type_assignable_to(source, constraint)
             {
                 let constraint_string = c.type_to_string_exported(constraint);
-                self.report_error(c, &diagnostics::X_0_is_assignable_to_the_constraint_of_type_1_but_1_could_be_instantiated_with_a_different_subtype_of_constraint_2, &[&source_type, &target_type, &constraint_string]);
+                self.report_error(c, &diagnostics::X_0_IS_ASSIGNABLE_TO_THE_CONSTRAINT_OF_TYPE_1_BUT_1_COULD_BE_INSTANTIATED_WITH_A_DIFFERENT_SUBTYPE_OF_CONSTRAINT_2, &[&source_type, &target_type, &constraint_string]);
             } else {
                 self.error_chain.set(None); // Only report this error once
-                self.report_error(c, &diagnostics::X_0_could_be_instantiated_with_an_arbitrary_type_which_could_be_unrelated_to_1, &[&target_type, &generalized_source_type]);
+                self.report_error(c, &diagnostics::X_0_COULD_BE_INSTANTIATED_WITH_AN_ARBITRARY_TYPE_WHICH_COULD_BE_UNRELATED_TO_1, &[&target_type, &generalized_source_type]);
             }
         }
         let message: &'static Message = match message {
             None => {
                 if self.rel() == c.comparable_relation {
-                    &diagnostics::Type_0_is_not_comparable_to_type_1
+                    &diagnostics::TYPE_0_IS_NOT_COMPARABLE_TO_TYPE_1
                 } else if source_type == target_type {
-                    &diagnostics::Type_0_is_not_assignable_to_type_1_Two_different_types_with_this_name_exist_but_they_are_unrelated
+                    &diagnostics::TYPE_0_IS_NOT_ASSIGNABLE_TO_TYPE_1_TWO_DIFFERENT_TYPES_WITH_THIS_NAME_EXIST_BUT_THEY_ARE_UNRELATED
                 } else if c.exact_optional_property_types
                     && !c.get_exact_optional_unassignable_properties(source, target).is_empty()
                 {
-                    &diagnostics::Type_0_is_not_assignable_to_type_1_with_exactOptionalPropertyTypes_Colon_true_Consider_adding_undefined_to_the_types_of_the_target_s_properties
+                    &diagnostics::TYPE_0_IS_NOT_ASSIGNABLE_TO_TYPE_1_WITH_EXACT_OPTIONAL_PROPERTY_TYPES_COLON_TRUE_CONSIDER_ADDING_UNDEFINED_TO_THE_TYPES_OF_THE_TARGET_S_PROPERTIES
                 } else {
                     if source.flags().intersects(TypeFlags::StringLiteral)
                         && target.flags().intersects(TypeFlags::Union)
@@ -4662,43 +4662,43 @@ impl Relater {
                             let suggested_type_string = c.type_to_string_exported(suggested_type);
                             self.report_error(
                                 c,
-                                &diagnostics::Type_0_is_not_assignable_to_type_1_Did_you_mean_2,
+                                &diagnostics::TYPE_0_IS_NOT_ASSIGNABLE_TO_TYPE_1_DID_YOU_MEAN_2,
                                 &[&generalized_source_type, &target_type, &suggested_type_string],
                             );
                             return;
                         }
                     }
-                    &diagnostics::Type_0_is_not_assignable_to_type_1
+                    &diagnostics::TYPE_0_IS_NOT_ASSIGNABLE_TO_TYPE_1
                 }
             }
             Some(message) => {
-                if std::ptr::eq(message, &raw const diagnostics::Argument_of_type_0_is_not_assignable_to_parameter_of_type_1) && c.exact_optional_property_types && !c.get_exact_optional_unassignable_properties(source, target).is_empty() {
-                    &diagnostics::Argument_of_type_0_is_not_assignable_to_parameter_of_type_1_with_exactOptionalPropertyTypes_Colon_true_Consider_adding_undefined_to_the_types_of_the_target_s_properties
+                if std::ptr::eq(message, &raw const diagnostics::ARGUMENT_OF_TYPE_0_IS_NOT_ASSIGNABLE_TO_PARAMETER_OF_TYPE_1) && c.exact_optional_property_types && !c.get_exact_optional_unassignable_properties(source, target).is_empty() {
+                    &diagnostics::ARGUMENT_OF_TYPE_0_IS_NOT_ASSIGNABLE_TO_PARAMETER_OF_TYPE_1_WITH_EXACT_OPTIONAL_PROPERTY_TYPES_COLON_TRUE_CONSIDER_ADDING_UNDEFINED_TO_THE_TYPES_OF_THE_TARGET_S_PROPERTIES
                 } else {
                     message
                 }
             }
         };
         let chain_message = self.get_chain_message(c, 0);
-        if is_message(chain_message, &diagnostics::Object_literal_may_only_specify_known_properties_and_0_does_not_exist_in_type_1)
-            || is_message(chain_message, &diagnostics::Object_literal_may_only_specify_known_properties_but_0_does_not_exist_in_type_1_Did_you_mean_to_write_2)
+        if is_message(chain_message, &diagnostics::OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES_AND_0_DOES_NOT_EXIST_IN_TYPE_1)
+            || is_message(chain_message, &diagnostics::OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES_BUT_0_DOES_NOT_EXIST_IN_TYPE_1_DID_YOU_MEAN_TO_WRITE_2)
         {
             // Suppress if next message is an excess property error
             return;
-        } else if is_message(chain_message, &diagnostics::Excessive_complexity_comparing_types_0_and_1) || is_message(chain_message, &diagnostics::The_type_0_is_readonly_and_cannot_be_assigned_to_the_mutable_type_1) {
+        } else if is_message(chain_message, &diagnostics::EXCESSIVE_COMPLEXITY_COMPARING_TYPES_0_AND_1) || is_message(chain_message, &diagnostics::THE_TYPE_0_IS_READONLY_AND_CANNOT_BE_ASSIGNED_TO_THE_MUTABLE_TYPE_1) {
             // Suppress if next message is an excessive complexity/stack depth message for source and target or a readonly
             // vs. mutable error for source and target
             if self.chain_args_match(c, &[Some(&generalized_source_type), Some(&target_type)]) {
                 return;
             }
-        } else if is_message(chain_message, &diagnostics::Property_0_is_missing_in_type_1_but_required_in_type_2) {
+        } else if is_message(chain_message, &diagnostics::PROPERTY_0_IS_MISSING_IN_TYPE_1_BUT_REQUIRED_IN_TYPE_2) {
             // Suppress if next message is a missing property message for source and target and we're not
             // reporting on conversion or interface implementation
             if !is_conversion_or_interface_implementation_message(message) && self.chain_args_match(c, &[None, Some(&generalized_source_type), Some(&target_type)]) {
                 return;
             }
-        } else if is_message(chain_message, &diagnostics::Type_0_is_missing_the_following_properties_from_type_1_Colon_2_and_3_more)
-            || is_message(chain_message, &diagnostics::Type_0_is_missing_the_following_properties_from_type_1_Colon_2)
+        } else if is_message(chain_message, &diagnostics::TYPE_0_IS_MISSING_THE_FOLLOWING_PROPERTIES_FROM_TYPE_1_COLON_2_AND_3_MORE)
+            || is_message(chain_message, &diagnostics::TYPE_0_IS_MISSING_THE_FOLLOWING_PROPERTIES_FROM_TYPE_1_COLON_2)
         {
             // Suppress if next message is a missing property message for source and target and we're not
             // reporting on conversion or interface implementation
@@ -4718,11 +4718,11 @@ impl Relater {
     ) {
         let mut message = message;
         let mut args = diagnostics::stringify_args(args);
-        if std::ptr::eq(message, &raw const diagnostics::Types_of_property_0_are_incompatible) {
+        if std::ptr::eq(message, &raw const diagnostics::TYPES_OF_PROPERTY_0_ARE_INCOMPATIBLE) {
             // Suppress if next message is an excess property error
             let chain_message = self.get_chain_message(c, 0);
-            if is_message(chain_message, &diagnostics::Object_literal_may_only_specify_known_properties_and_0_does_not_exist_in_type_1)
-                || is_message(chain_message, &diagnostics::Object_literal_may_only_specify_known_properties_but_0_does_not_exist_in_type_1_Did_you_mean_to_write_2)
+            if is_message(chain_message, &diagnostics::OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES_AND_0_DOES_NOT_EXIST_IN_TYPE_1)
+                || is_message(chain_message, &diagnostics::OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES_BUT_0_DOES_NOT_EXIST_IN_TYPE_1_DID_YOU_MEAN_TO_WRITE_2)
             {
                 return;
             }
@@ -4731,18 +4731,18 @@ impl Relater {
             // message for 'x()' or 'x(...)'
             let mut arg = String::new();
             let chain_message = self.get_chain_message(c, 1);
-            if is_message(chain_message, &diagnostics::Call_signatures_with_no_arguments_have_incompatible_return_types_0_and_1) {
+            if is_message(chain_message, &diagnostics::CALL_SIGNATURES_WITH_NO_ARGUMENTS_HAVE_INCOMPATIBLE_RETURN_TYPES_0_AND_1) {
                 arg = get_property_name_arg(&args[0]) + "()";
-            } else if is_message(chain_message, &diagnostics::Construct_signatures_with_no_arguments_have_incompatible_return_types_0_and_1) {
+            } else if is_message(chain_message, &diagnostics::CONSTRUCT_SIGNATURES_WITH_NO_ARGUMENTS_HAVE_INCOMPATIBLE_RETURN_TYPES_0_AND_1) {
                 arg = "new ".to_string() + &get_property_name_arg(&args[0]) + "()";
-            } else if is_message(chain_message, &diagnostics::Call_signature_return_types_0_and_1_are_incompatible) {
+            } else if is_message(chain_message, &diagnostics::CALL_SIGNATURE_RETURN_TYPES_0_AND_1_ARE_INCOMPATIBLE) {
                 arg = get_property_name_arg(&args[0]) + "(...)";
-            } else if is_message(chain_message, &diagnostics::Construct_signature_return_types_0_and_1_are_incompatible) {
+            } else if is_message(chain_message, &diagnostics::CONSTRUCT_SIGNATURE_RETURN_TYPES_0_AND_1_ARE_INCOMPATIBLE) {
                 arg = "new ".to_string() + &get_property_name_arg(&args[0]) + "(...)";
             }
             if !arg.is_empty() {
                 message =
-                    &diagnostics::The_types_returned_by_0_are_incompatible_between_these_types;
+                    &diagnostics::THE_TYPES_RETURNED_BY_0_ARE_INCOMPATIBLE_BETWEEN_THESE_TYPES;
                 args[0] = arg;
                 self.error_chain.set(self.error_chain.get().unwrap().next.unwrap().next);
             }
@@ -4750,14 +4750,14 @@ impl Relater {
             // followed by a property incompatibility message for property 'y' into a single property incompatibility
             // message for 'x.y'
             let chain_message = self.get_chain_message(c, 1);
-            if is_message(chain_message, &diagnostics::Types_of_property_0_are_incompatible)
+            if is_message(chain_message, &diagnostics::TYPES_OF_PROPERTY_0_ARE_INCOMPATIBLE)
                 || is_message(
                     chain_message,
-                    &diagnostics::The_types_of_0_are_incompatible_between_these_types,
+                    &diagnostics::THE_TYPES_OF_0_ARE_INCOMPATIBLE_BETWEEN_THESE_TYPES,
                 )
                 || is_message(
                     chain_message,
-                    &diagnostics::The_types_returned_by_0_are_incompatible_between_these_types,
+                    &diagnostics::THE_TYPES_RETURNED_BY_0_ARE_INCOMPATIBLE_BETWEEN_THESE_TYPES,
                 )
             {
                 let head = get_property_name_arg(&args[0]);
@@ -4767,9 +4767,9 @@ impl Relater {
                 self.error_chain.set(self.error_chain.get().unwrap().next.unwrap().next);
                 if std::ptr::eq(
                     message,
-                    &raw const diagnostics::Types_of_property_0_are_incompatible,
+                    &raw const diagnostics::TYPES_OF_PROPERTY_0_ARE_INCOMPATIBLE,
                 ) {
-                    message = &diagnostics::The_types_of_0_are_incompatible_between_these_types;
+                    message = &diagnostics::THE_TYPES_OF_0_ARE_INCOMPATIBLE_BETWEEN_THESE_TYPES;
                 }
                 self.report_error(c, message, &[&arg]);
                 return;
@@ -4860,12 +4860,12 @@ pub(crate) fn get_property_name_arg(arg: &str) -> String {
 
 // relater.go:4967
 pub(crate) fn is_conversion_or_interface_implementation_message(message: &'static Message) -> bool {
-    std::ptr::eq(message, &raw const diagnostics::Class_0_incorrectly_implements_interface_1)
-        || std::ptr::eq(message, &raw const diagnostics::Class_0_incorrectly_implements_class_1_Did_you_mean_to_extend_1_and_inherit_its_members_as_a_subclass)
-        || std::ptr::eq(message, &raw const diagnostics::Conversion_of_type_0_to_type_1_may_be_a_mistake_because_neither_type_sufficiently_overlaps_with_the_other_If_this_was_intentional_convert_the_expression_to_unknown_first)
-        || std::ptr::eq(message, &raw const diagnostics::Its_instance_type_0_is_not_a_valid_JSX_element)
-        || std::ptr::eq(message, &raw const diagnostics::Its_return_type_0_is_not_a_valid_JSX_element)
-        || std::ptr::eq(message, &raw const diagnostics::Its_element_type_0_is_not_a_valid_JSX_element)
+    std::ptr::eq(message, &raw const diagnostics::CLASS_0_INCORRECTLY_IMPLEMENTS_INTERFACE_1)
+        || std::ptr::eq(message, &raw const diagnostics::CLASS_0_INCORRECTLY_IMPLEMENTS_CLASS_1_DID_YOU_MEAN_TO_EXTEND_1_AND_INHERIT_ITS_MEMBERS_AS_A_SUBCLASS)
+        || std::ptr::eq(message, &raw const diagnostics::CONVERSION_OF_TYPE_0_TO_TYPE_1_MAY_BE_A_MISTAKE_BECAUSE_NEITHER_TYPE_SUFFICIENTLY_OVERLAPS_WITH_THE_OTHER_IF_THIS_WAS_INTENTIONAL_CONVERT_THE_EXPRESSION_TO_UNKNOWN_FIRST)
+        || std::ptr::eq(message, &raw const diagnostics::ITS_INSTANCE_TYPE_0_IS_NOT_A_VALID_JSX_ELEMENT)
+        || std::ptr::eq(message, &raw const diagnostics::ITS_RETURN_TYPE_0_IS_NOT_A_VALID_JSX_ELEMENT)
+        || std::ptr::eq(message, &raw const diagnostics::ITS_ELEMENT_TYPE_0_IS_NOT_A_VALID_JSX_ELEMENT)
 }
 
 // relater.go:4976

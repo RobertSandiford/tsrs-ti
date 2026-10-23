@@ -9,6 +9,7 @@ use crate::*;
 bitflags::bitflags! {
     // Flags enum to track count of temp variables and a few dedicated names
     #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Default)]
+    #[expect(non_camel_case_types, reason = "Keep the upstream bitflags type name.")]
     pub(crate) struct tempFlags: u32 {
         const Auto = 0x0000_0000; // No preferred name
         const CountMask = 0x0FFF_FFFF; // Temp variable counter
@@ -32,14 +33,14 @@ pub struct NameGenerator {
     node_id_to_generated_name: Option<FxHashMap<NodeId, String>>, // Map of generated names for specific nodes
     node_id_to_generated_private_name: Option<FxHashMap<NodeId, String>>, // Map of generated private names for specific nodes
     auto_generated_id_to_generated_name: Option<FxHashMap<AutoGenerateId, String>>, // Map of generated names for temp and loop variables
-    name_generation_scope: Option<Box<nameGenerationScope>>,
-    private_name_generation_scope: Option<Box<nameGenerationScope>>,
+    name_generation_scope: Option<Box<NameGenerationScope>>,
+    private_name_generation_scope: Option<Box<NameGenerationScope>>,
     generated_names: FxHashSet<String>, // NOTE: Used to match Strada, but should be moved to nameGenerationScope after port is complete.
 }
 
 #[derive(Default)]
-pub(crate) struct nameGenerationScope {
-    next: Option<Box<nameGenerationScope>>, // The next nameGenerationScope in the stack
+pub(crate) struct NameGenerationScope {
+    next: Option<Box<NameGenerationScope>>, // The next nameGenerationScope in the stack
     temp_flags: tempFlags,                  // TempFlags for the current name generation scope.
     formatted_name_temp_flags: Option<FxHashMap<String, tempFlags>>, // TempFlags for the current name generation scope.
     reserved_names: FxHashSet<String>, // Names reserved in nested name generation scopes.
@@ -48,12 +49,12 @@ pub(crate) struct nameGenerationScope {
 
 impl NameGenerator {
     pub fn push_scope(&mut self, reuse_temp_variable_scope: bool) {
-        self.private_name_generation_scope = Some(Box::new(nameGenerationScope {
+        self.private_name_generation_scope = Some(Box::new(NameGenerationScope {
             next: self.private_name_generation_scope.take(),
             ..Default::default()
         }));
         if !reuse_temp_variable_scope {
-            self.name_generation_scope = Some(Box::new(nameGenerationScope {
+            self.name_generation_scope = Some(Box::new(NameGenerationScope {
                 next: self.name_generation_scope.take(),
                 ..Default::default()
             }));
@@ -71,7 +72,7 @@ impl NameGenerator {
         }
     }
 
-    fn get_scope(&mut self, private_name: bool) -> &mut Option<Box<nameGenerationScope>> {
+    fn get_scope(&mut self, private_name: bool) -> &mut Option<Box<NameGenerationScope>> {
         if private_name {
             &mut self.private_name_generation_scope
         } else {

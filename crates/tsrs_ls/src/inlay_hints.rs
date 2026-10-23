@@ -431,7 +431,7 @@ impl InlayHintState<'_> {
         self.result.push(lsproto::InlayHint {
             label: hint,
             position: lsp_position,
-            kind: Some(lsproto::InlayHintKind::Type),
+            kind: Some(lsproto::InlayHintKind::TYPE),
             padding_left: Some(true),
             ..Default::default()
         });
@@ -487,7 +487,7 @@ impl InlayHintState<'_> {
         self.result.push(lsproto::InlayHint {
             label: label_parts,
             position: lsp_position,
-            kind: Some(lsproto::InlayHintKind::Parameter),
+            kind: Some(lsproto::InlayHintKind::PARAMETER),
             padding_right: Some(true),
             ..Default::default()
         });

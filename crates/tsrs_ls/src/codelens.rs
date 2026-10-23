@@ -46,7 +46,7 @@ impl CodeLensVisitor<'_> {
                     self.document_uri,
                     self.projection,
                     node,
-                    lsproto::CodeLensKind::References,
+                    lsproto::CodeLensKind::REFERENCES,
                 ) {
                     if self.seen.insert(key_for_code_lens(&code_lens)) {
                         self.result.push(code_lens);
@@ -61,7 +61,7 @@ impl CodeLensVisitor<'_> {
                     self.document_uri,
                     self.projection,
                     node,
-                    lsproto::CodeLensKind::Implementations,
+                    lsproto::CodeLensKind::IMPLEMENTATIONS,
                 ) {
                     if self.seen.insert(key_for_code_lens(&code_lens)) {
                         self.result.push(code_lens);
@@ -168,7 +168,7 @@ impl LanguageService {
         let mut locs: Vec<lsproto::Location> = Vec::new();
         let mut lens_title = String::new();
         match data.kind {
-            lsproto::CodeLensKind::References => {
+            lsproto::CodeLensKind::REFERENCES => {
                 let symbols_data = self
                     .provide_symbols_and_entries_at_position(
                         ctx, program, file, position, false, false,
@@ -193,12 +193,12 @@ impl LanguageService {
                 }
 
                 if locs.len() == 1 {
-                    lens_title = diagnostics::X_1_reference.localize(&[]);
+                    lens_title = diagnostics::X_1_REFERENCE.localize(&[]);
                 } else {
-                    lens_title = diagnostics::X_0_references.localize(&[&locs.len()]);
+                    lens_title = diagnostics::X_0_REFERENCES.localize(&[&locs.len()]);
                 }
             }
-            lsproto::CodeLensKind::Implementations => {
+            lsproto::CodeLensKind::IMPLEMENTATIONS => {
                 let symbols_data = self
                     .provide_symbols_and_entries_at_position(
                         ctx, program, file, position, false, true,
@@ -226,9 +226,9 @@ impl LanguageService {
                 }
 
                 if locs.len() == 1 {
-                    lens_title = diagnostics::X_1_implementation.localize(&[]);
+                    lens_title = diagnostics::X_1_IMPLEMENTATION.localize(&[]);
                 } else {
-                    lens_title = diagnostics::X_0_implementations.localize(&[&locs.len()]);
+                    lens_title = diagnostics::X_0_IMPLEMENTATIONS.localize(&[&locs.len()]);
                 }
             }
             _ => {}

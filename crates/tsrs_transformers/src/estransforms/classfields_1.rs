@@ -9,6 +9,7 @@ bitflags::bitflags! {
     // classfields.go:18
     // classFacts tracks various facts about a class being transformed.
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+    #[expect(non_camel_case_types, reason = "Keep the upstream bitflags type name.")]
     pub(crate) struct classFacts: u32 {
         const None = 0;
         const ClassWasDecorated = 1 << 0;
@@ -22,7 +23,7 @@ bitflags::bitflags! {
 // classfields.go:31
 // privateIdentifierKind represents the kind of private identifier declaration.
 // privateIdentifierInfo stores information about a private identifier during transformation.
-pub(crate) struct privateIdentifierInfo {
+pub(crate) struct PrivateIdentifierInfo {
     pub(crate) kind: PrivateIdentifierKind,
     // brandCheckIdentifier can contain:
     //  - For instance field: The WeakMap that will be the storage for the field.
@@ -47,7 +48,7 @@ pub(crate) struct privateIdentifierInfo {
 // classfields.go:54
 // privateEnvironmentData stores class-scoped environment data for private identifiers.
 #[derive(Default)]
-pub(crate) struct privateEnvironmentData {
+pub(crate) struct PrivateEnvironmentData {
     // className is used for prefixing generated variable names.
     pub(crate) class_name: Cell<Option<P<Node>>>,
     // weakSetName is used for brand check on private methods.
@@ -60,16 +61,16 @@ pub(crate) struct privateEnvironmentData {
 // and one for generated identifiers (keyed by original AST node). This prevents collisions
 // when different auto-accessors produce generated backing field names with the same text.
 #[derive(Default)]
-pub(crate) struct privateEnvironment {
-    pub(crate) data: privateEnvironmentData,
-    pub(crate) members: RefCell<FxHashMap<String, P<privateIdentifierInfo>>>,
-    pub(crate) generated_identifiers: RefCell<FxHashMap<P<Node>, P<privateIdentifierInfo>>>,
+pub(crate) struct PrivateEnvironment {
+    pub(crate) data: PrivateEnvironmentData,
+    pub(crate) members: RefCell<FxHashMap<String, P<PrivateIdentifierInfo>>>,
+    pub(crate) generated_identifiers: RefCell<FxHashMap<P<Node>, P<PrivateIdentifierInfo>>>,
 }
 
 // classfields.go:72
 // classLexicalEnvironment stores information about the lexical environment of a class.
 #[derive(Default)]
-pub(crate) struct classLexicalEnvironment {
+pub(crate) struct ClassLexicalEnvironment {
     pub(crate) facts: Cell<classFacts>,
     // classConstructor is used for brand checks on static members, and `this` references in static initializers.
     pub(crate) class_constructor: Cell<Option<P<Node>>>,
@@ -80,14 +81,14 @@ pub(crate) struct classLexicalEnvironment {
 
 // classfields.go:82
 // classLexicalEnv is a linked list of class lexical environments.
-pub(crate) struct classLexicalEnv {
-    pub(crate) previous: Option<P<classLexicalEnv>>,
-    pub(crate) data: Cell<Option<P<classLexicalEnvironment>>>,
-    pub(crate) private_env: Cell<Option<P<privateEnvironment>>>,
+pub(crate) struct ClassLexicalEnv {
+    pub(crate) previous: Option<P<ClassLexicalEnv>>,
+    pub(crate) data: Cell<Option<P<ClassLexicalEnvironment>>>,
+    pub(crate) private_env: Cell<Option<P<PrivateEnvironment>>>,
 }
 
 // classfields.go:88
-pub struct classFieldsTransformer {
+pub struct ClassFieldsTransformer {
     pub base: Transformer,
     pub(crate) compiler_options: P<CompilerOptions>,
     pub(crate) resolver: ReferenceResolverRef,
@@ -109,7 +110,7 @@ pub struct classFieldsTransformer {
     // pendingStatements tracks what computed name expression statements and static property
     // initializers must be emitted at the next execution site, in document order (for decorated classes).
     pub(crate) pending_statements: RefCell<Vec<P<Node>>>,
-    pub(crate) lexical_environment: Cell<Option<P<classLexicalEnv>>>,
+    pub(crate) lexical_environment: Cell<Option<P<ClassLexicalEnv>>>,
     pub(crate) current_class_container: Cell<Option<P<Node>>>,
     pub(crate) current_class_element: Cell<Option<P<Node>>>,
     // classAliases maps class declarations to alias identifiers for substituting class name
@@ -145,11 +146,11 @@ pub fn new_class_fields_transformer(opts: &TransformOptions) -> Option<P<Transfo
     // When targeting ESNext+ with useDefineForClassFields (the default), there are no class
     // field transformations to perform and no prior transform sets EFTransformPrivateStaticElements,
     // so every node would be returned unchanged. Skip entirely.
-    if language_version >= ScriptTarget::ESNext && use_define_for_class_fields {
+    if language_version >= ScriptTarget::ES_NEXT && use_define_for_class_fields {
         return None;
     }
 
-    let tx = P::new(classFieldsTransformer {
+    let tx = P::new(ClassFieldsTransformer {
         base: Transformer::default(),
         compiler_options: opts.compiler_options,
         resolver: opts.resolver,
@@ -202,7 +203,7 @@ pub fn new_class_fields_transformer(opts: &TransformOptions) -> Option<P<Transfo
 
     // We need to transform `accessor` fields when target < ESNext.
     // We may need to transform `accessor` fields when `useDefineForClassFields: false`
-    tx.should_transform_auto_accessors.set(language_version < ScriptTarget::ESNext);
+    tx.should_transform_auto_accessors.set(language_version < ScriptTarget::ES_NEXT);
 
     // We need to transform `this` in a static initializer into a reference to the class
     // when target < ES2022 since the assignment will be moved outside of the class body.
@@ -249,7 +250,7 @@ pub fn new_class_fields_transformer(opts: &TransformOptions) -> Option<P<Transfo
     Some(result)
 }
 
-impl classFieldsTransformer {
+impl ClassFieldsTransformer {
     pub(crate) fn emit_context(&self) -> P<EmitContext> {
         self.base.emit_context()
     }
@@ -1394,7 +1395,7 @@ impl classFieldsTransformer {
     // classfields.go:1022
     pub(crate) fn create_private_identifier_access(
         &self,
-        info: P<privateIdentifierInfo>,
+        info: P<PrivateIdentifierInfo>,
         receiver: P<Node>,
     ) -> P<Node> {
         let receiver = self.visitor().visit_node(Some(receiver)).unwrap();
@@ -1404,7 +1405,7 @@ impl classFieldsTransformer {
     // classfields.go:1027
     pub(crate) fn create_private_identifier_access_helper(
         &self,
-        info: P<privateIdentifierInfo>,
+        info: P<PrivateIdentifierInfo>,
         receiver: P<Node>,
     ) -> P<Node> {
         self.emit_context().set_comment_range(
@@ -2253,7 +2254,7 @@ impl classFieldsTransformer {
     // classfields.go:1627
     pub(crate) fn create_private_identifier_assignment(
         &self,
-        info: P<privateIdentifierInfo>,
+        info: P<PrivateIdentifierInfo>,
         receiver: P<Node>,
         right: P<Node>,
         operator: Kind,
@@ -2341,7 +2342,7 @@ impl classFieldsTransformer {
         let class_original = self.emit_context().most_original(Some(class_decl));
         let class_name = ast::get_name_of_declaration(class_decl);
         fn check(
-            tx: &classFieldsTransformer,
+            tx: &ClassFieldsTransformer,
             class_original: Option<P<Node>>,
             class_name: Option<P<Node>>,
             n: P<Node>,

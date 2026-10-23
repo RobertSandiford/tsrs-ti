@@ -414,7 +414,7 @@ impl RuntimeSyntaxTransformer {
         // still emit the comments if we are emitting to a System module.
         let mut emit_flags = EmitFlags::None;
         if var_added
-            && (self.compiler_options.get_emit_module_kind() != ModuleKind::System
+            && (self.compiler_options.get_emit_module_kind() != ModuleKind::SYSTEM
                 || self.current_scope.get() != self.current_source_file.get())
         {
             emit_flags |= EmitFlags::NoLeadingComments;
@@ -582,7 +582,7 @@ impl RuntimeSyntaxTransformer {
         // still emit the comments if we are emitting to a System module.
         let mut emit_flags = EmitFlags::None;
         if var_added
-            && (self.compiler_options.get_emit_module_kind() != ModuleKind::System
+            && (self.compiler_options.get_emit_module_kind() != ModuleKind::SYSTEM
                 || self.current_scope.get() != self.current_source_file.get())
         {
             emit_flags |= EmitFlags::NoLeadingComments;

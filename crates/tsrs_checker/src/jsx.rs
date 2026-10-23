@@ -46,7 +46,7 @@ impl Checker {
             && t != self.any_type
             && !self.is_array_type(t)
         {
-            self.error(Some(node), &diagnostics::JSX_spread_child_must_be_an_array_type, &[]);
+            self.error(Some(node), &diagnostics::JSX_SPREAD_CHILD_MUST_BE_AN_ARRAY_TYPE, &[]);
         }
         t
     }
@@ -82,9 +82,9 @@ impl Checker {
             && ast::get_pragma_from_source_file(node_source_file, "jsxfrag").is_none()
         {
             let message = if !compiler_options.jsx_factory.is_empty() {
-                &diagnostics::The_jsxFragmentFactory_compiler_option_must_be_provided_to_use_JSX_fragments_with_the_jsxFactory_compiler_option
+                &diagnostics::THE_JSX_FRAGMENT_FACTORY_COMPILER_OPTION_MUST_BE_PROVIDED_TO_USE_JSX_FRAGMENTS_WITH_THE_JSX_FACTORY_COMPILER_OPTION
             } else {
-                &diagnostics::An_jsxFrag_pragma_is_required_when_using_an_jsx_pragma_with_JSX_fragments
+                &diagnostics::AN_JSX_FRAG_PRAGMA_IS_REQUIRED_WHEN_USING_AN_JSX_PRAGMA_WITH_JSX_FRAGMENTS
             };
             self.error(Some(node), message, &[]);
         }
@@ -125,13 +125,13 @@ impl Checker {
                     element_type_constraint,
                     assignable_relation,
                     Some(tag_name),
-                    Some(&diagnostics::Its_type_0_is_not_a_valid_JSX_element_type),
+                    Some(&diagnostics::ITS_TYPE_0_IS_NOT_A_VALID_JSX_ELEMENT_TYPE),
                     Some(&mut diags),
                 ) {
                     let text = tsrs_scanner::get_text_of_node(tag_name);
                     self.add_diagnostic(ast::new_diagnostic_chain(
                         diags[0],
-                        &diagnostics::X_0_cannot_be_used_as_a_JSX_component,
+                        &diagnostics::X_0_CANNOT_BE_USED_AS_A_JSX_COMPONENT,
                         &[&text],
                     ));
                 }
@@ -146,10 +146,10 @@ impl Checker {
     // jsx.go:160
     pub(crate) fn check_jsx_preconditions(&mut self, error_node: P<Node>) {
         // Preconditions for using JSX
-        if self.compiler_options.jsx == JsxEmit::None {
+        if self.compiler_options.jsx == JsxEmit::NONE {
             self.error(
                 Some(error_node),
-                &diagnostics::Cannot_use_JSX_unless_the_jsx_flag_is_provided,
+                &diagnostics::CANNOT_USE_JSX_UNLESS_THE_JSX_FLAG_IS_PROVIDED,
                 &[],
             );
         }
@@ -159,7 +159,7 @@ impl Checker {
             self.get_jsx_element_type_at(error_node);
             false
         } {
-            self.error(Some(error_node), &diagnostics::JSX_element_implicitly_has_type_any_because_the_global_type_JSX_Element_does_not_exist, &[]);
+            self.error(Some(error_node), &diagnostics::JSX_ELEMENT_IMPLICITLY_HAS_TYPE_ANY_BECAUSE_THE_GLOBAL_TYPE_JSX_ELEMENT_DOES_NOT_EXIST, &[]);
         }
     }
 
@@ -181,7 +181,7 @@ impl Checker {
                     sfc_return_constraint,
                     assignable_relation,
                     Some(opening_like_element.tag_name()),
-                    Some(&diagnostics::Its_return_type_0_is_not_a_valid_JSX_element),
+                    Some(&diagnostics::ITS_RETURN_TYPE_0_IS_NOT_A_VALID_JSX_ELEMENT),
                     Some(&mut diags),
                 );
             }
@@ -194,7 +194,7 @@ impl Checker {
                         class_constraint,
                         assignable_relation,
                         Some(opening_like_element.tag_name()),
-                        Some(&diagnostics::Its_instance_type_0_is_not_a_valid_JSX_element),
+                        Some(&diagnostics::ITS_INSTANCE_TYPE_0_IS_NOT_A_VALID_JSX_ELEMENT),
                         Some(&mut diags),
                     );
                 }
@@ -212,7 +212,7 @@ impl Checker {
                     combined,
                     assignable_relation,
                     Some(opening_like_element.tag_name()),
-                    Some(&diagnostics::Its_element_type_0_is_not_a_valid_JSX_element),
+                    Some(&diagnostics::ITS_ELEMENT_TYPE_0_IS_NOT_A_VALID_JSX_ELEMENT),
                     Some(&mut diags),
                 );
             }
@@ -221,7 +221,7 @@ impl Checker {
             let text = tsrs_scanner::get_text_of_node(opening_like_element.tag_name());
             self.add_diagnostic(ast::new_diagnostic_chain(
                 diags[0],
-                &diagnostics::X_0_cannot_be_used_as_a_JSX_component,
+                &diagnostics::X_0_CANNOT_BE_USED_AS_A_JSX_COMPONENT,
                 &[&text],
             ));
         }
@@ -246,7 +246,7 @@ impl Checker {
             context.inferences.get(),
             check_attr_type,
             param_type,
-            InferencePriority::None,
+            InferencePriority::NONE,
             false,
         );
         self.get_inferred_types(context)
@@ -328,7 +328,7 @@ impl Checker {
         let attributes_type = match attributes_type {
             Some(attributes_type)
                 if !is_type_any(Some(attributes_type))
-                    && jsx_children_property_name != InternalSymbolNameMissing
+                    && jsx_children_property_name != INTERNAL_SYMBOL_NAME_MISSING
                     && !jsx_children_property_name.is_empty() =>
             {
                 attributes_type
@@ -458,7 +458,7 @@ impl Checker {
             let containing_element = parent.parent().unwrap(); // Containing JSXElement
             let jsx_namespace = self.get_jsx_namespace_at(Some(node));
             let mut children_prop_name = self.get_jsx_element_children_property_name(jsx_namespace);
-            if children_prop_name == InternalSymbolNameMissing {
+            if children_prop_name == INTERNAL_SYMBOL_NAME_MISSING {
                 children_prop_name = "children".to_string();
             }
             let children_name_type = self.get_string_literal_type(&children_prop_name);
@@ -505,7 +505,7 @@ impl Checker {
                         let children_target_type_text =
                             c.type_to_string_exported(children_target_type);
                         *invalid_text_diagnostic.borrow_mut() = Some((
-                        &diagnostics::X_0_components_don_t_accept_text_as_child_elements_Text_in_JSX_has_the_type_string_but_the_expected_type_of_1_is_2,
+                        &diagnostics::X_0_COMPONENTS_DON_T_ACCEPT_TEXT_AS_CHILD_ELEMENTS_TEXT_IN_JSX_HAS_THE_TYPE_STRING_BUT_THE_EXPECTED_TYPE_OF_1_IS_2,
                         vec![tag_name_text, children_prop_name_for_diagnostic.clone(), children_target_type_text],
                     ));
                     }
@@ -541,7 +541,7 @@ impl Checker {
                             self.type_to_string_exported(children_target_type);
                         let diag = self.error(
                             Some(containing_element.as_jsx_element().opening_element.tag_name()),
-                            &diagnostics::This_JSX_tag_s_0_prop_expects_a_single_child_of_type_1_but_multiple_children_were_provided,
+                            &diagnostics::THIS_JSX_TAG_S_0_PROP_EXPECTS_A_SINGLE_CHILD_OF_TYPE_1_BUT_MULTIPLE_CHILDREN_WERE_PROVIDED,
                             &[&children_prop_name, &children_target_type_text],
                         );
                         self.report_diagnostic(Some(diag), diagnostic_output.as_deref_mut());
@@ -582,7 +582,7 @@ impl Checker {
                         self.type_to_string_exported(children_target_type);
                     let diag = self.error(
                         Some(containing_element.as_jsx_element().opening_element.tag_name()),
-                        &diagnostics::This_JSX_tag_s_0_prop_expects_type_1_which_requires_multiple_children_but_only_a_single_child_was_provided,
+                        &diagnostics::THIS_JSX_TAG_S_0_PROP_EXPECTS_TYPE_1_WHICH_REQUIRES_MULTIPLE_CHILDREN_BUT_ONLY_A_SINGLE_CHILD_WAS_PROVIDED,
                         &[&children_prop_name, &children_target_type_text],
                     );
                     self.report_diagnostic(Some(diag), diagnostic_output);
@@ -771,18 +771,18 @@ impl Checker {
                         let target_prop_type_text = self.type_to_string_exported(target_prop_type);
                         let diag = create_diagnostic_for_node(
                             Some(prop),
-                            &diagnostics::Type_0_is_not_assignable_to_type_1_with_exactOptionalPropertyTypes_Colon_true_Consider_adding_undefined_to_the_type_of_the_target,
+                            &diagnostics::TYPE_0_IS_NOT_ASSIGNABLE_TO_TYPE_1_WITH_EXACT_OPTIONAL_PROPERTY_TYPES_COLON_TRUE_CONSIDER_ADDING_UNDEFINED_TO_THE_TYPE_OF_THE_TARGET,
                             &[&specific_source_text, &target_prop_type_text],
                         );
                         self.report_diagnostic(Some(diag), diagnostic_output.as_deref_mut());
                     } else {
-                        let target_is_optional = prop_name != InternalSymbolNameMissing
+                        let target_is_optional = prop_name != INTERNAL_SYMBOL_NAME_MISSING
                             && self
                                 .get_property_of_type(tuple_or_array_like_target_parts, &prop_name)
                                 .unwrap_or(self.unknown_symbol)
                                 .flags()
                                 .intersects(SymbolFlags::Optional);
-                        let source_is_optional = prop_name != InternalSymbolNameMissing
+                        let source_is_optional = prop_name != INTERNAL_SYMBOL_NAME_MISSING
                             && self
                                 .get_property_of_type(source, &prop_name)
                                 .unwrap_or(self.unknown_symbol)
@@ -854,7 +854,7 @@ impl Checker {
         }
         let jsx_fragment_factory_name = self.get_jsx_namespace(Some(node));
         // #38720/60122, allow null as jsxFragmentFactory
-        let should_resolve_factory_reference = (self.compiler_options.jsx == JsxEmit::React
+        let should_resolve_factory_reference = (self.compiler_options.jsx == JsxEmit::REACT
             || !self.compiler_options.jsx_fragment_factory.is_empty())
             && jsx_fragment_factory_name != "null";
         if !should_resolve_factory_reference {
@@ -863,8 +863,8 @@ impl Checker {
         }
         let mut jsx_factory_symbol = self.get_jsx_namespace_container_for_implicit_import(node);
         if jsx_factory_symbol.is_none() {
-            let should_module_ref_err = self.compiler_options.jsx != JsxEmit::Preserve
-                && self.compiler_options.jsx != JsxEmit::ReactNative;
+            let should_module_ref_err = self.compiler_options.jsx != JsxEmit::PRESERVE
+                && self.compiler_options.jsx != JsxEmit::REACT_NATIVE;
             let mut flags = SymbolFlags::Value;
             if !should_module_ref_err {
                 flags &= !SymbolFlags::Enum;
@@ -873,7 +873,7 @@ impl Checker {
                 Some(node),
                 &jsx_fragment_factory_name,
                 flags,
-                Some(&diagnostics::Using_JSX_fragments_requires_fragment_factory_0_to_be_in_scope_but_it_could_not_be_found),
+                Some(&diagnostics::USING_JSX_FRAGMENTS_REQUIRES_FRAGMENT_FACTORY_0_TO_BE_IN_SCOPE_BUT_IT_COULD_NOT_BE_FOUND),
                 true,  /*isUse*/
                 false, /*excludeGlobals*/
             );
@@ -882,7 +882,7 @@ impl Checker {
             links.jsx_fragment_type.set(Some(self.error_type));
             return self.error_type;
         };
-        if jsx_factory_symbol.name() == ReactNames.fragment {
+        if jsx_factory_symbol.name() == REACT_NAMES.fragment {
             let t = self.get_type_of_symbol(jsx_factory_symbol);
             links.jsx_fragment_type.set(Some(t));
             return t;
@@ -894,7 +894,7 @@ impl Checker {
 
         let react_exports = self.get_exports_of_symbol(resolved_alias);
         let type_symbol =
-            self.get_symbol(react_exports, ReactNames.fragment, SymbolFlags::BlockScopedVariable);
+            self.get_symbol(react_exports, REACT_NAMES.fragment, SymbolFlags::BlockScopedVariable);
         if let Some(type_symbol) = type_symbol {
             let t = self.get_type_of_symbol(type_symbol);
             links.jsx_fragment_type.set(Some(t));
@@ -954,7 +954,7 @@ impl Checker {
                     self.add_diagnostic(ast::new_diagnostic(
                         Some(source_file),
                         loc,
-                        &diagnostics::Expected_0_type_arguments_but_got_1,
+                        &diagnostics::EXPECTED_0_TYPE_ARGUMENTS_BUT_GOT_1,
                         &[&0, &type_arguments.len()],
                     ));
                 }
@@ -983,14 +983,14 @@ impl Checker {
                 let text = tsrs_scanner::get_text_of_node(node);
                 self.error(
                     Some(node),
-                    &diagnostics::JSX_element_type_0_does_not_have_any_construct_or_call_signatures,
+                    &diagnostics::JSX_ELEMENT_TYPE_0_DOES_NOT_HAVE_ANY_CONSTRUCT_OR_CALL_SIGNATURES,
                     &[&text],
                 );
             } else {
                 let text = tsrs_scanner::get_text_of_node(node.tag_name());
                 self.error(
                     Some(node.tag_name()),
-                    &diagnostics::JSX_element_type_0_does_not_have_any_construct_or_call_signatures,
+                    &diagnostics::JSX_ELEMENT_TYPE_0_DOES_NOT_HAVE_ANY_CONSTRUCT_OR_CALL_SIGNATURES,
                     &[&text],
                 );
             }
@@ -1207,7 +1207,7 @@ impl Checker {
                     } else {
                         self.error(
                             attribute_decl.expression(),
-                            &diagnostics::Spread_types_may_only_be_created_from_object_types,
+                            &diagnostics::SPREAD_TYPES_MAY_ONLY_BE_CREATED_FROM_OBJECT_TYPES,
                             &[],
                         );
                         if let Some(t) = type_to_intersect {
@@ -1259,14 +1259,14 @@ impl Checker {
             let child_types: Vec<P<Type>> =
                 self.check_jsx_children(opening_like_element.parent().unwrap(), check_mode);
             if !has_spread_any_type
-                && jsx_children_property_name != InternalSymbolNameMissing
+                && jsx_children_property_name != INTERNAL_SYMBOL_NAME_MISSING
                 && !jsx_children_property_name.is_empty()
             {
                 // Error if there is a attribute named "children" explicitly specified and children element.
                 // This is because children element will overwrite the value from attributes.
                 // Note: we will not warn "children" attribute overwritten if "children" attribute is specified in object spread.
                 if explicitly_specify_children_attribute {
-                    self.error(Some(attribute_parent), &diagnostics::X_0_are_specified_twice_The_attribute_named_0_will_be_overwritten, &[&jsx_children_property_name]);
+                    self.error(Some(attribute_parent), &diagnostics::X_0_ARE_SPECIFIED_TWICE_THE_ATTRIBUTE_NAMED_0_WILL_BE_OVERWRITTEN, &[&jsx_children_property_name]);
                 }
                 let mut children_contextual_type: Option<P<Type>> = None;
                 if ast::is_jsx_opening_element(opening_like_element) {
@@ -1399,10 +1399,10 @@ impl Checker {
                 self.get_intrinsic_attributes_type_from_string_literal_type(element_type, caller);
             let Some(intrinsic_type) = intrinsic_type else {
                 let value = get_string_literal_value(element_type);
-                let type_name = format!("JSX.{}", JsxNames.intrinsic_elements);
+                let type_name = format!("JSX.{}", JSX_NAMES.intrinsic_elements);
                 self.error(
                     Some(caller),
-                    &diagnostics::Property_0_does_not_exist_on_type_1,
+                    &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                     &[&value, &type_name],
                 );
                 return Vec::new();
@@ -1460,7 +1460,7 @@ impl Checker {
             jsx_namespace,
             props_type,
         );
-        let intrinsic_attribs = self.get_jsx_type(JsxNames.intrinsic_attributes, context);
+        let intrinsic_attribs = self.get_jsx_type(JSX_NAMES.intrinsic_attributes, context);
         if !self.is_error_type(intrinsic_attribs) {
             props_type = self.intersect_types(Some(intrinsic_attribs), Some(props_type)).unwrap();
         }
@@ -1476,7 +1476,7 @@ impl Checker {
         let ns = self.get_jsx_namespace_at(Some(context));
         let forced_lookup_location = self.get_jsx_element_properties_name(ns);
         let attributes_type: Option<P<Type>>;
-        if forced_lookup_location == InternalSymbolNameMissing {
+        if forced_lookup_location == INTERNAL_SYMBOL_NAME_MISSING {
             let unknown_type = self.unknown_type;
             attributes_type = Some(
                 self.get_type_of_first_parameter_of_signature_with_fallback(sig, unknown_type),
@@ -1488,7 +1488,7 @@ impl Checker {
                 self.get_jsx_props_type_for_signature_from_member(sig, &forced_lookup_location);
             if attributes_type.is_none() && !context.attributes().unwrap().properties().is_empty() {
                 // There is no property named 'props' on this instance type
-                self.error(Some(context), &diagnostics::JSX_element_class_does_not_support_attributes_because_it_does_not_have_a_0_property, &[&forced_lookup_location]);
+                self.error(Some(context), &diagnostics::JSX_ELEMENT_CLASS_DOES_NOT_SUPPORT_ATTRIBUTES_BECAUSE_IT_DOES_NOT_HAVE_A_0_PROPERTY, &[&forced_lookup_location]);
             }
         }
         let Some(located_attributes_type) = attributes_type else {
@@ -1506,7 +1506,7 @@ impl Checker {
         // Normal case -- add in IntrinsicClassAttributes<T> and IntrinsicAttributes
         let mut apparent_attributes_type = attributes_type;
         let intrinsic_class_attribs =
-            self.get_jsx_type(JsxNames.intrinsic_class_attributes, context);
+            self.get_jsx_type(JSX_NAMES.intrinsic_class_attributes, context);
         if !self.is_error_type(intrinsic_class_attribs) {
             let type_params = self.get_local_type_parameters_of_class_or_interface_or_type_alias(
                 intrinsic_class_attribs.symbol().unwrap(),
@@ -1541,7 +1541,7 @@ impl Checker {
                 )
                 .unwrap();
         }
-        let intrinsic_attribs = self.get_jsx_type(JsxNames.intrinsic_attributes, context);
+        let intrinsic_attribs = self.get_jsx_type(JSX_NAMES.intrinsic_attributes, context);
         if !self.is_error_type(intrinsic_attribs) {
             apparent_attributes_type = self
                 .intersect_types(Some(intrinsic_attribs), Some(apparent_attributes_type))
@@ -1652,7 +1652,7 @@ impl Checker {
         if let Some(jsx_namespace) = jsx_namespace {
             return self.get_symbol(
                 jsx_namespace.exports(),
-                JsxNames.library_managed_attributes,
+                JSX_NAMES.library_managed_attributes,
                 SymbolFlags::Type,
             );
         }
@@ -1668,7 +1668,7 @@ impl Checker {
         if let Some(jsx_namespace) = jsx_namespace {
             return self.get_symbol(
                 jsx_namespace.exports(),
-                JsxNames.element_type,
+                JSX_NAMES.element_type,
                 SymbolFlags::Type,
             );
         }
@@ -1690,7 +1690,7 @@ impl Checker {
         jsx_namespace: Option<P<Symbol>>,
     ) -> String {
         self.get_name_from_jsx_element_attributes_container(
-            JsxNames.element_attributes_property_name_container,
+            JSX_NAMES.element_attributes_property_name_container,
             jsx_namespace,
         )
     }
@@ -1701,14 +1701,14 @@ impl Checker {
         &mut self,
         jsx_namespace: Option<P<Symbol>>,
     ) -> String {
-        if self.compiler_options.jsx == JsxEmit::ReactJSX
-            || self.compiler_options.jsx == JsxEmit::ReactJSXDev
+        if self.compiler_options.jsx == JsxEmit::REACT_JSX
+            || self.compiler_options.jsx == JsxEmit::REACT_JSX_DEV
         {
             // In these JsxEmit modes the children property is fixed to 'children'
             return "children".to_string();
         }
         self.get_name_from_jsx_element_attributes_container(
-            JsxNames.element_children_attribute_name_container,
+            JSX_NAMES.element_children_attribute_name_container,
             jsx_namespace,
         )
     }
@@ -1754,13 +1754,13 @@ impl Checker {
                     // More than one property on ElementAttributesProperty is an error
                     self.error(
                         first_declaration,
-                        &diagnostics::The_global_type_JSX_0_may_not_have_more_than_one_property,
+                        &diagnostics::THE_GLOBAL_TYPE_JSX_0_MAY_NOT_HAVE_MORE_THAN_ONE_PROPERTY,
                         &[&name_of_attrib_prop_container],
                     );
                 }
             }
         }
-        InternalSymbolNameMissing.to_string()
+        INTERNAL_SYMBOL_NAME_MISSING.to_string()
     }
 
     // jsx.go:1114
@@ -1800,7 +1800,7 @@ impl Checker {
         // For example:
         //      var CustomTag: "h1" = "h1";
         //      <CustomTag> Hello World </CustomTag>
-        let intrinsic_elements_type = self.get_jsx_type(JsxNames.intrinsic_elements, location);
+        let intrinsic_elements_type = self.get_jsx_type(JSX_NAMES.intrinsic_elements, location);
         if !self.is_error_type(intrinsic_elements_type) {
             let string_literal_type_name = get_string_literal_value(t);
             let intrinsic_prop =
@@ -1845,7 +1845,8 @@ impl Checker {
         let mut element_type = self.error_type;
         if let Some(namespace) = self.get_jsx_namespace_at(Some(node)) {
             let exports = self.get_exports_of_symbol(namespace);
-            if let Some(type_symbol) = self.get_symbol(exports, JsxNames.element, SymbolFlags::Type)
+            if let Some(type_symbol) =
+                self.get_symbol(exports, JSX_NAMES.element, SymbolFlags::Type)
             {
                 element_type = self.get_declared_type_of_symbol(type_symbol);
             }
@@ -1886,7 +1887,7 @@ impl Checker {
             return links.resolved_jsx_element_attributes_type.get();
         }
         if links.jsx_flags.get().intersects(JsxFlags::IntrinsicIndexedElement) {
-            let intrinsic_elements_type = self.get_jsx_type(JsxNames.intrinsic_elements, node);
+            let intrinsic_elements_type = self.get_jsx_type(JSX_NAMES.intrinsic_elements, node);
             let index_info = self.get_applicable_index_info_for_name(
                 intrinsic_elements_type,
                 node.tag_name().text(),
@@ -1910,7 +1911,7 @@ impl Checker {
         if links.resolved_symbol.get().is_some() {
             return links.resolved_symbol.get();
         }
-        let intrinsic_elements_type = self.get_jsx_type(JsxNames.intrinsic_elements, node);
+        let intrinsic_elements_type = self.get_jsx_type(JSX_NAMES.intrinsic_elements, node);
         if !self.is_error_type(intrinsic_elements_type) {
             // Property case
             let tag_name = node.tag_name();
@@ -1952,10 +1953,10 @@ impl Checker {
                 return links.resolved_symbol.get();
             }
             // Wasn't found
-            let type_name = format!("JSX.{}", JsxNames.intrinsic_elements);
+            let type_name = format!("JSX.{}", JSX_NAMES.intrinsic_elements);
             self.error(
                 Some(node),
-                &diagnostics::Property_0_does_not_exist_on_type_1,
+                &diagnostics::PROPERTY_0_DOES_NOT_EXIST_ON_TYPE_1,
                 &[&tag_name.text(), &type_name],
             );
             links.resolved_symbol.set(Some(self.unknown_symbol));
@@ -1964,8 +1965,8 @@ impl Checker {
         if self.no_implicit_any {
             self.error(
                 Some(node),
-                &diagnostics::JSX_element_implicitly_has_type_any_because_no_interface_JSX_0_exists,
-                &[&JsxNames.intrinsic_elements],
+                &diagnostics::JSX_ELEMENT_IMPLICITLY_HAS_TYPE_ANY_BECAUSE_NO_INTERFACE_JSX_0_EXISTS,
+                &[&JSX_NAMES.intrinsic_elements],
             );
         }
         links.resolved_symbol.set(Some(self.unknown_symbol));
@@ -1982,7 +1983,7 @@ impl Checker {
 
     // jsx.go:1265
     pub(crate) fn get_jsx_element_class_type_at(&mut self, location: P<Node>) -> Option<P<Type>> {
-        let t = self.get_jsx_type(JsxNames.element_class, location);
+        let t = self.get_jsx_type(JSX_NAMES.element_class, location);
         if self.is_error_type(t) {
             return None;
         }
@@ -1991,7 +1992,7 @@ impl Checker {
 
     // jsx.go:1273
     pub(crate) fn get_jsx_element_type_at(&mut self, location: P<Node>) -> P<Type> {
-        self.get_jsx_type(JsxNames.element, location)
+        self.get_jsx_type(JSX_NAMES.element, location)
     }
 
     // jsx.go:1277
@@ -2054,7 +2055,7 @@ impl Checker {
                 let resolved = self.resolve_symbol(resolved_namespace);
                 let exports = self.get_exports_of_symbol(resolved);
                 let candidate = self
-                    .get_symbol(exports, JsxNames.jsx, SymbolFlags::Namespace)
+                    .get_symbol(exports, JSX_NAMES.jsx, SymbolFlags::Namespace)
                     .map(|s| self.resolve_symbol(s));
                 if let Some(candidate) = candidate {
                     if candidate != self.unknown_symbol {
@@ -2071,7 +2072,7 @@ impl Checker {
         }
         // JSX global fallback
         let s = self
-            .get_global_symbol(JsxNames.jsx, SymbolFlags::Namespace, None /*diagnostic*/)
+            .get_global_symbol(JSX_NAMES.jsx, SymbolFlags::Namespace, None /*diagnostic*/)
             .map(|s| self.resolve_symbol(s));
         if s == Some(self.unknown_symbol) {
             return None;
@@ -2264,7 +2265,7 @@ impl Checker {
         if module_reference.is_empty() {
             return None;
         }
-        let error_message = &diagnostics::This_JSX_tag_requires_the_module_path_0_to_exist_but_none_could_be_found_Make_sure_you_have_types_for_the_appropriate_package_installed;
+        let error_message = &diagnostics::THIS_JSX_TAG_REQUIRES_THE_MODULE_PATH_0_TO_EXIST_BUT_NONE_COULD_BE_FOUND_MAKE_SURE_YOU_HAVE_TYPES_FOR_THE_APPROPRIATE_PACKAGE_INSTALLED;
         let mod_ = self.resolve_external_module(
             specifier.or(canonical_error_tag),
             &module_reference,
@@ -2382,7 +2383,7 @@ fn check_tag_name_does_not_expect_too_many_arguments(
         let factory_text = crate::entity_name_to_string(factory);
         let diag = new_diagnostic_for_node(
             Some(tag_name),
-            Some(&diagnostics::Tag_0_expects_at_least_1_arguments_but_the_JSX_factory_2_provides_at_most_3),
+            Some(&diagnostics::TAG_0_EXPECTS_AT_LEAST_1_ARGUMENTS_BUT_THE_JSX_FACTORY_2_PROVIDES_AT_MOST_3),
             &[&tag_name_text, &absolute_min_arg_count, &factory_text, &max_param_count],
         );
         let tag_name_symbol = c.get_symbol_at_location(tag_name, false);
@@ -2391,7 +2392,7 @@ fn check_tag_name_does_not_expect_too_many_arguments(
                 let tag_name_text = crate::entity_name_to_string(tag_name);
                 diag.add_related_info(new_diagnostic_for_node(
                     Some(value_declaration),
-                    Some(&diagnostics::X_0_is_declared_here),
+                    Some(&diagnostics::X_0_IS_DECLARED_HERE),
                     &[&tag_name_text],
                 ));
             }

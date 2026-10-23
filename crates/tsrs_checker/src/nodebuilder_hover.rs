@@ -490,7 +490,7 @@ impl NodeBuilderImpl {
                         false,
                         true,
                         super::checker::Checker::compare_types_identical,
-                    ) != Ternary::True
+                    ) != Ternary::TRUE
                     {
                         all_match = false;
                         break;

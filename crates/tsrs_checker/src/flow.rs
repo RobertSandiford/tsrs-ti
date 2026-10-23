@@ -1471,7 +1471,7 @@ impl Checker {
         if assume_true {
             return self.narrow_type_by_type_name(t, literal.text());
         }
-        let facts = match typeofNEFacts.get(literal.text()) {
+        let facts = match TYPEOF_NE_FACTS.get(literal.text()) {
             Some(&facts) => facts,
             None => TypeFacts::TypeofNEHostObject,
         };
@@ -2501,7 +2501,7 @@ impl Checker {
             let ref_key = self.get_flow_reference_key(f);
             f.ref_key.set(ref_key);
         }
-        if f.ref_key.get() == nonDottedNameCacheKey {
+        if f.ref_key.get() == NON_DOTTED_NAME_CACHE_KEY {
             // No cache key is generated when binding patterns are in unnarrowable situations
             return flow_type_of(f.declared());
         }
@@ -2906,7 +2906,7 @@ impl Checker {
                 .pos()
                 .expect_source("parsed node lists have source positions"),
         );
-        self.add_diagnostic(ast::new_diagnostic(Some(source_file), span, &diagnostics::The_containing_function_or_module_body_is_too_large_for_control_flow_analysis, &[]));
+        self.add_diagnostic(ast::new_diagnostic(Some(source_file), span, &diagnostics::THE_CONTAINING_FUNCTION_OR_MODULE_BODY_IS_TOO_LARGE_FOR_CONTROL_FLOW_ANALYSIS, &[]));
     }
 
     // flow.go:1597
@@ -3019,7 +3019,7 @@ impl Checker {
     // The result is nonDottedNameCacheKey if the reference isn't a dotted name.
     // flow.go:1657
     pub(crate) fn get_flow_reference_key(&mut self, f: P<FlowState>) -> CacheHashKey {
-        let mut b = keyBuilder::default();
+        let mut b = KeyBuilder::default();
         if self.write_flow_cache_key(
             &mut b,
             f.ref_node(),
@@ -3029,13 +3029,13 @@ impl Checker {
         ) {
             return b.hash();
         }
-        nonDottedNameCacheKey // Reference isn't a dotted name
+        NON_DOTTED_NAME_CACHE_KEY // Reference isn't a dotted name
     }
 
     // flow.go:1665
     pub(crate) fn write_flow_cache_key(
         &mut self,
-        b: &mut keyBuilder,
+        b: &mut KeyBuilder,
         node: P<Node>,
         declared_type: P<Type>,
         initial_type: P<Type>,
@@ -3590,7 +3590,7 @@ impl Checker {
         let mut facts = TypeFacts::None;
         for (i, &witness) in witnesses.iter().enumerate() {
             if (i < start || i >= end) && !witness.is_empty() {
-                let f = match typeofNEFacts.get(witness) {
+                let f = match TYPEOF_NE_FACTS.get(witness) {
                     Some(&f) => f,
                     None => TypeFacts::TypeofNEHostObject,
                 };
@@ -3713,7 +3713,7 @@ impl Checker {
                 }
             }
         }
-        format!("{}@{}", ast::InternalSymbolNamePrefix, symbol_name)
+        format!("{}@{}", ast::INTERNAL_SYMBOL_NAME_PREFIX, symbol_name)
     }
 
     // We require the dotted function name in an assertion expression to be comprised of identifiers
@@ -3842,7 +3842,7 @@ impl Checker {
                     let symbol_string = self.symbol_to_string(symbol);
                     diagnostic.add_related_info(create_diagnostic_for_node(
                         Some(declaration),
-                        &diagnostics::X_0_needs_an_explicit_type_annotation,
+                        &diagnostics::X_0_NEEDS_AN_EXPLICIT_TYPE_ANNOTATION,
                         &[&symbol_string],
                     ));
                 }
@@ -4234,13 +4234,13 @@ impl Checker {
         constructor: P<Node>,
     ) -> Option<P<Type>> {
         let symbol_name = symbol.name();
-        let access_name = if symbol_name.starts_with(&format!("{}#", ast::InternalSymbolNamePrefix))
-        {
-            let start = symbol_name.find('@').map_or(0, |i| i + 1);
-            self.factory.new_private_identifier(alloc_str(&symbol_name[start..]))
-        } else {
-            self.factory.new_identifier(symbol_name)
-        };
+        let access_name =
+            if symbol_name.starts_with(&format!("{}#", ast::INTERNAL_SYMBOL_NAME_PREFIX)) {
+                let start = symbol_name.find('@').map_or(0, |i| i + 1);
+                self.factory.new_private_identifier(alloc_str(&symbol_name[start..]))
+            } else {
+                self.factory.new_identifier(symbol_name)
+            };
         let this_keyword = self.factory.new_keyword_expression(Kind::ThisKeyword);
         let reference = self.factory.new_property_access_expression(
             this_keyword,
@@ -4259,7 +4259,7 @@ impl Checker {
             let type_string = self.type_to_string_exported(flow_type);
             self.error(
                 symbol.value_declaration(),
-                &diagnostics::Member_0_implicitly_has_an_1_type,
+                &diagnostics::MEMBER_0_IMPLICITLY_HAS_AN_1_TYPE,
                 &[&symbol_string, &type_string],
             );
         }
@@ -4277,13 +4277,13 @@ impl Checker {
         static_blocks: &[P<Node>],
     ) -> Option<P<Type>> {
         let symbol_name = symbol.name();
-        let access_name = if symbol_name.starts_with(&format!("{}#", ast::InternalSymbolNamePrefix))
-        {
-            let start = symbol_name.find('@').map_or(0, |i| i + 1);
-            self.factory.new_private_identifier(alloc_str(&symbol_name[start..]))
-        } else {
-            self.factory.new_identifier(symbol_name)
-        };
+        let access_name =
+            if symbol_name.starts_with(&format!("{}#", ast::INTERNAL_SYMBOL_NAME_PREFIX)) {
+                let start = symbol_name.find('@').map_or(0, |i| i + 1);
+                self.factory.new_private_identifier(alloc_str(&symbol_name[start..]))
+            } else {
+                self.factory.new_identifier(symbol_name)
+            };
         if let Some(result) = static_blocks.iter().find_map(|&static_block| {
             let this_keyword = self.factory.new_keyword_expression(Kind::ThisKeyword);
             let reference = self.factory.new_property_access_expression(
@@ -4305,7 +4305,7 @@ impl Checker {
                 let type_string = self.type_to_string_exported(flow_type);
                 self.error(
                     symbol.value_declaration(),
-                    &diagnostics::Member_0_implicitly_has_an_1_type,
+                    &diagnostics::MEMBER_0_IMPLICITLY_HAS_AN_1_TYPE,
                     &[&symbol_string, &type_string],
                 );
             }

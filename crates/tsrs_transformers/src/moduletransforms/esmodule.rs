@@ -5,13 +5,13 @@ pub struct ESModuleTransformer {
     compiler_options: P<CompilerOptions>,
     get_emit_module_format_of_file: Rc<dyn Fn(P<SourceFile>) -> ModuleKind>,
     current_source_file: Cell<Option<P<SourceFile>>>,
-    import_require_statements: RefCell<Option<importRequireStatements>>,
+    import_require_statements: RefCell<Option<ImportRequireStatements>>,
     content_mapper_extension_rewrites: Vec<tspath::ExtensionRewrite>,
     use_case_sensitive_file_names: bool,
 }
 
 #[derive(Clone)]
-struct importRequireStatements {
+struct ImportRequireStatements {
     statements: Vec<P<Node>>,
     require_helper_name: P<Node>,
 }
@@ -119,7 +119,7 @@ impl ESModuleTransformer {
         }
 
         if ast::is_external_module(result)
-            && self.compiler_options.get_emit_module_kind() != ModuleKind::Preserve
+            && self.compiler_options.get_emit_module_kind() != ModuleKind::PRESERVE
             && !result.statements.nodes().iter().any(|&s| ast::is_external_module_indicator(s))
         {
             let mut statements: Vec<P<Node>> = result.statements.nodes().to_vec();
@@ -164,7 +164,7 @@ impl ESModuleTransformer {
         // Though an error in es2020 modules, in node-flavor es2020 modules, we can helpfully transform this to a synthetic `require` call
         // To give easy access to a synchronous `require` in node-flavor esm. We do the transform even in scenarios where we error, but `import.meta.url`
         // is available, just because the output is reasonable for a node-like runtime.
-        if self.compiler_options.get_emit_module_kind() < ModuleKind::Node16 {
+        if self.compiler_options.get_emit_module_kind() < ModuleKind::NODE16 {
             return None;
         }
 
@@ -223,7 +223,7 @@ impl ESModuleTransformer {
         if !n.is_export_equals {
             return self.visitor().visit_each_child(Some(node));
         }
-        if self.compiler_options.get_emit_module_kind() != ModuleKind::Preserve {
+        if self.compiler_options.get_emit_module_kind() != ModuleKind::PRESERVE {
             // Elide `export=` as it is not legal with --module ES6
             return None;
         }
@@ -347,7 +347,7 @@ impl ESModuleTransformer {
         } else {
             f.new_rewrite_relative_import_extensions_helper(
                 first,
-                self.compiler_options.jsx == tsrs_core::JsxEmit::Preserve,
+                self.compiler_options.jsx == tsrs_core::JsxEmit::PRESERVE,
                 &self.content_mapper_extension_rewrites,
                 self.use_case_sensitive_file_names,
             )
@@ -401,7 +401,7 @@ impl ESModuleTransformer {
             );
         }
 
-        if self.compiler_options.get_emit_module_kind() == ModuleKind::Preserve {
+        if self.compiler_options.get_emit_module_kind() == ModuleKind::PRESERVE {
             return f.new_call_expression(
                 f.new_identifier("require"),
                 None, /*questionDotToken*/
@@ -468,7 +468,7 @@ impl ESModuleTransformer {
                 ),
             );
             emit_context.add_emit_flags(require_statement, EmitFlags::CustomPrologue);
-            *self.import_require_statements.borrow_mut() = Some(importRequireStatements {
+            *self.import_require_statements.borrow_mut() = Some(ImportRequireStatements {
                 statements: vec![import_statement, require_statement],
                 require_helper_name,
             });

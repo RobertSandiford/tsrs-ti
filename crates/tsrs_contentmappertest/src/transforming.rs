@@ -13,8 +13,8 @@ use tsrs_ipc as ipc;
 use tsrs_spanmap::{Feature, Kind, Segment, SpanMap};
 
 use crate::protocol::{
-    initialize_result, marshal_span_map, no_notifications, projectLifecycleHandler, quote,
-    testHandler, unexpected_method, unmarshal_params,
+    ProjectLifecycleHandler, TestHandler, initialize_result, marshal_span_map, no_notifications,
+    quote, unexpected_method, unmarshal_params,
 };
 
 // transforming.go:17
@@ -34,7 +34,7 @@ pub struct Handler {
     mu: Mutex<FxHashMap<String, Option<Arc<JsonMap>>>>,
 }
 
-impl projectLifecycleHandler for Handler {
+impl ProjectLifecycleHandler for Handler {
     // transforming.go:35
     fn open_project(&self, p: OpenProjectParams) -> Result<(), ipc::Error> {
         // json.Unmarshal(p.CompilerOptions, &options) into a *collections.OrderedMap.
@@ -56,8 +56,8 @@ impl projectLifecycleHandler for Handler {
     }
 }
 
-impl testHandler for Handler {
-    fn project_lifecycle(&self) -> Option<&dyn projectLifecycleHandler> {
+impl TestHandler for Handler {
+    fn project_lifecycle(&self) -> Option<&dyn ProjectLifecycleHandler> {
         Some(self)
     }
 }
@@ -114,12 +114,12 @@ fn mapped_extension(content: &str) -> String {
     ".ts".to_string()
 }
 
-type transformOutput = (String, Value, Vec<Diagnostic>, Option<DiagnosticDirectives>);
+type TransformOutput = (String, Value, Vec<Diagnostic>, Option<DiagnosticDirectives>);
 
 // transforming.go:91 (Go's writeVerbatim and writeAtom closures share the builder and the segments, which
 // `virtualWriter` holds.)
-fn transform(content: &str, options: Option<&JsonMap>) -> Result<transformOutput, ipc::Error> {
-    let mut w = virtualWriter { virtual_: String::new(), segments: Vec::new() };
+fn transform(content: &str, options: Option<&JsonMap>) -> Result<TransformOutput, ipc::Error> {
+    let mut w = VirtualWriter { virtual_: String::new(), segments: Vec::new() };
     let mut diagnostics = Vec::new();
 
     w.virtual_.push_str(PREAMBLE);
@@ -162,12 +162,12 @@ fn transform(content: &str, options: Option<&JsonMap>) -> Result<transformOutput
     Ok((w.virtual_, mappings, diagnostics, directives))
 }
 
-struct virtualWriter {
+struct VirtualWriter {
     virtual_: String,
     segments: Vec<Segment>,
 }
 
-impl virtualWriter {
+impl VirtualWriter {
     // transforming.go:98
     fn write_verbatim(&mut self, content: &str, from: usize, to: usize) {
         if to <= from {
@@ -180,7 +180,7 @@ impl virtualWriter {
             virtual_end: self.virtual_.len() as u32,
             original_start: from as u32,
             original_end: to as u32,
-            kind: Kind::Verbatim,
+            kind: Kind::VERBATIM,
             features: Feature::All,
         });
     }
@@ -194,7 +194,7 @@ impl virtualWriter {
             virtual_end: self.virtual_.len() as u32,
             original_start: from as u32,
             original_end: to as u32,
-            kind: Kind::Atom,
+            kind: Kind::ATOM,
             features: Feature::All,
         });
     }
@@ -220,8 +220,8 @@ fn diagnostic_directives(content: &str, mappings: &SpanMap) -> Option<Diagnostic
                 ..Default::default()
             }
         };
-        let ignore = DiagnosticDirectivePolicy::Ignore;
-        let expect = DiagnosticDirectivePolicy::Expect;
+        let ignore = DiagnosticDirectivePolicy::IGNORE;
+        let expect = DiagnosticDirectivePolicy::EXPECT;
         match rest.split('\n').next().unwrap_or_default().trim() {
             "invalid-range" => return wrap(vec![directive(-1, 0, 0, ignore)], Vec::new()),
             "original-range-out-of-bounds" => {
@@ -274,10 +274,10 @@ fn diagnostic_directives(content: &str, mappings: &SpanMap) -> Option<Diagnostic
         let mut has_policy = false;
         let mut unused_diagnostic_index: Option<usize> = None;
         if trimmed == IGNORE_PREFIX {
-            policy = DiagnosticDirectivePolicy::Ignore;
+            policy = DiagnosticDirectivePolicy::IGNORE;
             has_policy = true;
         } else if let Some(message_text) = trimmed.strip_prefix(EXPECT_PREFIX) {
-            policy = DiagnosticDirectivePolicy::Expect;
+            policy = DiagnosticDirectivePolicy::EXPECT;
             has_policy = true;
             unused_diagnostic_index = Some(unused_diagnostics.len());
             unused_diagnostics.push(UnusedExpectDirectiveDiagnostic {

@@ -20,6 +20,7 @@ use crate::lsutil::{self, QuotePreference, UserPreferences};
 bitflags::bitflags! {
     // codeactions_missingmemberfixer.go:18
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    #[expect(non_camel_case_types, reason = "Keep the upstream bitflags type name.")]
     pub(crate) struct preserveOptionalFlags: u32 {
         const Method = 1 << 0;
         const Property = 1 << 1;
@@ -28,7 +29,7 @@ bitflags::bitflags! {
 }
 
 // codeactions_missingmemberfixer.go:26
-pub(crate) struct missingMemberFixer<'a> {
+pub(crate) struct MissingMemberFixer<'a> {
     change_tracker: &'a change::Tracker,
     type_checker: &'a mut Checker,
     program: &'static Program,
@@ -49,11 +50,11 @@ pub(crate) fn new_missing_member_fixer<'a>(
     preferences: UserPreferences,
     import_adder: Option<&'a mut (dyn ImportAdder + 'static)>,
     locale: Locale,
-) -> missingMemberFixer<'a> {
-    missingMemberFixer { change_tracker, type_checker, program, preferences, import_adder, locale }
+) -> MissingMemberFixer<'a> {
+    MissingMemberFixer { change_tracker, type_checker, program, preferences, import_adder, locale }
 }
 
-impl<'a> missingMemberFixer<'a> {
+impl<'a> MissingMemberFixer<'a> {
     fn factory(&self) -> &'a NodeFactory {
         &self.change_tracker.node_factory
     }
@@ -788,7 +789,7 @@ impl<'a> missingMemberFixer<'a> {
                 factory.new_identifier("Error"),
                 None, /*typeArguments*/
                 Some(factory.new_node_list(vec![factory.new_string_literal(
-                    alloc_str(&diagnostics::Method_not_implemented.localize(&[])),
+                    alloc_str(&diagnostics::METHOD_NOT_IMPLEMENTED.localize(&[])),
                     token_flags,
                 )])),
             ))]),

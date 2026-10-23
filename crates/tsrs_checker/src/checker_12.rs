@@ -163,9 +163,9 @@ impl Checker {
                 || num_type_arguments > type_parameters.len()
             {
                 let message = if min_type_argument_count == type_parameters.len() {
-                    &diagnostics::Generic_type_0_requires_1_type_argument_s
+                    &diagnostics::GENERIC_TYPE_0_REQUIRES_1_TYPE_ARGUMENT_S
                 } else {
-                    &diagnostics::Generic_type_0_requires_between_1_and_2_type_arguments
+                    &diagnostics::GENERIC_TYPE_0_REQUIRES_BETWEEN_1_AND_2_TYPE_ARGUMENTS
                 };
                 let name = self.symbol_to_string(symbol);
                 self.error(
@@ -230,7 +230,7 @@ impl Checker {
     ) -> P<Type> {
         let t = self.get_declared_type_of_symbol(symbol);
         if t == self.intrinsic_marker_type {
-            if let Some(&type_kind) = intrinsicTypeKinds.get(symbol.name()) {
+            if let Some(&type_kind) = INTRINSIC_TYPE_KINDS.get(symbol.name()) {
                 if type_arguments.len() == 1 {
                     match type_kind {
                         IntrinsicTypeKind::NoInfer => {
@@ -607,7 +607,7 @@ impl Checker {
                 let name = self.symbol_to_string(symbol);
                 self.error(
                     Some(error_node),
-                    &diagnostics::Type_alias_0_circularly_references_itself,
+                    &diagnostics::TYPE_ALIAS_0_CIRCULARLY_REFERENCES_ITSELF,
                     &[&name],
                 );
                 t = self.error_type;
@@ -730,17 +730,17 @@ impl Checker {
         if ast::is_computed_non_literal_name(name) {
             self.error(
                 Some(name),
-                &diagnostics::Computed_property_names_are_not_allowed_in_enums,
+                &diagnostics::COMPUTED_PROPERTY_NAMES_ARE_NOT_ALLOWED_IN_ENUMS,
                 &[],
             );
         } else if ast::is_big_int_literal(name) {
-            self.error(Some(name), &diagnostics::An_enum_member_cannot_have_a_numeric_name, &[]);
+            self.error(Some(name), &diagnostics::AN_ENUM_MEMBER_CANNOT_HAVE_A_NUMERIC_NAME, &[]);
         } else {
             let text = ast::get_text_of_property_name(name);
             if is_numeric_literal_name(&text) && !ast::is_infinity_or_nan_string(&text) {
                 self.error(
                     Some(name),
-                    &diagnostics::An_enum_member_cannot_have_a_numeric_name,
+                    &diagnostics::AN_ENUM_MEMBER_CANNOT_HAVE_A_NUMERIC_NAME,
                     &[],
                 );
             }
@@ -759,7 +759,7 @@ impl Checker {
         // Otherwise, it is assigned the value of the immediately preceding member plus one, and an error
         // occurs if the immediately preceding member is not a constant enum member.
         let Some(auto_value) = auto_value else {
-            self.error(Some(name), &diagnostics::Enum_member_must_have_initializer, &[]);
+            self.error(Some(name), &diagnostics::ENUM_MEMBER_MUST_HAVE_INITIALIZER, &[]);
             return evaluator::new_result(None, false, false, false);
         };
         if self.compiler_options.get_isolated_modules() {
@@ -768,7 +768,7 @@ impl Checker {
                     let prev_value = self.get_enum_member_value(previous);
                     let prev_is_num = matches!(prev_value.value, Some(LiteralValue::Number(_)));
                     if !prev_is_num || prev_value.resolved_other_files {
-                        self.error(Some(name), &diagnostics::Enum_member_following_a_non_literal_numeric_member_must_have_an_initializer_when_isolatedModules_is_enabled, &[]);
+                        self.error(Some(name), &diagnostics::ENUM_MEMBER_FOLLOWING_A_NON_LITERAL_NUMERIC_MEMBER_MUST_HAVE_AN_INITIALIZER_WHEN_ISOLATED_MODULES_IS_ENABLED, &[]);
                     }
                 }
             }
@@ -790,9 +790,9 @@ impl Checker {
                 if let Some(LiteralValue::Number(num_value)) = result.value {
                     if num_value.is_inf() || num_value.is_nan() {
                         let message = if num_value.is_nan() {
-                            &diagnostics::X_const_enum_member_initializer_was_evaluated_to_disallowed_value_NaN
+                            &diagnostics::X_CONST_ENUM_MEMBER_INITIALIZER_WAS_EVALUATED_TO_DISALLOWED_VALUE_NA_N
                         } else {
-                            &diagnostics::X_const_enum_member_initializer_was_evaluated_to_a_non_finite_value
+                            &diagnostics::X_CONST_ENUM_MEMBER_INITIALIZER_WAS_EVALUATED_TO_A_NON_FINITE_VALUE
                         };
                         self.error(Some(initializer), message, &[]);
                     }
@@ -808,7 +808,7 @@ impl Checker {
                         );
                         self.error(
                             Some(initializer),
-                            &diagnostics::X_0_has_a_string_type_but_must_have_syntactically_recognizable_string_syntax_when_isolatedModules_is_enabled,
+                            &diagnostics::X_0_HAS_A_STRING_TYPE_BUT_MUST_HAVE_SYNTACTICALLY_RECOGNIZABLE_STRING_SYNTAX_WHEN_ISOLATED_MODULES_IS_ENABLED,
                             &[&member_name],
                         );
                     }
@@ -817,18 +817,18 @@ impl Checker {
         } else if is_const_enum {
             self.error(
                 Some(initializer),
-                &diagnostics::X_const_enum_member_initializers_must_be_constant_expressions,
+                &diagnostics::X_CONST_ENUM_MEMBER_INITIALIZERS_MUST_BE_CONSTANT_EXPRESSIONS,
                 &[],
             );
         } else if parent.flags().intersects(NodeFlags::Ambient) {
-            self.error(Some(initializer), &diagnostics::In_ambient_enum_declarations_member_initializer_must_be_constant_expression, &[]);
+            self.error(Some(initializer), &diagnostics::IN_AMBIENT_ENUM_DECLARATIONS_MEMBER_INITIALIZER_MUST_BE_CONSTANT_EXPRESSION, &[]);
         } else {
             let t = self.check_expression(initializer);
             self.check_type_assignable_to(
                 t,
                 self.number_type,
                 Some(initializer),
-                Some(&diagnostics::Type_0_is_not_assignable_to_type_1_as_required_for_computed_enum_member_values),
+                Some(&diagnostics::TYPE_0_IS_NOT_ASSIGNABLE_TO_TYPE_1_AS_REQUIRED_FOR_COMPUTED_ENUM_MEMBER_VALUES),
             );
         }
         result
@@ -955,7 +955,7 @@ impl Checker {
             let name = self.symbol_to_string(symbol);
             self.error(
                 Some(expr),
-                &diagnostics::Property_0_is_used_before_being_assigned,
+                &diagnostics::PROPERTY_0_IS_USED_BEFORE_BEING_ASSIGNED,
                 &[&name],
             );
             return evaluator::new_result(None, false, false, false);
@@ -964,7 +964,7 @@ impl Checker {
         if !self.is_block_scoped_name_declared_before_use(declaration, location) {
             self.error(
                 Some(expr),
-                &diagnostics::A_member_initializer_in_a_enum_declaration_cannot_reference_members_declared_after_it_including_members_defined_in_other_enums,
+                &diagnostics::A_MEMBER_INITIALIZER_IN_A_ENUM_DECLARATION_CANNOT_REFERENCE_MEMBERS_DECLARED_AFTER_IT_INCLUDING_MEMBERS_DEFINED_IN_OTHER_ENUMS,
                 &[],
             );
             return evaluator::new_result(
@@ -1359,7 +1359,7 @@ impl Checker {
             if tail_count == 1000 {
                 self.error(
                     self.current_node,
-                    &diagnostics::Type_instantiation_is_excessively_deep_and_possibly_infinite,
+                    &diagnostics::TYPE_INSTANTIATION_IS_EXCESSIVELY_DEEP_AND_POSSIBLY_INFINITE,
                     &[],
                 );
                 return self.error_type;
@@ -1425,7 +1425,7 @@ impl Checker {
                         context.inferences.get(),
                         check_type,
                         extends_type,
-                        InferencePriority::NoConstraints | InferencePriority::AlwaysStrict,
+                        InferencePriority::NO_CONSTRAINTS | InferencePriority::ALWAYS_STRICT,
                         false,
                     );
                 }
@@ -1769,7 +1769,7 @@ impl Checker {
         if links.resolved_type.get().is_none() {
             let n = node.as_import_type_node();
             if !ast::is_literal_import_type_node(node) {
-                self.error(Some(n.argument), &diagnostics::String_literal_expected, &[]);
+                self.error(Some(n.argument), &diagnostics::STRING_LITERAL_EXPECTED, &[]);
                 self.symbol_node_links.get(node).resolved_symbol.set(Some(self.unknown_symbol));
                 links.resolved_type.set(Some(self.error_type));
                 return links.resolved_type.get().unwrap();
@@ -1846,7 +1846,7 @@ impl Checker {
                         let member_name = tsrs_scanner::declaration_name_to_string(Some(current));
                         self.error(
                             Some(current),
-                            &diagnostics::Namespace_0_has_no_exported_member_1,
+                            &diagnostics::NAMESPACE_0_HAS_NO_EXPORTED_MEMBER_1,
                             &[&namespace_name, &member_name],
                         );
                         links.resolved_type.set(Some(self.error_type));
@@ -1872,9 +1872,9 @@ impl Checker {
                 )));
             } else {
                 let message = if target_meaning == SymbolFlags::Value {
-                    &diagnostics::Module_0_does_not_refer_to_a_value_but_is_used_as_a_value_here
+                    &diagnostics::MODULE_0_DOES_NOT_REFER_TO_A_VALUE_BUT_IS_USED_AS_A_VALUE_HERE
                 } else {
-                    &diagnostics::Module_0_does_not_refer_to_a_type_but_is_used_as_a_type_here_Did_you_mean_typeof_import_0
+                    &diagnostics::MODULE_0_DOES_NOT_REFER_TO_A_TYPE_BUT_IS_USED_AS_A_TYPE_HERE_DID_YOU_MEAN_TYPEOF_IMPORT_0
                 };
                 let text = n.argument.as_literal_type_node().literal.text();
                 self.error(Some(node), message, &[&text]);

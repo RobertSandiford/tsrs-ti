@@ -117,7 +117,7 @@ impl LanguageService {
             let (hover_range, hover_fidelity) =
                 self.converters.to_lsp_range_for_feature(&range_file, text_range, Feature::Hover);
 
-            let content = if content_format == lsproto::MarkupKind::Markdown {
+            let content = if content_format == lsproto::MarkupKind::MARKDOWN {
                 format_quick_info(&quick_info) + &documentation
             } else {
                 quick_info + &documentation
@@ -167,7 +167,7 @@ impl LanguageService {
                 let doc_text = vs_documentation.trim_start_matches('\n');
                 if !doc_text.is_empty() {
                     documentation_runs = vec![lsproto::VSClassifiedTextRun {
-                        classification_type_name: lsproto::ClassificationTypeName::Text
+                        classification_type_name: lsproto::ClassificationTypeName::TEXT
                             .0
                             .to_string(),
                         text: doc_text.to_string(),
@@ -223,7 +223,7 @@ impl LanguageService {
         let mut combined = hovers.swap_remove(0);
         combined.can_increase_verbosity = can_increase_verbosity;
         let separator =
-            if content_format == lsproto::MarkupKind::Markdown { "\n\n---\n\n" } else { "\n\n" };
+            if content_format == lsproto::MarkupKind::MARKDOWN { "\n\n---\n\n" } else { "\n\n" };
         combined.contents.markup_content.as_mut().unwrap().value = contents.join(separator);
         combined.range = common_range;
         match raw_contents.len() {
@@ -231,7 +231,7 @@ impl LanguageService {
             1 => combined.vs_raw_content = raw_contents.pop().unwrap().container_element,
             _ => {
                 combined.vs_raw_content = Some(lsproto::VSContainerElement {
-                    style: lsproto::VSContainerElementStyle::Stacked,
+                    style: lsproto::VSContainerElementStyle::STACKED,
                     elements: raw_contents,
                     ..Default::default()
                 });
@@ -292,7 +292,7 @@ impl LanguageService {
                 symbol,
                 node,
                 info.declaration,
-                lsproto::MarkupKind::PlainText,
+                lsproto::MarkupKind::PLAIN_TEXT,
                 true, /*commentOnly*/
             );
         }
@@ -512,7 +512,7 @@ pub(crate) fn get_documentation_from_declaration(
     let Some(declaration) = declaration else {
         return String::new();
     };
-    let is_markdown = content_format == lsproto::MarkupKind::Markdown;
+    let is_markdown = content_format == lsproto::MarkupKind::MARKDOWN;
     let mut b = String::new();
     if let Some(jsdoc) = get_jsdoc_or_tag(c, Some(declaration), &mut FxHashSet::default()) {
         if declaration.flags().intersects(NodeFlags::Reparsed) || !contains_typedef_tag(jsdoc) {
@@ -1071,7 +1071,7 @@ impl QuickInfoWriter {
                         self.dpw.write_keyword("var ");
                     }
                 }
-                if symbol.name() == ast::InternalSymbolNameExportEquals
+                if symbol.name() == ast::INTERNAL_SYMBOL_NAME_EXPORT_EQUALS
                     && symbol.parent().is_some_and(|p| p.flags().intersects(SymbolFlags::Module))
                 {
                     self.dpw.write("exports");

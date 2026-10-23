@@ -1100,7 +1100,7 @@ impl FormatSpanWorker {
 
                 // We need to trim trailing whitespace between the tokens if they were on different lines, and no rule was applied to put them on the same line
                 trim_trailing_whitespaces = trim_trailing_whitespaces
-                    && (rule.action() & RuleAction::DeleteSpace == RuleAction::None)
+                    && (rule.action() & RuleAction::DELETE_SPACE == RuleAction::NONE)
                     && rule.flags() != RuleFlags::CanDeleteNewLines;
             }
         } else {
@@ -1131,11 +1131,11 @@ impl FormatSpanWorker {
     ) -> LineAction {
         let on_later_line = current_start_line != previous_start_line;
         match rule.action() {
-            RuleAction::StopProcessingSpaceActions => {
+            RuleAction::STOP_PROCESSING_SPACE_ACTIONS => {
                 // no action required
                 return LineAction::None;
             }
-            RuleAction::DeleteSpace => {
+            RuleAction::DELETE_SPACE => {
                 if previous_range.loc.end() != current_range.loc.pos() {
                     // delete characters starting from t1.end up to t2.pos exclusive
                     let start = previous_range
@@ -1156,7 +1156,7 @@ impl FormatSpanWorker {
                     return LineAction::None;
                 }
             }
-            RuleAction::DeleteToken => {
+            RuleAction::DELETE_TOKEN => {
                 self.record_delete(
                     previous_range
                         .loc
@@ -1165,7 +1165,7 @@ impl FormatSpanWorker {
                     previous_range.loc.len().expect("formatting ranges have source positions"),
                 );
             }
-            RuleAction::InsertNewLine => {
+            RuleAction::INSERT_NEW_LINE => {
                 // exit early if we on different lines and rule cannot change number of newlines
                 // if line1 and line2 are on subsequent lines then no edits are required - ok to exit
                 // if line1 and line2 are separated with more than one newline - ok to exit since we cannot delete extra new lines
@@ -1198,7 +1198,7 @@ impl FormatSpanWorker {
                     return LineAction::LineAdded;
                 }
             }
-            RuleAction::InsertSpace => {
+            RuleAction::INSERT_SPACE => {
                 // exit early if we on different lines and rule cannot change number of newlines
                 if rule.flags() != RuleFlags::CanDeleteNewLines
                     && previous_start_line != current_start_line
@@ -1226,7 +1226,7 @@ impl FormatSpanWorker {
                     return LineAction::None;
                 }
             }
-            RuleAction::InsertTrailingSemicolon => {
+            RuleAction::INSERT_TRAILING_SEMICOLON => {
                 self.record_insert(
                     previous_range
                         .loc

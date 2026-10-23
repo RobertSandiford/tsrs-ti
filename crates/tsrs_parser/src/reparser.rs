@@ -52,7 +52,7 @@ impl Parser {
                 let pos = name.loc().pos().expect_source("parsed nodes have source positions");
                 err_loc = TextRange::new(pos - 1, pos);
             }
-            self.parse_error_at_range(err_loc, &diagnostics::Identifier_expected, &[]);
+            self.parse_error_at_range(err_loc, &diagnostics::IDENTIFIER_EXPECTED, &[]);
         }
         Some(name)
     }

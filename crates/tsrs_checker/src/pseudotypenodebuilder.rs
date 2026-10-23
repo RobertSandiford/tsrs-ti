@@ -493,7 +493,7 @@ impl NodeBuilderImpl {
                 {
                     // does union comparison in general, since the unions may not be `==` identical due to aliasing and the like
                     if c.compare_types_identical(type_from_pseudo, undefined_stripped)
-                        == Ternary::True
+                        == Ternary::TRUE
                     {
                         return true;
                     }
@@ -509,7 +509,7 @@ impl NodeBuilderImpl {
                 && ty.flags().intersects(TypeFlags::Union)
             {
                 // handles union comparison in general, since unions may not be `==` identical due to aliasing
-                if c.compare_types_identical(type_from_pseudo, ty) == Ternary::True {
+                if c.compare_types_identical(type_from_pseudo, ty) == Ternary::TRUE {
                     return true;
                 }
             }
@@ -983,7 +983,7 @@ impl NodeBuilderImpl {
             };
             let predicate_type_from_node = c.get_type_from_type_node(tp_type);
             if predicate_type_from_node != predicate_t
-                && c.compare_types_identical(predicate_type_from_node, predicate_t) != Ternary::True
+                && c.compare_types_identical(predicate_type_from_node, predicate_t) != Ternary::TRUE
             {
                 return false;
             }

@@ -22643,7 +22643,7 @@ pub fn is_trivia_kind(kind: Kind) -> bool {
 }
 
 pub fn is_literal_kind(kind: Kind) -> bool {
-    kind >= Kind::FirstLiteralToken && kind <= Kind::LastLiteralToken
+    kind >= Kind::FIRST_LITERAL_TOKEN && kind <= Kind::LAST_LITERAL_TOKEN
 }
 
 pub fn is_pseudo_literal_kind(kind: Kind) -> bool {
@@ -22651,11 +22651,11 @@ pub fn is_pseudo_literal_kind(kind: Kind) -> bool {
 }
 
 pub fn is_punctuation_kind(kind: Kind) -> bool {
-    kind >= Kind::FirstPunctuation && kind <= Kind::LastPunctuation
+    kind >= Kind::FIRST_PUNCTUATION && kind <= Kind::LAST_PUNCTUATION
 }
 
 pub fn is_keyword_kind(kind: Kind) -> bool {
-    kind >= Kind::FirstKeyword && kind <= Kind::LastKeyword
+    kind >= Kind::FIRST_KEYWORD && kind <= Kind::LAST_KEYWORD
 }
 
 pub fn is_modifier_kind(kind: Kind) -> bool {
@@ -22710,7 +22710,7 @@ pub fn is_keyword_expression_kind(kind: Kind) -> bool {
 }
 
 pub fn is_token_kind(kind: Kind) -> bool {
-    kind >= Kind::FirstToken && kind <= Kind::LastToken
+    kind >= Kind::FIRST_TOKEN && kind <= Kind::LAST_TOKEN
 }
 
 pub fn is_jsx_token_kind(kind: Kind) -> bool {
@@ -22727,7 +22727,7 @@ pub fn is_jsx_token_kind(kind: Kind) -> bool {
 }
 
 pub fn is_jsdoc_node_kind(kind: Kind) -> bool {
-    kind >= Kind::FirstJSDocNode && kind <= Kind::LastJSDocNode
+    kind >= Kind::FIRST_JSDOC_NODE && kind <= Kind::LAST_JSDOC_NODE
 }
 
 pub fn is_import_phase_modifier_kind(kind: Kind) -> bool {

@@ -109,7 +109,7 @@ impl Checker {
     ) -> Option<P<Symbol>> {
         let mut prop_flags = SymbolFlags::None;
         let mut single_prop: Option<P<Symbol>> = None;
-        let mut prop_set: orderedSet<P<Symbol>> = orderedSet::default();
+        let mut prop_set: CheckerOrderedSet<P<Symbol>> = CheckerOrderedSet::default();
         let mut index_types: Vec<P<Type>> = Vec::new();
         let is_union = containing_type.flags().intersects(TypeFlags::Union);
         // Flags we want to propagate to the result if they exist in all source symbols
@@ -170,7 +170,7 @@ impl Checker {
                         if is_instantiation
                             && self
                                 .compare_properties(sp, prop, |_, s, t| compare_types_equal(s, t))
-                                == Ternary::True
+                                == Ternary::TRUE
                         {
                             // If we merged instantiations of a generic type, we replicate the symbol parent resetting behavior we used
                             // to do when we recorded multiple distinct symbols so that we still get, eg, `Array<T>.length` printed
@@ -912,7 +912,7 @@ impl Checker {
                 let type_string =
                     self.type_to_string_ex(t, None, TypeFormatFlags::NoTypeReduction, None);
                 let prop_string = self.symbol_to_string(never_prop);
-                return Some(new_diagnostic_chain_for_node(chain, node, Some(&diagnostics::The_intersection_0_was_reduced_to_never_because_property_1_has_conflicting_types_in_some_constituents), &[&type_string, &prop_string]));
+                return Some(new_diagnostic_chain_for_node(chain, node, Some(&diagnostics::THE_INTERSECTION_0_WAS_REDUCED_TO_NEVER_BECAUSE_PROPERTY_1_HAS_CONFLICTING_TYPES_IN_SOME_CONSTITUENTS), &[&type_string, &prop_string]));
             }
             let private_prop = self
                 .get_properties_of_union_or_intersection_type(t)
@@ -923,7 +923,7 @@ impl Checker {
                 let type_string =
                     self.type_to_string_ex(t, None, TypeFormatFlags::NoTypeReduction, None);
                 let prop_string = self.symbol_to_string(private_prop);
-                return Some(new_diagnostic_chain_for_node(chain, node, Some(&diagnostics::The_intersection_0_was_reduced_to_never_because_property_1_exists_in_multiple_constituents_and_is_private_in_some), &[&type_string, &prop_string]));
+                return Some(new_diagnostic_chain_for_node(chain, node, Some(&diagnostics::THE_INTERSECTION_0_WAS_REDUCED_TO_NEVER_BECAUSE_PROPERTY_1_EXISTS_IN_MULTIPLE_CONSTITUENTS_AND_IS_PRIVATE_IN_SOME), &[&type_string, &prop_string]));
             }
         }
         chain
@@ -995,13 +995,13 @@ impl Checker {
                     let s = self.symbol_to_string(target_symbol);
                     self.error(
                         error_node,
-                        &diagnostics::Type_arguments_for_0_circularly_reference_themselves,
+                        &diagnostics::TYPE_ARGUMENTS_FOR_0_CIRCULARLY_REFERENCE_THEMSELVES,
                         &[&s],
                     );
                 } else {
                     self.error(
                         error_node,
-                        &diagnostics::Tuple_type_arguments_circularly_reference_themselves,
+                        &diagnostics::TUPLE_TYPE_ARGUMENTS_CIRCULARLY_REFERENCE_THEMSELVES,
                         &[],
                     );
                 }
@@ -1329,7 +1329,7 @@ impl Checker {
                 std::cmp::Ordering::Equal => {
                     self.error(
                         self.current_node,
-                        &diagnostics::Instantiations_of_type_0_appear_infinitely_circular,
+                        &diagnostics::INSTANTIATIONS_OF_TYPE_0_APPEAR_INFINITELY_CIRCULAR,
                         &[&circular_type_names[0]],
                     );
                 }
@@ -1337,12 +1337,12 @@ impl Checker {
                     let names: Vec<&str> =
                         circular_type_names.iter().map(std::string::String::as_str).collect();
                     let quoted = quoted_and_comma_separated(&names);
-                    self.error(self.current_node, &diagnostics::Instantiations_of_the_following_types_appear_infinitely_circular_Colon_0, &[&quoted]);
+                    self.error(self.current_node, &diagnostics::INSTANTIATIONS_OF_THE_FOLLOWING_TYPES_APPEAR_INFINITELY_CIRCULAR_COLON_0, &[&quoted]);
                 }
                 std::cmp::Ordering::Less => {
                     self.error(
                         self.current_node,
-                        &diagnostics::Type_instantiation_is_excessively_deep_and_possibly_infinite,
+                        &diagnostics::TYPE_INSTANTIATION_IS_EXCESSIVELY_DEEP_AND_POSSIBLY_INFINITE,
                         &[],
                     );
                 }
@@ -1405,7 +1405,7 @@ fn active_mapper_cache_key(t: P<Type>, alias: Option<P<TypeAlias>>) -> CacheHash
             lo: u64::from(t.id.0).wrapping_mul(0x9e37_79b9_7f4a_7c15),
         }
     } else {
-        let mut b = keyBuilder::default();
+        let mut b = KeyBuilder::default();
         b.write_type(t);
         b.write_alias(alias);
         b.hash()
@@ -1428,7 +1428,7 @@ impl Checker {
                 }
                 if let Some(symbol) = symbol {
                     if !symbol.name().is_empty()
-                        && symbol.name().as_bytes()[0] != InternalSymbolNamePrefixByte
+                        && symbol.name().as_bytes()[0] != INTERNAL_SYMBOL_NAME_PREFIX_BYTE
                     {
                         let name = self.symbol_to_string_exported(symbol);
                         if !circular_type_names.contains(&name) {
@@ -2802,7 +2802,7 @@ impl Checker {
                 }
             }
         }
-        self.error(Some(node), &diagnostics::A_this_type_is_available_only_in_a_non_static_member_of_a_class_or_interface, &[]);
+        self.error(Some(node), &diagnostics::A_THIS_TYPE_IS_AVAILABLE_ONLY_IN_A_NON_STATIC_MEMBER_OF_A_CLASS_OR_INTERFACE, &[]);
         self.error_type
     }
 
@@ -2908,7 +2908,7 @@ impl Checker {
                         unique_type
                     } else {
                         let mut b = String::new();
-                        b.push_str(InternalSymbolNamePrefix);
+                        b.push_str(INTERNAL_SYMBOL_NAME_PREFIX);
                         b.push('@');
                         b.push_str(symbol.name());
                         b.push('@');
@@ -3223,15 +3223,15 @@ impl Checker {
                     && !is_jsdoc_augments_tag(node.parent().unwrap());
                 let message: &'static Message = if missing_augments_tag {
                     if min_type_argument_count < type_parameters.len() {
-                        &diagnostics::Expected_0_1_type_arguments_provide_these_with_an_extends_tag
+                        &diagnostics::EXPECTED_0_1_TYPE_ARGUMENTS_PROVIDE_THESE_WITH_AN_EXTENDS_TAG
                     } else {
-                        &diagnostics::Expected_0_type_arguments_provide_these_with_an_extends_tag
+                        &diagnostics::EXPECTED_0_TYPE_ARGUMENTS_PROVIDE_THESE_WITH_AN_EXTENDS_TAG
                     }
                 } else {
                     if min_type_argument_count < type_parameters.len() {
-                        &diagnostics::Generic_type_0_requires_between_1_and_2_type_arguments
+                        &diagnostics::GENERIC_TYPE_0_REQUIRES_BETWEEN_1_AND_2_TYPE_ARGUMENTS
                     } else {
-                        &diagnostics::Generic_type_0_requires_1_type_argument_s
+                        &diagnostics::GENERIC_TYPE_0_REQUIRES_1_TYPE_ARGUMENT_S
                     }
                 };
                 let type_str = self.type_to_string_ex(
@@ -3301,7 +3301,7 @@ impl Checker {
                     node.as_type_reference_node().type_name,
                 )),
             };
-            self.error(Some(node), &diagnostics::Type_0_is_not_generic, &[&type_name]);
+            self.error(Some(node), &diagnostics::TYPE_0_IS_NOT_GENERIC, &[&type_name]);
             return false;
         }
         true
@@ -3540,9 +3540,9 @@ impl TupleNormalizer {
                     let spread_types = c.get_element_types(t);
                     if spread_types.len() + self.types.len() >= 10_000 {
                         let message = if c.current_node.is_some_and(is_part_of_type_node) {
-                            &diagnostics::Type_produces_a_tuple_type_that_is_too_large_to_represent
+                            &diagnostics::TYPE_PRODUCES_A_TUPLE_TYPE_THAT_IS_TOO_LARGE_TO_REPRESENT
                         } else {
-                            &diagnostics::Expression_produces_a_tuple_type_that_is_too_large_to_represent
+                            &diagnostics::EXPRESSION_PRODUCES_A_TUPLE_TYPE_THAT_IS_TOO_LARGE_TO_REPRESENT
                         };
                         c.error(c.current_node, message, &[]);
                         return false;

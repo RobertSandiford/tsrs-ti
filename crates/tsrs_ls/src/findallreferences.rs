@@ -635,20 +635,20 @@ pub(crate) fn get_symbol_scope(symbol: P<Symbol>) -> Option<P<Node>> {
 
 // findallreferences.go:480
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct position {
+pub(crate) struct Position {
     pub(crate) uri: lsproto::DocumentUri,
     pub(crate) pos: lsproto::Position,
 }
 
 // findallreferences.go:487
-impl lsproto::HasTextDocumentURI for position {
+impl lsproto::HasTextDocumentURI for Position {
     fn text_document_uri(&self) -> &lsproto::DocumentUri {
         &self.uri
     }
 }
 
 // findallreferences.go:488
-impl lsproto::HasTextDocumentPosition for position {
+impl lsproto::HasTextDocumentPosition for Position {
     fn text_document_position(&self) -> lsproto::Position {
         self.pos
     }
@@ -657,17 +657,17 @@ impl lsproto::HasTextDocumentPosition for position {
 // Go's GetSourcePosition / GetGeneratedPosition are `sync.OnceValue` closures over the language service that
 // created the definition; the port keeps their inputs and cached results and takes that service as an argument.
 // findallreferences.go:490
-pub(crate) struct nonLocalDefinition {
-    pub(crate) position: position,
+pub(crate) struct NonLocalDefinition {
+    pub(crate) position: Position,
     file_name: String,
     start_pos: TextPos,
-    source_position: OnceCell<Option<position>>,
-    generated_position: OnceCell<Option<position>>,
+    source_position: OnceCell<Option<Position>>,
+    generated_position: OnceCell<Option<Position>>,
 }
 
-impl nonLocalDefinition {
+impl NonLocalDefinition {
     // findallreferences.go:524
-    pub(crate) fn get_source_position(&self, l: &LanguageService) -> Option<&position> {
+    pub(crate) fn get_source_position(&self, l: &LanguageService) -> Option<&Position> {
         self.source_position
             .get_or_init(|| {
                 let mapped = l.try_get_source_position(&self.file_name, self.start_pos);
@@ -678,7 +678,7 @@ impl nonLocalDefinition {
                     if mapped_fidelity.is_none() {
                         return None;
                     }
-                    return Some(position {
+                    return Some(Position {
                         uri: lsconv::file_name_to_document_uri(&mapped.file_name),
                         pos: mapped_position,
                     });
@@ -689,7 +689,7 @@ impl nonLocalDefinition {
     }
 
     // findallreferences.go:538
-    pub(crate) fn get_generated_position(&self, l: &LanguageService) -> Option<&position> {
+    pub(crate) fn get_generated_position(&self, l: &LanguageService) -> Option<&Position> {
         self.generated_position
             .get_or_init(|| {
                 let mapped = l.try_get_generated_position(&self.file_name, self.start_pos);
@@ -700,7 +700,7 @@ impl nonLocalDefinition {
                     if mapped_fidelity.is_none() {
                         return None;
                     }
-                    return Some(position {
+                    return Some(Position {
                         uri: lsconv::file_name_to_document_uri(&mapped.file_name),
                         pos: mapped_position,
                     });
@@ -732,7 +732,7 @@ impl LanguageService {
         &self,
         ctx: &Context,
         entry: &SymbolAndEntries,
-    ) -> Option<nonLocalDefinition> {
+    ) -> Option<NonLocalDefinition> {
         if !entry.can_use_definition_symbol() {
             return None;
         }
@@ -752,8 +752,8 @@ impl LanguageService {
                         if fidelity.is_none() {
                             return None;
                         }
-                        return Some(Some(nonLocalDefinition {
-                            position: position {
+                        return Some(Some(NonLocalDefinition {
+                            position: Position {
                                 uri: lsconv::file_name_to_document_uri(file_name),
                                 pos: lsp_position,
                             },
@@ -1171,7 +1171,7 @@ impl LanguageService {
                 vs_id: definition_id,
                 vs_location: def_info.location,
                 vs_definition_text: def_info.display_text,
-                vs_kind: Some(vec![lsproto::VSReferenceKind::Unknown]),
+                vs_kind: Some(vec![lsproto::VSReferenceKind::UNKNOWN]),
                 vs_project_name: Some(project_name.clone()),
                 vs_containing_type: Some(empty_str),
                 ..Default::default()
@@ -1195,12 +1195,12 @@ impl LanguageService {
                 };
 
                 // Determine read/write kind
-                let mut kind = lsproto::VSReferenceKind::Read;
+                let mut kind = lsproto::VSReferenceKind::READ;
                 if r.kind != EntryKind::Range
                     && r.node.is_some()
                     && ast::is_write_access_for_reference(r.node.unwrap())
                 {
-                    kind = lsproto::VSReferenceKind::Write;
+                    kind = lsproto::VSReferenceKind::WRITE;
                 }
 
                 let ref_item = lsproto::VSReferenceItem {
@@ -1222,7 +1222,7 @@ impl LanguageService {
 
 // referencedSymbolDefinitionInfo holds the computed info for a definition
 // findallreferences.go:866 (Go's node field is never read)
-pub(crate) struct referencedSymbolDefinitionInfo {
+pub(crate) struct ReferencedSymbolDefinitionInfo {
     pub(crate) location: lsproto::Location,
     pub(crate) display_text: Option<lsproto::VSClassifiedTextElement>,
 }
@@ -1251,7 +1251,7 @@ impl LanguageService {
         original_node: Option<P<Node>>,
         vs_capability: bool,
         feature: Feature,
-    ) -> Option<referencedSymbolDefinitionInfo> {
+    ) -> Option<ReferencedSymbolDefinitionInfo> {
         match def.kind {
             DefinitionKind::Symbol => {
                 let symbol = def.symbol?;
@@ -1274,7 +1274,7 @@ impl LanguageService {
                     &ReferenceEntry::new(EntryKind::Node, Some(node), None),
                     feature,
                 )?;
-                Some(referencedSymbolDefinitionInfo { location: loc, display_text: Some(element) })
+                Some(ReferencedSymbolDefinitionInfo { location: loc, display_text: Some(element) })
             }
 
             DefinitionKind::Label => {
@@ -1283,11 +1283,11 @@ impl LanguageService {
                     &ReferenceEntry::new(EntryKind::Node, Some(node), None),
                     feature,
                 )?;
-                Some(referencedSymbolDefinitionInfo {
+                Some(ReferencedSymbolDefinitionInfo {
                     location: loc,
                     display_text: Some(single_run(
                         node.text(),
-                        lsproto::ClassificationTypeName::Text,
+                        lsproto::ClassificationTypeName::TEXT,
                     )),
                 })
             }
@@ -1299,9 +1299,9 @@ impl LanguageService {
                     &ReferenceEntry::new(EntryKind::Node, Some(node), None),
                     feature,
                 )?;
-                Some(referencedSymbolDefinitionInfo {
+                Some(ReferencedSymbolDefinitionInfo {
                     location: loc,
-                    display_text: Some(single_run(name, lsproto::ClassificationTypeName::Keyword)),
+                    display_text: Some(single_run(name, lsproto::ClassificationTypeName::KEYWORD)),
                 })
             }
 
@@ -1314,7 +1314,7 @@ impl LanguageService {
                     &ReferenceEntry::new(EntryKind::Node, Some(node), None),
                     feature,
                 )?;
-                Some(referencedSymbolDefinitionInfo { location: loc, display_text: Some(element) })
+                Some(ReferencedSymbolDefinitionInfo { location: loc, display_text: Some(element) })
             }
 
             DefinitionKind::String => {
@@ -1323,11 +1323,11 @@ impl LanguageService {
                     &ReferenceEntry::new(EntryKind::Node, Some(node), None),
                     feature,
                 )?;
-                Some(referencedSymbolDefinitionInfo {
+                Some(ReferencedSymbolDefinitionInfo {
                     location: loc,
                     display_text: Some(single_run(
                         node.text(),
-                        lsproto::ClassificationTypeName::String,
+                        lsproto::ClassificationTypeName::STRING,
                     )),
                 })
             }
@@ -1341,9 +1341,9 @@ impl LanguageService {
                     feature,
                 )?;
                 let text = format!("\"{}\"", triple_slash_file_ref.reference.unwrap().file_name);
-                Some(referencedSymbolDefinitionInfo {
+                Some(ReferencedSymbolDefinitionInfo {
                     location: loc,
-                    display_text: Some(single_run(&text, lsproto::ClassificationTypeName::String)),
+                    display_text: Some(single_run(&text, lsproto::ClassificationTypeName::STRING)),
                 })
             }
         }
@@ -1385,7 +1385,7 @@ impl LanguageService {
         }
         // Fallback: single unclassified run with the full text
         let text = info.display_parts.as_str().to_string();
-        single_run(&text, lsproto::ClassificationTypeName::Text)
+        single_run(&text, lsproto::ClassificationTypeName::TEXT)
     }
 
     // findallreferences.go:1016
@@ -1867,7 +1867,7 @@ impl LanguageService {
             return Vec::new();
         };
 
-        if symbol.name() == ast::InternalSymbolNameExportEquals {
+        if symbol.name() == ast::INTERNAL_SYMBOL_NAME_EXPORT_EQUALS {
             let Some(parent) = symbol.parent() else {
                 return Vec::new();
             };
@@ -2024,7 +2024,7 @@ impl LanguageService {
         }
         let export_equals = symbol
             .exports()
-            .and_then(|exports| exports.lookup(ast::InternalSymbolNameExportEquals));
+            .and_then(|exports| exports.lookup(ast::INTERNAL_SYMBOL_NAME_EXPORT_EQUALS));
         // If exportEquals != nil, we're about to add references to `import("mod")` anyway, so don't double-count them.
         let module_references = Self::get_referenced_symbols_for_module(
             checker,
@@ -2649,7 +2649,7 @@ impl LanguageService {
         // Handle export equals declarations
         let exported = symbol
             .exports()
-            .and_then(|exports| exports.lookup(ast::InternalSymbolNameExportEquals));
+            .and_then(|exports| exports.lookup(ast::INTERNAL_SYMBOL_NAME_EXPORT_EQUALS));
         if let Some(exported) = exported {
             references.extend(exported.declarations().iter().filter_map(|&decl| {
                 let source_file = ast::get_source_file_of_node(decl).unwrap();
@@ -2769,7 +2769,7 @@ pub(crate) fn get_referenced_symbols_for_symbol(
             true, /*alwaysGetReferences*/
         );
     } else if node.is_some_and(|node| node.kind() == Kind::DefaultKeyword)
-        && symbol.name() == ast::InternalSymbolNameDefault
+        && symbol.name() == ast::INTERNAL_SYMBOL_NAME_DEFAULT
         && symbol.parent().is_some()
     {
         state.add_reference(node.unwrap(), symbol, EntryKind::Node);
@@ -2830,7 +2830,7 @@ impl RefSearch {
 
 // findallreferences.go:1903
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct inheritKey {
+pub(crate) struct InheritKey {
     symbol: P<Symbol>,
     parent: P<Symbol>,
 }
@@ -2846,7 +2846,7 @@ pub(crate) struct RefState<'a> {
     pub(crate) search_meaning: SemanticMeaning,
     pub(crate) options: RefOptions,
     pub(crate) result: Vec<SymbolAndEntries>,
-    pub(crate) inherits_from_cache: FxHashMap<inheritKey, bool>,
+    pub(crate) inherits_from_cache: FxHashMap<InheritKey, bool>,
     pub(crate) seen_containing_type_references: FxHashSet<P<Node>>, // node seen tracker
     pub(crate) seen_re_export_rhs: FxHashSet<P<Node>>,              // node seen tracker
     pub(crate) import_tracker: Option<ImportTracker<'a>>,
@@ -3052,7 +3052,7 @@ pub(crate) fn try_get_class_by_extending_identifier(
 // findallreferences.go:2040
 pub(crate) fn get_class_constructor_symbol(class_symbol: P<Symbol>) -> Option<P<Symbol>> {
     let members = class_symbol.members()?;
-    members.lookup(ast::InternalSymbolNameConstructor)
+    members.lookup(ast::INTERNAL_SYMBOL_NAME_CONSTRUCTOR)
 }
 
 // findallreferences.go:2047
@@ -4120,7 +4120,7 @@ impl RefState<'_> {
         }
 
         // Check cache first
-        let key = inheritKey { symbol, parent };
+        let key = InheritKey { symbol, parent };
         if let Some(&cached) = self.inherits_from_cache.get(&key) {
             return cached;
         }

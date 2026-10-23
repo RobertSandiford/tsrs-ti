@@ -38,19 +38,19 @@ impl NodeBuilderImpl {
         };
 
         let kind = classify_property_name(&text, ast::is_string_literal(res), is_method);
-        if ast::is_identifier(res) && kind == propertyNameNodeKind::Identifier {
+        if ast::is_identifier(res) && kind == PropertyNameNodeKind::Identifier {
             return Some(res);
         }
-        if ast::is_string_literal(res) && kind == propertyNameNodeKind::StringLiteral {
+        if ast::is_string_literal(res) && kind == PropertyNameNodeKind::StringLiteral {
             return Some(res);
         }
 
         let renamed = match kind {
-            propertyNameNodeKind::Identifier => self.new_identifier(c, &text, None),
-            propertyNameNodeKind::StringLiteral => {
+            PropertyNameNodeKind::Identifier => self.new_identifier(c, &text, None),
+            PropertyNameNodeKind::StringLiteral => {
                 self.f.new_string_literal(self.f.alloc_text(&text), TokenFlags::None)
             }
-            propertyNameNodeKind::NumericLiteral => return Some(res),
+            PropertyNameNodeKind::NumericLiteral => return Some(res),
         };
         self.e.set_original(renamed, res);
         Some(self.set_text_range(c, renamed, Some(res)))
@@ -106,7 +106,7 @@ impl NodeBuilderImpl {
     }
 }
 
-impl recoveryBoundary {
+impl RecoveryBoundary {
     // nodecopy.go:109
     pub(crate) fn mark_error(&self, f: Option<Box<dyn FnOnce()>>) {
         self.had_error.set(true);
@@ -116,10 +116,10 @@ impl recoveryBoundary {
     }
 
     // nodecopy.go:122
-    pub(crate) fn start_recovery_scope(&self) -> originalRecoveryScopeState {
+    pub(crate) fn start_recovery_scope(&self) -> OriginalRecoveryScopeState {
         let tracked_symbols_top = self.ctx.tracked_symbols.borrow().len();
         let unreported_errors_top = self.deferred_reports.borrow().len();
-        originalRecoveryScopeState {
+        OriginalRecoveryScopeState {
             tracked_symbols_top,
             unreported_errors_top,
             had_error: self.had_error.get(),
@@ -127,14 +127,14 @@ impl recoveryBoundary {
     }
 
     // nodecopy.go:128
-    pub(crate) fn end_recovery_scope(&self, state: originalRecoveryScopeState) {
+    pub(crate) fn end_recovery_scope(&self, state: OriginalRecoveryScopeState) {
         self.had_error.set(state.had_error);
         self.ctx.tracked_symbols.borrow_mut().truncate(state.tracked_symbols_top);
         self.deferred_reports.borrow_mut().truncate(state.unreported_errors_top);
     }
 }
 
-impl wrappingTracker {
+impl WrappingTracker {
     // nodecopy.go:139
     pub fn pop_error_fallback_node(&self) {
         self.wrapped.pop_error_fallback_node();
@@ -241,17 +241,17 @@ impl wrappingTracker {
 // nodecopy.go:188
 pub(crate) fn new_wrapping_tracker(
     inner: &'static dyn SymbolTracker,
-    bound: P<recoveryBoundary>,
-) -> P<wrappingTracker> {
-    P::new_scratch(wrappingTracker { wrapped: inner, bound })
+    bound: P<RecoveryBoundary>,
+) -> P<WrappingTracker> {
+    P::new_scratch(WrappingTracker { wrapped: inner, bound })
 }
 
 impl NodeBuilderImpl {
     // nodecopy.go:195
-    pub(crate) fn create_recovery_boundary(&self, c: &Checker) -> P<recoveryBoundary> {
+    pub(crate) fn create_recovery_boundary(&self, c: &Checker) -> P<RecoveryBoundary> {
         c.check_not_canceled();
         let ctx = self.ctx();
-        let bound = P::new_scratch(recoveryBoundary {
+        let bound = P::new_scratch(RecoveryBoundary {
             ctx,
             had_error: Cell::new(false),
             deferred_reports: RefCell::new(Vec::new()),
@@ -271,7 +271,7 @@ impl NodeBuilderImpl {
     }
 
     // nodecopy.go:204
-    pub(crate) fn finalize_boundary(&self, c: &mut Checker, bound: P<recoveryBoundary>) -> bool {
+    pub(crate) fn finalize_boundary(&self, c: &mut Checker, bound: P<RecoveryBoundary>) -> bool {
         let _ = c;
         let ctx = self.ctx();
         ctx.tracker.set(bound.old_tracker);
@@ -423,7 +423,7 @@ impl NodeBuilderImpl {
 pub(crate) fn get_existing_node_tree_visitor(
     c: &Checker,
     b: P<NodeBuilderImpl>,
-    bound: P<recoveryBoundary>,
+    bound: P<RecoveryBoundary>,
 ) -> NodeVisitor {
     // TODO: wrap all these closures into methods on an object so we can guarantee we reuse the same memory on each invocation by reusing/resetting the object
     // instead of re-closing-over all of these each time we need a visitor. In theory the compiler could handle this, but in practice closure inlining hasn't been reliable
@@ -480,7 +480,7 @@ pub(crate) fn get_existing_node_tree_visitor(
 #[derive(Clone, Copy)]
 struct ExistingNodeTree {
     b: P<NodeBuilderImpl>,
-    bound: P<recoveryBoundary>,
+    bound: P<RecoveryBoundary>,
 }
 
 impl ExistingNodeTree {

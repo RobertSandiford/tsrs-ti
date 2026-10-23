@@ -196,11 +196,11 @@ pub struct CachedSignatureKey {
     pub key: CacheHashKey, // Type list key or one of the special keys below
 }
 
-pub const SignatureKeyErased: CacheHashKey = CacheHashKey::hash_string_128("-");
-pub const SignatureKeyCanonical: CacheHashKey = CacheHashKey::hash_string_128("*");
-pub const SignatureKeyBase: CacheHashKey = CacheHashKey::hash_string_128("#");
-pub const SignatureKeyInner: CacheHashKey = CacheHashKey::hash_string_128("<");
-pub const SignatureKeyOuter: CacheHashKey = CacheHashKey::hash_string_128(">");
+pub const SIGNATURE_KEY_ERASED: CacheHashKey = CacheHashKey::hash_string_128("-");
+pub const SIGNATURE_KEY_CANONICAL: CacheHashKey = CacheHashKey::hash_string_128("*");
+pub const SIGNATURE_KEY_BASE: CacheHashKey = CacheHashKey::hash_string_128("#");
+pub const SIGNATURE_KEY_INNER: CacheHashKey = CacheHashKey::hash_string_128("<");
+pub const SIGNATURE_KEY_OUTER: CacheHashKey = CacheHashKey::hash_string_128(">");
 
 // StringMappingKey
 
@@ -650,24 +650,23 @@ enum InferencePriorityRepr {
 #[derive(Clone, Copy, Eq, Debug)]
 pub struct InferencePriority(InferencePriorityRepr);
 
-#[expect(non_upper_case_globals, reason = "names match the upstream inference priorities")]
 impl InferencePriority {
-    pub const Circularity: Self = Self(InferencePriorityRepr::Circularity);
-    pub const None: Self = Self::from_bits(0);
-    pub const NakedTypeVariable: Self = Self::from_bits(1 << 0); // Naked type variable in union or intersection type
-    pub const SpeculativeTuple: Self = Self::from_bits(1 << 1); // Speculative tuple inference
-    pub const SubstituteSource: Self = Self::from_bits(1 << 2); // Source of inference originated within a substitution type's substitute
-    pub const HomomorphicMappedType: Self = Self::from_bits(1 << 3); // Reverse inference for homomorphic mapped type
-    pub const PartialHomomorphicMappedType: Self = Self::from_bits(1 << 4); // Partial reverse inference for homomorphic mapped type
-    pub const MappedTypeConstraint: Self = Self::from_bits(1 << 5); // Reverse inference for mapped type
-    pub const ContravariantConditional: Self = Self::from_bits(1 << 6); // Conditional type in contravariant position
-    pub const ReturnType: Self = Self::from_bits(1 << 7); // Inference made from return type of generic function
-    pub const LiteralKeyof: Self = Self::from_bits(1 << 8); // Inference made from a string literal to a keyof T
+    pub const CIRCULARITY: Self = Self(InferencePriorityRepr::Circularity);
+    pub const NONE: Self = Self::from_bits(0);
+    pub const NAKED_TYPE_VARIABLE: Self = Self::from_bits(1 << 0); // Naked type variable in union or intersection type
+    pub const SPECULATIVE_TUPLE: Self = Self::from_bits(1 << 1); // Speculative tuple inference
+    pub const SUBSTITUTE_SOURCE: Self = Self::from_bits(1 << 2); // Source of inference originated within a substitution type's substitute
+    pub const HOMOMORPHIC_MAPPED_TYPE: Self = Self::from_bits(1 << 3); // Reverse inference for homomorphic mapped type
+    pub const PARTIAL_HOMOMORPHIC_MAPPED_TYPE: Self = Self::from_bits(1 << 4); // Partial reverse inference for homomorphic mapped type
+    pub const MAPPED_TYPE_CONSTRAINT: Self = Self::from_bits(1 << 5); // Reverse inference for mapped type
+    pub const CONTRAVARIANT_CONDITIONAL: Self = Self::from_bits(1 << 6); // Conditional type in contravariant position
+    pub const RETURN_TYPE: Self = Self::from_bits(1 << 7); // Inference made from return type of generic function
+    pub const LITERAL_KEYOF: Self = Self::from_bits(1 << 8); // Inference made from a string literal to a keyof T
     // These priorities imply that the resulting type should be a combination of all candidates.
-    pub const PriorityImpliesCombination: Self = Self::from_bits((1 << 7) | (1 << 5) | (1 << 8));
-    pub const NoConstraints: Self = Self::from_bits(1 << 9); // Don't infer from constraints of instantiable types
-    pub const AlwaysStrict: Self = Self::from_bits(1 << 10); // Always use strict rules for contravariant inferences
-    pub const MaxValue: Self = Self::from_bits(1 << 11); // Seed for inference priority tracking
+    pub const PRIORITY_IMPLIES_COMBINATION: Self = Self::from_bits((1 << 7) | (1 << 5) | (1 << 8));
+    pub const NO_CONSTRAINTS: Self = Self::from_bits(1 << 9); // Don't infer from constraints of instantiable types
+    pub const ALWAYS_STRICT: Self = Self::from_bits(1 << 10); // Always use strict rules for contravariant inferences
+    pub const MAX_VALUE: Self = Self::from_bits(1 << 11); // Seed for inference priority tracking
 
     const fn from_bits(bits: u16) -> Self {
         assert!(bits <= u16::MAX >> 1, "inference priority exceeds u16 storage");
@@ -706,7 +705,7 @@ impl InferencePriority {
 
 impl Default for InferencePriority {
     fn default() -> Self {
-        Self::None
+        Self::NONE
     }
 }
 
@@ -747,7 +746,7 @@ impl std::ops::BitOr for InferencePriority {
             (InferencePriorityRepr::Bits(left), InferencePriorityRepr::Bits(right)) => {
                 Self(InferencePriorityRepr::Bits(left | right))
             }
-            _ => Self::Circularity,
+            _ => Self::CIRCULARITY,
         }
     }
 }
@@ -759,7 +758,7 @@ mod inference_priority_tests {
     #[test]
     fn reachable_priorities_match_integer_semantics() {
         // Circularity keeps its sentinel behavior; finite flags follow the integer operations below.
-        let circularity = InferencePriority::Circularity;
+        let circularity = InferencePriority::CIRCULARITY;
         assert_eq!(InferencePriority::default().memo_bits(), 0);
         assert_eq!(circularity.memo_bits(), u32::MAX);
         assert_eq!(circularity.cmp(&circularity), std::cmp::Ordering::Equal);
@@ -838,7 +837,7 @@ pub enum IntrinsicTypeKind {
     NoInfer,
 }
 
-pub static intrinsicTypeKinds: LazyLock<FxHashMap<&'static str, IntrinsicTypeKind>> =
+pub static INTRINSIC_TYPE_KINDS: LazyLock<FxHashMap<&'static str, IntrinsicTypeKind>> =
     LazyLock::new(|| {
         FxHashMap::from_iter([
             ("Uppercase", IntrinsicTypeKind::Uppercase),
@@ -1104,7 +1103,7 @@ impl IterationTypesResolver {
             return c.get_awaited_type_ex(
                 t,
                 error_node,
-                Some(&diagnostics::Type_of_await_operand_must_either_be_a_valid_promise_or_must_not_contain_a_callable_then_member),
+                Some(&diagnostics::TYPE_OF_AWAIT_OPERAND_MUST_EITHER_BE_A_VALID_PROMISE_OR_MUST_NOT_CONTAIN_A_CALLABLE_THEN_MEMBER),
                 &[],
             );
         }
@@ -1128,14 +1127,14 @@ pub struct VarianceStackEntry {
     pub type_parameters: &'static [P<Type>],
 }
 
-pub const maxSerializationLevel: u32 = 2;
+pub const MAX_SERIALIZATION_LEVEL: u32 = 2;
 
 // Checker
 
-static nextCheckerID: AtomicU32 = AtomicU32::new(0);
+static NEXT_CHECKER_ID: AtomicU32 = AtomicU32::new(0);
 
 /// Go `symbolTableID` (symbolaccessibility.go); the `stKind*` constants live with the printer port.
-pub type symbolTableID = u64;
+pub type SymbolTableID = u64;
 
 pub struct Checker {
     pub id: u32,
@@ -1219,7 +1218,7 @@ pub struct Checker {
     pub template_literal_types: PackedMap<CacheHashKey, P<Type>>,
     pub string_mapping_types: FxHashMap<StringMappingKey, P<Type>>,
     pub unique_es_symbol_types: FxHashMap<P<Symbol>, P<Type>>,
-    pub this_expando_kinds: FxHashMap<P<Symbol>, thisAssignmentDeclarationKind>,
+    pub this_expando_kinds: FxHashMap<P<Symbol>, ThisAssignmentDeclarationKind>,
     pub this_expando_locations: FxHashMap<P<Symbol>, Option<P<Node>>>,
     pub subtype_reduction_cache: FxHashMap<CacheHashKey, &'static [P<Type>]>,
     pub cached_types: FxHashMap<CachedTypeKey, P<Type>>,
@@ -1247,7 +1246,7 @@ pub struct Checker {
     /// resolver's string, alive and unchanged as long as the program): `resolve_external_module`.
     pub(crate) resolved_module_source_files: FxHashMap<(usize, usize), Option<P<SourceFile>>>,
     pub global_this_symbol: P<Symbol>,
-    pub symbol_table_alias_cache: FxHashMap<symbolTableID, &'static [P<Symbol>]>,
+    pub symbol_table_alias_cache: FxHashMap<SymbolTableID, &'static [P<Symbol>]>,
     pub class_expression_name_tables: FxHashMap<NodeId, P<SymbolTable>>,
     /// Go `resolveName = c.createNameResolver().Resolve`; call through `resolve_name`.
     pub name_resolver: P<NameResolver<Checker>>,
@@ -1634,7 +1633,7 @@ pub struct Checker {
     pub type_to_string_nodebuilder: Option<P<NodeBuilder>>,
     /// tsrs-only: accessible-chain cache entries keyed by a node in the current emit scratch region
     /// (`forget_scratch_keyed_caches`, notes/mem-emit-regions.md).
-    pub scratch_keyed_chain_cache: Vec<(P<Symbol>, accessibleChainCacheKey)>,
+    pub scratch_keyed_chain_cache: Vec<(P<Symbol>, AccessibleChainCacheKey)>,
     pub emit_resolver_links: P<EmitResolverLinks>,
     /// Rust-only context-independent helper for checker paths that still call resolver methods.
     /// File emit uses a fresh `EmitResolver` bound to its own scratch `EmitContext`.
@@ -1664,14 +1663,14 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
     let dummy_iteration_resolver = P::new(IterationTypesResolver {
         is_async: false,
         iterator_symbol_name: "",
-        must_have_a_next_method_diagnostic: &diagnostics::An_iterator_must_have_a_next_method,
-        must_be_a_method_diagnostic: &diagnostics::The_0_property_of_an_iterator_must_be_a_method,
-        must_have_a_value_diagnostic: &diagnostics::The_type_returned_by_the_0_method_of_an_iterator_must_have_a_value_property,
+        must_have_a_next_method_diagnostic: &diagnostics::AN_ITERATOR_MUST_HAVE_A_NEXT_METHOD,
+        must_be_a_method_diagnostic: &diagnostics::THE_0_PROPERTY_OF_AN_ITERATOR_MUST_BE_A_METHOD,
+        must_have_a_value_diagnostic: &diagnostics::THE_TYPE_RETURNED_BY_THE_0_METHOD_OF_AN_ITERATOR_MUST_HAVE_A_VALUE_PROPERTY,
     });
 
     let files = program.source_files();
     let mut c = Box::new(Checker {
-        id: nextCheckerID.fetch_add(1, Ordering::Relaxed) + 1,
+        id: NEXT_CHECKER_ID.fetch_add(1, Ordering::Relaxed) + 1,
         program,
         compiler_options,
         files,
@@ -2134,7 +2133,8 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
     c.empty_object_type = c.new_anonymous_type(None /*symbol*/, None, &[], &[], &[]);
     c.empty_jsx_object_type = c.new_anonymous_type(None /*symbol*/, None, &[], &[], &[]);
     c.empty_fresh_jsx_object_type = c.new_anonymous_type(None /*symbol*/, None, &[], &[], &[]);
-    let type_literal_symbol = c.new_symbol(SymbolFlags::TypeLiteral, ast::InternalSymbolNameType);
+    let type_literal_symbol =
+        c.new_symbol(SymbolFlags::TypeLiteral, ast::INTERNAL_SYMBOL_NAME_TYPE);
     c.empty_type_literal_type =
         c.new_anonymous_type(Some(type_literal_symbol), None, &[], &[], &[]);
     c.unknown_empty_object_type = c.new_anonymous_type(None /*symbol*/, None, &[], &[], &[]);
@@ -2195,7 +2195,7 @@ pub fn new_checker(program: &'static dyn Program) -> Box<Checker> {
     c.empty_string_type = c.get_string_literal_type("");
     c.zero_type = c.get_number_literal_type(Number(0.0));
     c.zero_big_int_type = c.get_big_int_literal_type(PseudoBigInt::default());
-    let mut typeof_names: Vec<&'static str> = typeofNEFacts.keys().copied().collect();
+    let mut typeof_names: Vec<&'static str> = TYPEOF_NE_FACTS.keys().copied().collect();
     typeof_names.sort_unstable();
     let typeof_types: Vec<P<Type>> =
         typeof_names.iter().map(|name| c.get_string_literal_type(name)).collect();
@@ -2217,7 +2217,7 @@ impl Checker {
         base.assert_freezable();
         let mut c = Box::new(Checker {
             // Relaxed: the counter only hands out distinct ids (as in new_checker).
-            id: nextCheckerID.fetch_add(1, Ordering::Relaxed) + 1,
+            id: NEXT_CHECKER_ID.fetch_add(1, Ordering::Relaxed) + 1,
             program: base.program,
             compiler_options: base.compiler_options,
             files: base.files,
@@ -2889,7 +2889,7 @@ impl Checker {
         let s = self.get_global_symbol(
             "NaN",
             SymbolFlags::Value,
-            if false { Some(&diagnostics::Cannot_find_global_value_0) } else { None },
+            if false { Some(&diagnostics::CANNOT_FIND_GLOBAL_VALUE_0) } else { None },
         );
         self.get_global_nan_symbol_or_nil_cache = Some(s);
         s
@@ -2925,7 +2925,7 @@ impl Checker {
         let s = self.get_global_symbol(
             "Symbol",
             SymbolFlags::Value,
-            if false { Some(&diagnostics::Cannot_find_global_value_0) } else { None },
+            if false { Some(&diagnostics::CANNOT_FIND_GLOBAL_VALUE_0) } else { None },
         );
         self.get_global_es_symbol_constructor_symbol_or_nil_cache = Some(s);
         s
@@ -2940,7 +2940,7 @@ impl Checker {
         let s = self.get_global_symbol(
             "SymbolConstructor",
             SymbolFlags::Type,
-            if false { Some(&diagnostics::Cannot_find_global_type_0) } else { None },
+            if false { Some(&diagnostics::CANNOT_FIND_GLOBAL_TYPE_0) } else { None },
         );
         self.get_global_es_symbol_constructor_type_symbol_or_nil_cache = Some(s);
         s
@@ -3016,7 +3016,7 @@ impl Checker {
         let s = self.get_global_symbol(
             "Promise",
             SymbolFlags::Value,
-            if true { Some(&diagnostics::Cannot_find_global_value_0) } else { None },
+            if true { Some(&diagnostics::CANNOT_FIND_GLOBAL_VALUE_0) } else { None },
         );
         self.get_global_promise_constructor_symbol_cache = Some(s);
         s
@@ -3029,7 +3029,7 @@ impl Checker {
         let s = self.get_global_symbol(
             "Promise",
             SymbolFlags::Value,
-            if false { Some(&diagnostics::Cannot_find_global_value_0) } else { None },
+            if false { Some(&diagnostics::CANNOT_FIND_GLOBAL_VALUE_0) } else { None },
         );
         self.get_global_promise_constructor_symbol_or_nil_cache = Some(s);
         s
@@ -3377,7 +3377,7 @@ pub enum UnusedKind {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct constructorAccessibilityError {
+pub struct ConstructorAccessibilityError {
     pub kind: ModifierFlags,
     pub declaring_class: P<Type>,
 }
@@ -3442,21 +3442,21 @@ impl CacheHashKey {
 }
 
 /// Go `keyBuilder`; its methods are in `checker_09.rs`.
-pub struct keyBuilder {
+pub struct KeyBuilder {
     pub inline_length: usize,
     pub overflow_buffer: Option<Vec<u8>>, // Go nil slice = no overflow yet
     pub inline_buffer: [u8; 192],
 }
 
-impl Default for keyBuilder {
+impl Default for KeyBuilder {
     fn default() -> Self {
-        keyBuilder { inline_length: 0, overflow_buffer: None, inline_buffer: [0; 192] }
+        KeyBuilder { inline_length: 0, overflow_buffer: None, inline_buffer: [0; 192] }
     }
 }
 
 #[repr(u32)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Default)]
-pub enum thisAssignmentDeclarationKind {
+pub enum ThisAssignmentDeclarationKind {
     #[default]
     None, // not (all) this.property assignments
     Typed,       // typed; use the type annotation
@@ -3495,8 +3495,8 @@ bitflags! {
 // Limits on the size of a template literal type produced by getTemplateLiteralType. Recursive instantiations
 // such as `Recur<any, `${S}_${S}`>` double the text (or the number of placeholders) on every iteration and
 // exhaust memory long before the tail recursion limit in getConditionalType is reached (see #63271).
-pub const maxTemplateLiteralTypeLength: usize = 50_000_000;
-pub const maxTemplateLiteralTypeSpans: usize = 100_000;
+pub const MAX_TEMPLATE_LITERAL_TYPE_LENGTH: usize = 50_000_000;
+pub const MAX_TEMPLATE_LITERAL_TYPE_SPANS: usize = 100_000;
 
 /// Go `ObjectLiteralDiscriminator`; the `c` field is dropped (methods take `c: &mut Checker`).
 #[derive(Default)]

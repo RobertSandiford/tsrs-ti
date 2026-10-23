@@ -63,7 +63,7 @@ pub(crate) fn create_not_null_condition(
 // and forawaitTransformer to share the tracking logic.
 // utilities.go:55
 #[derive(Default)]
-pub struct superAccessState {
+pub struct SuperAccessState {
     pub factory: OnceCell<&'static printer::NodeFactory>,
 
     // Keeps track of property names accessed on super (`super.x`) within async functions.
@@ -77,7 +77,7 @@ pub struct superAccessState {
     pub super_access_visitor: OnceCell<NodeVisitor>,
 }
 
-impl superAccessState {
+impl SuperAccessState {
     fn factory(&self) -> &'static printer::NodeFactory {
         self.factory.get().unwrap()
     }

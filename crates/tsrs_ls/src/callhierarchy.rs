@@ -440,15 +440,15 @@ fn find_all_initial_declarations(c: &mut Checker, node: P<Node>) -> Option<Vec<P
     }
 
     #[derive(Clone)]
-    struct declKey {
+    struct DeclKey {
         file: String,
         pos: TextPos,
     }
 
     let mut indices: Vec<usize> = (0..symbol_declarations.len()).collect();
-    let keys: Vec<declKey> = symbol_declarations
+    let keys: Vec<DeclKey> = symbol_declarations
         .iter()
-        .map(|&decl| declKey {
+        .map(|&decl| DeclKey {
             file: ast::get_source_file_of_node(decl).unwrap().file_name().to_string(),
             pos: decl.pos(),
         })
@@ -672,14 +672,14 @@ impl LanguageService {
 }
 
 // callhierarchy.go:533
-struct callSite {
+struct CallSite {
     declaration: P<Node>,
     text_range: TextRange,
     source_file: P<Node>,
 }
 
 // callhierarchy.go:539
-fn convert_entry_to_call_site(entry: &ReferenceEntry) -> Option<callSite> {
+fn convert_entry_to_call_site(entry: &ReferenceEntry) -> Option<CallSite> {
     if entry.kind != EntryKind::Node {
         return None;
     }
@@ -705,7 +705,7 @@ fn convert_entry_to_call_site(entry: &ReferenceEntry) -> Option<callSite> {
         source_file.text(),
         node.pos().expect_source("call sites have source positions"),
     );
-    Some(callSite {
+    Some(CallSite {
         declaration: ancestor,
         text_range: TextRange::new(
             start,
@@ -716,7 +716,7 @@ fn convert_entry_to_call_site(entry: &ReferenceEntry) -> Option<callSite> {
 }
 
 // callhierarchy.go:568
-fn get_call_site_group_key(site: &callSite) -> NodeId {
+fn get_call_site_group_key(site: &CallSite) -> NodeId {
     ast::get_node_id(site.declaration)
 }
 
@@ -725,7 +725,7 @@ impl LanguageService {
     fn convert_call_site_group_to_incoming_call(
         &self,
         program: &'static Program,
-        entries: &[callSite],
+        entries: &[CallSite],
     ) -> Option<lsproto::CallHierarchyIncomingCall> {
         let mut from_ranges: Vec<lsproto::Range> = Vec::with_capacity(entries.len());
         from_ranges.extend(entries.iter().filter_map(|entry| {
@@ -751,7 +751,7 @@ impl LanguageService {
 
 // Go caches the source file, URI and position with `sync.Once`s.
 // callhierarchy.go:593
-pub(crate) struct incomingEntry<'a> {
+pub(crate) struct IncomingEntry<'a> {
     ls: &'a LanguageService,
     node: P<Node>,
 
@@ -762,7 +762,7 @@ pub(crate) struct incomingEntry<'a> {
     position: OnceCell<lsproto::Position>,
 }
 
-impl incomingEntry<'_> {
+impl IncomingEntry<'_> {
     // callhierarchy.go:609
     fn get_source_file(&self) -> P<SourceFile> {
         *self.source_file.get_or_init(|| ast::get_source_file_of_node(self.node).unwrap())
@@ -770,7 +770,7 @@ impl incomingEntry<'_> {
 }
 
 // callhierarchy.go:616
-impl lsproto::HasTextDocumentURI for incomingEntry<'_> {
+impl lsproto::HasTextDocumentURI for IncomingEntry<'_> {
     fn text_document_uri(&self) -> &lsproto::DocumentUri {
         self.document_uri.get_or_init(|| {
             lsconv::file_name_to_document_uri(self.get_source_file().original_file_name())
@@ -779,7 +779,7 @@ impl lsproto::HasTextDocumentURI for incomingEntry<'_> {
 }
 
 // callhierarchy.go:623
-impl lsproto::HasTextDocumentPosition for incomingEntry<'_> {
+impl lsproto::HasTextDocumentPosition for IncomingEntry<'_> {
     fn text_document_position(&self) -> lsproto::Position {
         *self.position.get_or_init(|| {
             let start = scanner::get_token_pos_of_node(
@@ -827,7 +827,7 @@ impl LanguageService {
             return Ok(lsproto::CallHierarchyIncomingCallsOrNull::default());
         }
 
-        let incoming_entry = incomingEntry {
+        let incoming_entry = IncomingEntry {
             ls: self,
             node: location,
             source_file: OnceCell::new(),
@@ -872,7 +872,7 @@ impl LanguageService {
     fn symbol_and_entries_to_incoming_calls(
         &self,
         _ctx: &Context,
-        _params: &incomingEntry,
+        _params: &IncomingEntry,
         data: &SymbolAndEntriesData,
         _options: SymbolEntryTransformOptions,
     ) -> Result<lsproto::CallHierarchyIncomingCallsResponse, lsproto::Error> {
@@ -884,14 +884,14 @@ impl LanguageService {
                 .flat_map(|symbol_and_entry| symbol_and_entry.references.iter().cloned()),
         );
 
-        let mut call_sites: Vec<callSite> = Vec::new();
+        let mut call_sites: Vec<CallSite> = Vec::new();
         call_sites.extend(ref_entries.iter().filter_map(|entry| convert_entry_to_call_site(entry)));
 
         if call_sites.is_empty() {
             return Ok(lsproto::CallHierarchyIncomingCallsOrNull::default());
         }
 
-        let mut grouped: OrderedMap<NodeId, Vec<callSite>> = OrderedMap::default();
+        let mut grouped: OrderedMap<NodeId, Vec<CallSite>> = OrderedMap::default();
         for site in call_sites {
             let key = get_call_site_group_key(&site);
             grouped.entry(key).or_default().push(site);
@@ -908,12 +908,12 @@ impl LanguageService {
 }
 
 // callhierarchy.go:711
-struct callSiteCollector {
+struct CallSiteCollector {
     program: &'static Program,
-    call_sites: Vec<callSite>,
+    call_sites: Vec<CallSite>,
 }
 
-impl callSiteCollector {
+impl CallSiteCollector {
     // callhierarchy.go:716
     fn record_call_site(&mut self, node: P<Node>) {
         let target: Option<P<Node>> = if ast::is_tagged_template_expression(node) {
@@ -952,14 +952,14 @@ impl callSiteCollector {
 
         match declaration {
             CallHierarchyDeclarations::Node(decl) => {
-                self.call_sites.push(callSite {
+                self.call_sites.push(CallSite {
                     declaration: decl,
                     text_range,
                     source_file: source_file.as_node(),
                 });
             }
             CallHierarchyDeclarations::Nodes(decls) => {
-                self.call_sites.extend(decls.into_iter().map(|d| callSite {
+                self.call_sites.extend(decls.into_iter().map(|d| CallSite {
                     declaration: d,
                     text_range,
                     source_file: source_file.as_node(),
@@ -1076,8 +1076,8 @@ impl callSiteCollector {
 }
 
 // callhierarchy.go:869
-fn collect_call_sites(program: &'static Program, c: &mut Checker, node: P<Node>) -> Vec<callSite> {
-    let mut collector = callSiteCollector { program, call_sites: Vec::new() };
+fn collect_call_sites(program: &'static Program, c: &mut Checker, node: P<Node>) -> Vec<CallSite> {
+    let mut collector = CallSiteCollector { program, call_sites: Vec::new() };
 
     match node.kind() {
         Kind::SourceFile => {
@@ -1165,7 +1165,7 @@ impl LanguageService {
     fn convert_call_site_group_to_outgoing_call(
         &self,
         program: &'static Program,
-        entries: &[callSite],
+        entries: &[CallSite],
     ) -> Option<lsproto::CallHierarchyOutgoingCall> {
         let mut from_ranges: Vec<lsproto::Range> = Vec::with_capacity(entries.len());
         from_ranges.extend(entries.iter().filter_map(|entry| {
@@ -1211,7 +1211,7 @@ impl LanguageService {
             return Vec::new();
         }
 
-        let mut grouped: OrderedMap<NodeId, Vec<callSite>> = OrderedMap::default();
+        let mut grouped: OrderedMap<NodeId, Vec<CallSite>> = OrderedMap::default();
         for site in call_sites {
             let key = get_call_site_group_key(&site);
             grouped.entry(key).or_default().push(site);

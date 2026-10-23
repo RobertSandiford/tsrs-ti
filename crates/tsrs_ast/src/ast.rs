@@ -1859,7 +1859,7 @@ impl ImportAttributes {
             if let Some(f) = grammar_error_on_node.as_mut() {
                 f(
                     elem.value,
-                    &diagnostics::X_resolution_mode_should_be_either_require_or_import,
+                    &diagnostics::X_RESOLUTION_MODE_SHOULD_BE_EITHER_REQUIRE_OR_IMPORT,
                     &[],
                 );
             }
@@ -1868,7 +1868,7 @@ impl ImportAttributes {
         if text == "import" {
             Some(tsrs_core::RESOLUTION_MODE_ESM)
         } else {
-            Some(tsrs_core::ModuleKind::CommonJS)
+            Some(tsrs_core::ModuleKind::COMMON_JS)
         }
     }
 }
@@ -2963,13 +2963,13 @@ pub struct Pragma {
 
 pub type PragmaKindFlags = u8;
 
-pub const PragmaKindTripleSlashXML: PragmaKindFlags = 1 << 0;
-pub const PragmaKindSingleLine: PragmaKindFlags = 1 << 1;
-pub const PragmaKindMultiLine: PragmaKindFlags = 1 << 2;
-pub const PragmaKindFlagsNone: PragmaKindFlags = 0;
-pub const PragmaKindAll: PragmaKindFlags =
-    PragmaKindTripleSlashXML | PragmaKindSingleLine | PragmaKindMultiLine;
-pub const PragmaKindDefault: PragmaKindFlags = PragmaKindAll;
+pub const PRAGMA_KIND_TRIPLE_SLASH_XML: PragmaKindFlags = 1 << 0;
+pub const PRAGMA_KIND_SINGLE_LINE: PragmaKindFlags = 1 << 1;
+pub const PRAGMA_KIND_MULTI_LINE: PragmaKindFlags = 1 << 2;
+pub const PRAGMA_KIND_FLAGS_NONE: PragmaKindFlags = 0;
+pub const PRAGMA_KIND_ALL: PragmaKindFlags =
+    PRAGMA_KIND_TRIPLE_SLASH_XML | PRAGMA_KIND_SINGLE_LINE | PRAGMA_KIND_MULTI_LINE;
+pub const PRAGMA_KIND_DEFAULT: PragmaKindFlags = PRAGMA_KIND_ALL;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PragmaArgumentSpecification {
@@ -2986,7 +2986,7 @@ pub struct PragmaSpecification {
 
 impl PragmaSpecification {
     pub fn is_triple_slash(&self) -> bool {
-        (self.kind & PragmaKindTripleSlashXML) > 0
+        (self.kind & PRAGMA_KIND_TRIPLE_SLASH_XML) > 0
     }
 }
 
@@ -3325,8 +3325,8 @@ mod tests {
         assert_eq!(table.len(), 1);
         assert_eq!(table.lookup("b"), Some(s1));
         assert!(!table.has("a"));
-        assert!(InternalSymbolNameCall.starts_with(InternalSymbolNamePrefix));
-        assert_eq!(escape_symbol_name(InternalSymbolNameCall), "__call");
+        assert!(INTERNAL_SYMBOL_NAME_CALL.starts_with(INTERNAL_SYMBOL_NAME_PREFIX));
+        assert_eq!(escape_symbol_name(INTERNAL_SYMBOL_NAME_CALL), "__call");
     }
 
     // Regression: a table past the linear-search size keeps insertion order, keeps the original position on
@@ -3402,8 +3402,8 @@ mod tests {
 
     #[test]
     fn kinds_and_flags() {
-        assert_eq!(Kind::FirstKeyword, Kind::BreakKeyword);
-        assert_eq!(Kind::LastToken, Kind::SourceKeyword);
+        assert_eq!(Kind::FIRST_KEYWORD, Kind::BreakKeyword);
+        assert_eq!(Kind::LAST_TOKEN, Kind::SourceKeyword);
         assert_eq!(Kind::from_i16(Kind::Identifier as i16), Kind::Identifier);
         assert!(is_keyword_kind(Kind::ClassKeyword));
         assert!(is_assignment_operator(Kind::PlusEqualsToken));

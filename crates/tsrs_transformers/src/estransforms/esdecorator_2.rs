@@ -6,7 +6,7 @@ use super::*;
 
 // esdecorator.go:1232
 #[derive(Default)]
-pub(crate) struct partialResult {
+pub(crate) struct PartialResult {
     pub modifiers: Option<P<ModifierList>>,
     pub referenced_name: Option<P<Node>>,
     pub name: Option<P<Node>>,
@@ -17,17 +17,17 @@ pub(crate) struct partialResult {
 }
 
 // esdecorator.go:1242
-pub(crate) type createDescriptorFunc =
-    fn(&esDecoratorTransformer, P<Node>, Option<P<ModifierList>>) -> P<Node>;
+pub(crate) type CreateDescriptorFunc =
+    fn(&EsDecoratorTransformer, P<Node>, Option<P<ModifierList>>) -> P<Node>;
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1244
     pub(crate) fn partial_transform_class_element(
         &self,
         member: P<Node>,
-        ci: Option<P<classInfo>>,
-        create_descriptor: Option<createDescriptorFunc>,
-    ) -> partialResult {
+        ci: Option<P<ClassInfo>>,
+        create_descriptor: Option<CreateDescriptorFunc>,
+    ) -> PartialResult {
         let f = self.base.factory();
         let ec = self.base.emit_context();
 
@@ -37,7 +37,7 @@ impl esDecoratorTransformer {
             self.enter_name();
             let name = self.visit_property_name(member.name().unwrap());
             self.exit_name();
-            return partialResult { modifiers, name: Some(name), ..Default::default() };
+            return PartialResult { modifiers, name: Some(name), ..Default::default() };
         };
 
         // Member decorators require privileged access to private names. However, computed property
@@ -53,7 +53,7 @@ impl esDecoratorTransformer {
         let modifiers =
             self.modifier_visitor.get().unwrap().clone().visit_modifiers(member.modifiers());
 
-        let mut result = partialResult { modifiers, ..Default::default() };
+        let mut result = PartialResult { modifiers, ..Default::default() };
 
         if !member_decorators.is_empty() {
             let member_decorators_name = self.create_helper_variable(member, "decorators");
@@ -61,7 +61,7 @@ impl esDecoratorTransformer {
                 f.new_array_literal_expression(f.new_node_list(member_decorators), false);
             let member_decorators_assignment =
                 f.new_assignment_expression(member_decorators_name, member_decorators_array);
-            let mi = P::new(memberInfo::default());
+            let mi = P::new(MemberInfo::default());
             mi.member_decorators_name.set(Some(member_decorators_name));
             ci.member_infos.borrow_mut().insert(member, mi);
             self.pending_expressions
@@ -250,7 +250,7 @@ impl esDecoratorTransformer {
     // esdecorator.go:1447
     // appendDecorationStatement appends an __esDecorate statement to the appropriate
     // decoration statement list on classInfo based on the member's kind and static-ness.
-    pub(crate) fn append_decoration_statement(ci: P<classInfo>, member: P<Node>, stmt: P<Node>) {
+    pub(crate) fn append_decoration_statement(ci: P<ClassInfo>, member: P<Node>, stmt: P<Node>) {
         if ast::is_method_or_accessor(member) || ast::is_auto_accessor_property_declaration(member)
         {
             if ast::is_static(member) {
@@ -272,7 +272,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1465
     #[expect(
         clippy::unnecessary_wraps,
@@ -283,7 +283,7 @@ impl esDecoratorTransformer {
         let result = self.partial_transform_class_element(
             node,
             self.class_info_stack.get(),
-            Some(esDecoratorTransformer::create_method_descriptor_object),
+            Some(EsDecoratorTransformer::create_method_descriptor_object),
         );
         if let Some(descriptor_name) = result.descriptor_name {
             self.exit_class_element();
@@ -327,7 +327,7 @@ impl esDecoratorTransformer {
         let result = self.partial_transform_class_element(
             node,
             self.class_info_stack.get(),
-            Some(esDecoratorTransformer::create_get_accessor_descriptor_object),
+            Some(EsDecoratorTransformer::create_get_accessor_descriptor_object),
         );
         if let Some(descriptor_name) = result.descriptor_name {
             self.exit_class_element();
@@ -368,7 +368,7 @@ impl esDecoratorTransformer {
         let result = self.partial_transform_class_element(
             node,
             self.class_info_stack.get(),
-            Some(esDecoratorTransformer::create_set_accessor_descriptor_object),
+            Some(EsDecoratorTransformer::create_set_accessor_descriptor_object),
         );
         if let Some(descriptor_name) = result.descriptor_name {
             self.exit_class_element();
@@ -463,7 +463,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1574
     pub(crate) fn visit_property_declaration(&self, node: P<Node>) -> Option<P<Node>> {
         let ec = self.base.emit_context();
@@ -485,8 +485,8 @@ impl esDecoratorTransformer {
         //                 future, and how. For now, these should be elided by the `ts` transform.
         assert!(!ast::has_syntactic_modifier(node, ModifierFlags::Ambient), "Not yet implemented.");
 
-        let create_descriptor: Option<createDescriptorFunc> = if ast::has_accessor_modifier(node) {
-            Some(esDecoratorTransformer::create_accessor_property_descriptor_object)
+        let create_descriptor: Option<CreateDescriptorFunc> = if ast::has_accessor_modifier(node) {
+            Some(EsDecoratorTransformer::create_accessor_property_descriptor_object)
         } else {
             None
         };
@@ -651,7 +651,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1731
     pub(crate) fn visit_call_expression(&self, node: P<Node>) -> P<Node> {
         let call = node.as_call_expression();
@@ -808,7 +808,7 @@ pub(crate) fn can_ignore_empty_string_literal_in_assigned_name(node: Option<P<No
         && !ast::class_or_constructor_parameter_is_decorated(false, inner_expression)
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1893
     pub(crate) fn visit_for_statement(&self, node: P<Node>) -> P<Node> {
         let fs = node.as_for_statement();
@@ -835,7 +835,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:1909
     pub(crate) fn visit_binary_expression(&self, node: P<Node>, discarded: bool) -> P<Node> {
         let f = self.base.factory();
@@ -1080,7 +1080,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:2134
     pub(crate) fn visit_destructuring_assignment_target(&self, node: P<Node>) -> P<Node> {
         if ast::is_object_literal_expression(node) || ast::is_array_literal_expression(node) {
@@ -1260,7 +1260,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:2289
     pub(crate) fn visit_export_assignment(&self, node: P<Node>) -> P<Node> {
         // 16.2.3.7 RS: Evaluation (see esdecorator.go)
@@ -1340,7 +1340,7 @@ impl esDecoratorTransformer {
     // esdecorator.go:2359
     pub(crate) fn inject_pending_initializers(
         &self,
-        ci: P<classInfo>,
+        ci: P<ClassInfo>,
         is_static: bool,
         expression: Option<P<Node>>,
     ) -> Option<P<Node>> {
@@ -1457,7 +1457,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:2462
     // Creates a "value", "get", or "set" method for a pseudo-PropertyDescriptor object created for
     // a private element.
@@ -1642,7 +1642,7 @@ impl esDecoratorTransformer {
     }
 }
 
-impl esDecoratorTransformer {
+impl EsDecoratorTransformer {
     // esdecorator.go:2585
     // Creates a MethodDeclaration that forwards its invocation to a PropertyDescriptor object.
     // (Go builds a GetAccessorDeclaration here; kept as is.)

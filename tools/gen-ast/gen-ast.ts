@@ -13,6 +13,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { MemberInfo, NodeType } from "./schema.ts";
 import { api, kindGuardName } from "./schema.ts";
+import { screamingSnakeCase } from "../lib/rust-names.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const outPath = path.join(root, "crates/tsrs_ast/src/generated.rs");
@@ -975,7 +976,7 @@ function genKindAliasGuards() {
         const fn = snake(tsName);
         w(`pub fn ${fn}(kind: Kind) -> bool {`);
         if (g.type === "range") {
-            w(`    kind >= Kind::${g.first} && kind <= Kind::${g.last}`);
+            w(`    kind >= Kind::${screamingSnakeCase(g.first)} && kind <= Kind::${screamingSnakeCase(g.last)}`);
         }
         else {
             const expanded = api.expandKindAliasMembers(g.aliasName);
