@@ -982,6 +982,7 @@ dependencies = [
  "tsrs_compiler",
  "tsrs_core",
  "tsrs_diagnostics",
+ "tsrs_execute",
  "tsrs_ls",
  "tsrs_lsproto",
  "tsrs_module",
@@ -1100,7 +1101,6 @@ dependencies = [
  "tsrs_core",
  "tsrs_execute",
  "tsrs_lsp",
- "tsrs_tsoptions",
  "tsrs_vfs",
 ]
 
@@ -1327,6 +1327,8 @@ version = "0.19.0"
 dependencies = [
  "indexmap",
  "rustc-hash",
+ "tsrs_api",
+ "tsrs_api_transport",
  "tsrs_compiler",
  "tsrs_core",
  "tsrs_diagnostics",
@@ -1334,6 +1336,7 @@ dependencies = [
  "tsrs_ls",
  "tsrs_lsproto",
  "tsrs_project",
+ "tsrs_tsoptions",
  "tsrs_vfs",
 ]
 
