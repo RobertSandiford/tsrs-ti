@@ -3866,6 +3866,10 @@ impl Checker {
             ready.index_infos.get(),
         );
         self.lazy_member_tables.remove(&t);
+        // tsrs-only: every instantiated member in `lm.declared` is now in t's resolved members, and nothing looks
+        // the table up again (`get_ready_lazy_member_table` answers None once t's members are resolved). The table
+        // is in the arena, which never drops it, so free its heap buffers here.
+        lm.declared.clear_and_free();
     }
 
     #[cfg_attr(feature = "site-counts", track_caller)]

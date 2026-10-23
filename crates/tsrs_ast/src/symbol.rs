@@ -1077,6 +1077,12 @@ impl SymbolTable {
         P::new(SymbolTable(FrozenCell::new(self.0.borrow().clone())))
     }
 
+    /// Empties the table and frees its heap buffers (an arena table no one reads again: arena objects are never
+    /// dropped, so its entry buffer and index would otherwise stay allocated).
+    pub fn clear_and_free(&self) {
+        drop(self.0.replace(SymbolMap::default()));
+    }
+
     /// Go `table[name]`. On a `P<SymbolTable>` receiver `table.get(name)` resolves to `P::get`, so use
     /// `table.lookup(name)` (same thing) there.
     #[inline]
