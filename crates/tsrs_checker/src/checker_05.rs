@@ -1407,7 +1407,9 @@ impl Checker {
             let r = self.infer_type_arguments_worker(node, signature, args, check_mode, context);
             let timing = self.census_end(span).unwrap();
             let census = self.census.as_mut().unwrap();
-            let mut words: Vec<u32> = vec![signature.to_bits() as u32, check_mode.bits()];
+            // Both halves: to_bits() is a 35-bit arena offset with compressed pointers and an address without.
+            let sig = signature.to_bits() as u64;
+            let mut words: Vec<u32> = vec![sig as u32, (sig >> 32) as u32, check_mode.bits()];
             words.extend_from_slice(&census.infer_args[start..]);
             census.infer_args.truncate(start);
             let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
