@@ -117,9 +117,9 @@ Seeded fuzz and mutation generators use a deterministic JavaScript PRNG, so a se
 | `pnpm ci:diagnostics` | `node tools/ci/compare_diagnostics.mjs` |
 | `pnpm ci:skip-marker` | `node tools/ci/skip_marker.mjs` |
 | `pnpm ci:determinism` | Benchmark tsgo snapshot matrix and regression scheduling sweep in `tasks/determinism` |
-| `pnpm ci:tsan` | `bash tools/ci/tsan.sh` |
-| `pnpm ci:tsan-summary` | `node tools/ci/tsan_summary.mjs` |
-| `pnpm ci:workloads` | `node tools/ci/workloads.mjs` |
+| `pnpm ci:thread-sanitizer` | ThreadSanitizer gate in `tasks/thread_sanitizer`; accepts an instrumented compiler binary; CI runs it in the `thread-sanitizer` job |
+| `pnpm ci:thread-sanitizer-summary` | `node tasks/thread_sanitizer/summary.mjs` |
+| `pnpm ci:thread-sanitizer-workloads` | `node tasks/thread_sanitizer/workloads.mjs` |
 | `pnpm ci:release-wasm` | `node .github/scripts/restore-release-wasm.mjs` |
 | `pnpm ci:wait-npm` | `node .github/scripts/wait-for-npm-packages.mjs` |
 | `pnpm ci:triage-labels` | `bash .github/scripts/setup-triagebot-labels.sh` |

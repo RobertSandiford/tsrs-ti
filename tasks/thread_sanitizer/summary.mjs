@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { args, read, main } from "../lib/cli.mjs";
+import { args, read, main } from "../../tools/lib/cli.mjs";
 function firstFrame(text) {
     const frames = [...text.matchAll(/#\d+ (\S+) (\S+)/g)].map((m) => [m[1].replace(/::h[0-9a-f]{16}$/, ""), m[2]]);
     const f = frames.find(([fn]) => fn.split("<")[0].includes("tsrs"));

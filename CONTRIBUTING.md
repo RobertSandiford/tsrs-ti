@@ -140,6 +140,9 @@ Capture its combined stdout and stderr, replacing the case's absolute directory 
   all available CPU checkers, three runs each, plus three fixed random assignments per count. It also sweeps every
   regression fixture under default and seeded random scheduling at two and four checkers. Diagnostic order and exit
   status must match; crashes and incomplete runs fail.
+  The separate `thread-sanitizer` job builds the compiler and standard library with the pinned nightly sanitizer,
+  then runs type checking, emit, incremental builds, watch edits and LSP edits through `tasks/thread_sanitizer`.
+  Reports and failures are retained in its artifact; any sanitizer report or failed workload fails the job.
   See [the determinism task](tasks/determinism/README.md) for snapshot updates. Regression output must still match
   the checked-in reference output; `fourslash` runs the server framing checks, gate checks, and
   [Go fourslash subprocess gate](tools/go-fourslash/README.md#ci-gate); `node-api-clients` runs the pinned upstream

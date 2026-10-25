@@ -421,25 +421,39 @@ suite in the default checker mode with forced splits and compare its lists with 
 330 test programs are split). `cargo test -p tsrs_cli --test split_check` runs testdata/split-check in every mode
 against tsgo-ref's output.
 
-## Data races: ThreadSanitizer (`tools/ci/tsan.sh`)
+## Data races: ThreadSanitizer (`tasks/thread_sanitizer`)
 
 `P<T>` is `Send`/`Sync` by decree (`tsrs_core::ptr`): nothing in the type system stops two threads from writing the same
-arena value. Build tsrs with ThreadSanitizer and run `tools/ci/tsan.sh`, which fails on
+arena value. Build tsrs with ThreadSanitizer and run `pnpm ci:thread-sanitizer <binary>`, which fails on
 any report: type checks at 2 and 8 checkers, emit, `-b` on a generated graph of 12 projects, `--watch` and `-b --watch`
-with edits, and a language-server session. To run it locally (about 2 minutes on an M3 Max after a 2.5-minute build):
+with edits, and a language-server session. Prepare the benchmark projects first, then run the separate task:
 
 ```sh
-RUSTFLAGS=-Zsanitizer=thread CARGO_PROFILE_RELEASE_STRIP=false CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
-  CARGO_TARGET_DIR=target/tsan cargo +nightly-2026-10-04 build --release -p tsrs_cli -Zbuild-std \
+node bench/bench.mjs prepare --projects xstate-main,webpack
+RUSTFLAGS=-Zsanitizer=thread CARGO_PROFILE_DEV_DEBUG=line-tables-only \
+  CARGO_TARGET_DIR=target/thread-sanitizer cargo +nightly-2026-10-04 build --profile dev -p tsrs_cli -Zbuild-std \
   --features tsrs_core/plain-ptrs,tsrs_cli/system-alloc --target "$(rustc -vV | sed -n 's/^host: //p')"
-tools/ci/tsan.sh target/tsan/<host triple>/release/tsrs
+pnpm ci:thread-sanitizer target/thread-sanitizer/<host triple>/debug/tsrs
 ```
+
+The `ThreadSanitizer` job in `.github/workflows/ci.yml` runs this gate on Linux for pull requests, merge groups,
+pushes to `main`, and manual CI runs. It uses the pinned nightly with an instrumented standard library and the
+optimized `ci` profile, retaining debug locations and symbols. The `xstate-main` and `webpack` workloads have a
+separate preparation cache. Results are uploaded as the `thread-sanitizer` artifact on success or failure and kept
+for 14 days; sanitizer failures fail the job.
 
 `plain-ptrs` because ThreadSanitizer's shadow memory takes the compressed handles' address range; `system-alloc`
 because it cannot see mimalloc reuse memory across threads (with mimalloc it reports about 120 races that are not).
-On Linux, ThreadSanitizer needs `sudo sysctl vm.mmap_rnd_bits=28` on kernels that randomize 32 bits. A failing run
-prints each race once with one full report (`tools/ci/tsan_summary.mjs`) and keeps the logs. `tools/ci/tsan.supp` lists
-reports that are not tsrs races, each with its reason; anything else is a race to fix.
+On Linux, ThreadSanitizer needs `sudo sysctl vm.mmap_rnd_bits=28` on kernels that randomize 32 bits.
+The task rejects an uninstrumented binary and fails on sanitizer reports, abnormal exits, LSP request errors,
+or timeouts. It continues independent workloads after a failure and never retries a failed workload into a pass.
+Each invocation retains a new directory under `target/thread-sanitizer-results/`, including `summary.json`, the binary SHA-256,
+commands, relevant environment settings, exit statuses, stdout/stderr, sanitizer reports, and watch/LSP transcripts.
+`summary.json` stays incomplete if setup fails or the task is interrupted. Earlier run directories are never replaced.
+`--projects all|a,b`, `--work-dir DIR`, `--out-dir DIR`, and `--timeout SECONDS` select the inputs, output parent, and
+per-workload deadline (900 seconds by default). The default projects remain `xstate-main,webpack`.
+`pnpm ci:thread-sanitizer-summary <logs...>` groups reports by their first tsrs frames. `tasks/thread_sanitizer/suppressions.txt` lists reports
+that are not tsrs races, each with its reason; anything else is a race to fix.
 
 ## Profiling
 
