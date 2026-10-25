@@ -59,8 +59,9 @@ are where a lifetime fix starts. Each is one safe API, not many unsafe blocks.
 - **Allocations #638 already owns** (`format/rule.rs`, `rulecontext.rs`, `lsproto::intern`, the background
   worker pool and timer, `includeProcessor::get_reference_location`): the rows change to `keep` or disappear when it
   merges.
-- **`new_ad_hoc_message`** leaks one `Message` per call. Bounded in `tsc`; unbounded if a long-lived server calls it
-  per request. Worth a count in the repeated-lifecycle leak run.
+- **`new_ad_hoc_message`**: removed. It leaked one `Message` and its text per call; now `Message::ad_hoc` builds the
+  value and `tsrs_ast::new_ad_hoc_message` allocates it and its text in the arena with the diagnostics that use it.
+  Only tests and the test runner call it.
 - **Enum-from-integer transmutes** (`Kind`, `NodeDataTag`, the codec's `kind_from_u32`): a checked table costs a
   bounds check per decode, unmeasured.
 

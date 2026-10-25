@@ -96,7 +96,7 @@ fn formatting_missing_arg_panics() {
 
 #[test]
 fn ad_hoc_message() {
-    let m = diagnostics::new_ad_hoc_message("hello {0}");
+    let m = diagnostics::Message::ad_hoc("hello {0}");
     assert_eq!(m.code(), -1);
     assert_eq!(m.category(), Category::Error);
     assert_eq!(m.key().as_str(), "-1");

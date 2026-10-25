@@ -456,6 +456,12 @@ pub fn new_diagnostic_chain(
     new_diagnostic(None, None, message, args)
 }
 
+/// A `Message` outside the catalog (code -1) with run-time text, allocated where the diagnostics that use it
+/// live, like their message text (`alloc_str`).
+pub fn new_ad_hoc_message(message: &str) -> &'static Message {
+    tsrs_core::alloc(Message::ad_hoc(alloc_str(message)))
+}
+
 pub fn new_compiler_diagnostic(
     message: &'static Message,
     args: &[&dyn fmt::Display],
@@ -892,8 +898,8 @@ mod tests {
     #[test]
     fn diagnostics_collection_preserves_distinct_ad_hoc_messages() {
         let mut collection = DiagnosticsCollection::default();
-        let first = new_compiler_diagnostic(diagnostics::new_ad_hoc_message("first"), &[]);
-        let second = new_compiler_diagnostic(diagnostics::new_ad_hoc_message("second"), &[]);
+        let first = new_compiler_diagnostic(new_ad_hoc_message("first"), &[]);
+        let second = new_compiler_diagnostic(new_ad_hoc_message("second"), &[]);
         collection.add(first);
         collection.add(second);
         assert_eq!(collection.get_global_diagnostics().len(), 2);

@@ -166,9 +166,9 @@ pub fn compile_files_with_host_emit(
             pre_errors.len(),
             post_errors.len()
         );
-        let mut diag = new_compiler_diagnostic(tsrs_diagnostics::new_ad_hoc_message(&message), &[]);
+        let mut diag = new_compiler_diagnostic(tsrs_ast::new_ad_hoc_message(&message), &[]);
         diag = diag.add_related_info(new_compiler_diagnostic(
-            tsrs_diagnostics::new_ad_hoc_message("The excess diagnostics are:"),
+            tsrs_ast::new_ad_hoc_message("The excess diagnostics are:"),
             &[],
         ));
         for &d in longer_errors {
