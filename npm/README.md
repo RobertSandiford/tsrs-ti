@@ -17,6 +17,18 @@ The main package name is set in `npm/tsrs/package.json`; platform packages are `
 
 The repository's root `README.md` is also the main package README. `npm/build.mjs` copies it into the staged package.
 
+## Compiler defaults and fast mode
+
+The unreleased source build uses the pinned TypeScript checker defaults. `--fast` or `TSRS_FAST=1` opts into
+adaptive checker counts, lazy members, additional caches and eligible memory-saving modes; `--fast false`
+overrides the environment preset. Known cases can change diagnostics and exit status, resource use and compiler
+counters; switching modes can invalidate incremental caches. The launcher forwards CLI arguments and environment
+variables to the compiler. See the [main README](../README.md#fast-mode) and
+[performance options](../docs/USAGE.md#performance-options) for side effects and per-feature overrides.
+
+Default mode preserves TypeScript's checker behavior, including its known diagnostic sensitivity to changes
+in checker count or file order. This sensitivity is inherited from TypeScript itself.
+
 ## How the launcher finds the binary
 
 `bin/tsrs` -> `lib/tsrs.js` -> `lib/getExePath.js`:
@@ -241,9 +253,10 @@ pnpm exec tsrs -p path/to/project --noEmit --extendedDiagnostics
 #    (`--noEmit` for a typecheck-only script).
 ```
 
-Without `--checkers`, tsrs picks its checker count per machine (tsgo defaults to 4): every core up to 16, then the
-greater of 16 and half the cores, capped at 32; a program with fewer than 32 type-checked files per checker gets
-fewer, down to 4, and never more checkers than files. `--build` uses 4 per project; `--singleThreaded` uses one.
+Without `--checkers`, current source builds use four checkers, as tsgo does, capped by file count. With `--fast`
+or `TSRS_FAST=1`, the count adapts to the machine: every core up to 16, then the greater of 16 and half the cores,
+clamped to 4–32; a program with fewer than 32 type-checked files per checker gets fewer, down to 4, and never more
+checkers than files. `--build` uses 4 per project in both modes; `--singleThreaded` uses one.
 `GOMEMLIMIT` has no effect on tsrs.
 `--extendedDiagnostics` uses tsgo's counter labels; `Memory used` is the process RSS and `Memory allocs` is always 0.
 Compilation timings are collected only when `--diagnostics` or `--extendedDiagnostics` is enabled. Pass the flag on
