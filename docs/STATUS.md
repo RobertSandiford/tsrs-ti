@@ -5,6 +5,39 @@ change are identified separately from measurements of the packaged release. For 
 see the [compatibility table](COMPATIBILITY.md); detailed investigations are indexed in the
 [engineering notes](../notes/README.md). The early development log follows the release entries.
 
+## 2026-10-25: 0.19.0 beta refresh
+
+The release candidate remains `0.19.0-ts7.1.0-beta`, rebased onto main `b938b0a2`. All nine npm packages are
+prepared for `latest`, with a GitHub prerelease and manual npm `beta` tagging. The playground deploys after
+publication. The TypeScript pin remains `3e9236361fa9`; 0.18.0 remains the published release until this candidate ships.
+
+The candidate includes TypeScript-compatible checker defaults and the opt-in `--fast` / `TSRS_FAST=1` preset
+described below. Lazy declaration parsing now requires the preset or `TSRS_LAZY_DTS=1`, with `skipLibCheck` or
+`noCheck`; watch and API sessions remain eager. Build diagnostics keep the source text needed for error summaries
+after program regions are freed. Signature links, inherited path mappings, copy-on-write maps, lazy-member tables
+and mapped string names include the latest storage changes, and diagnostic formatting preserves output order
+while running in parallel. Ad hoc diagnostic messages use arena storage instead of leaked allocations (#779).
+The [release notes](releases/0.19.0.md) link individual performance measurements.
+
+Earlier candidate features remain: LSP API sessions over projects and unsaved editor files, mapper-contribution
+validation, the Cloudflare Workers WASM host fix, UTF-8 parent-path normalization, the macOS/Linux project-local
+VS Code SDK launcher, and Intel macOS and Windows x64 packages. Language-server mapper execution remains unported.
+The CLI returns through the C runtime so Windows PGO training can write profiles; failed Fourslash groups print
+diagnostics in job logs. CI and release BOLT use the shared conformance gate in both modes with a scheduling sweep,
+and CI adds ThreadSanitizer coverage for checking, emit, incremental builds, watch and LSP edits.
+
+Local dev-profile validation on the candidate based on `fb6aeb54` passes all 1,246 workspace tests (four existing
+tests are ignored), including all 16 macOS watch cases, all 50 regression fixtures, and 4,092 Go Fourslash groups
+with 470 skipped and no failures. Every compiler baseline matches in both modes after one isolated retry:
+`intersectionConstructorReductionCrash` hit the 300-second limit during concurrent validation and passed alone
+in 266 seconds with a 900-second limit. All 36 scheduling runs at four and eight checkers pass.
+
+After the final rebase onto `b938b0a2`, diagnostic and test-runner unit checks, six focused diagnostic/emit
+conformance runs across both modes and checker assignments, and dev/noembed builds pass. The final packed macOS
+arm64 consumer passes all 25 CLI/Node API steps with disk libraries and no embedded copies. Clippy, source/script
+checks, SDK freshness, and release-version consistency pass. Native Windows PGO training and Linux PGO/BOLT gates
+still require a successful release-workflow run.
+
 ## 2026-10-25: TypeScript defaults and opt-in fast mode (unreleased)
 
 Ordinary compilation now uses the pinned TypeScript defaults: four checkers, Go's file assignment and checker
