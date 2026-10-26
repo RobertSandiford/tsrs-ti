@@ -167,7 +167,7 @@ function buildSdk(tscPath) {
     }
     fs.rmSync(path.join(pkgDir, "dist"), { recursive: true, force: true });
     fs.rmSync(path.join(pkgDir, "tsconfig.tsbuildinfo"), { force: true });
-    const isJs = /\.[cm]?js$/.test(tsc);
+    const isJs = tscPath === undefined || /\.[cm]?js$/.test(tsc);
     execFileSync(isJs ? process.execPath : tsc, [...(isJs ? [tsc] : []), "-b", path.join(pkgDir, "tsconfig.json")], { stdio: "inherit" });
     // Type-check the declarations consumers receive after stripInternal removes private API surfaces.
     execFileSync(isJs ? process.execPath : tsc, [...(isJs ? [tsc] : []), "-p", path.join(pkgDir, "tsconfig.dist.json")], { stdio: "inherit" });
@@ -235,11 +235,17 @@ function stageWasm(module, out, versions, license, notice) {
 }
 
 function pnpmPack(dir, out) {
-    const stdout = execFileSync("pnpm", ["pack", "--json", "--pack-destination", out], {
-        cwd: dir,
-        encoding: "utf8",
-        shell: process.platform === "win32",
-    });
+    let stdout;
+    try {
+        stdout = execFileSync("pnpm", ["pack", "--json", "--pack-destination", out], {
+            cwd: dir,
+            encoding: "utf8",
+            shell: process.platform === "win32",
+        });
+    } catch (error) {
+        if (error.stdout) process.stderr.write(error.stdout);
+        throw error;
+    }
     const info = JSON.parse(stdout);
     return path.resolve(out, info.filename);
 }
