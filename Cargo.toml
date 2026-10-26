@@ -100,11 +100,14 @@ tsrs_fswatch = { path = "crates/tsrs_fswatch" }
 [profile.dev]
 debug = false
 
-# Optimized correctness binaries without release LTO; measured in notes/dev-loop-build.md.
+# Optimized correctness binaries without release LTO, keeping the debug assertions and overflow checks that local
+# `cargo test` runs; build times measured in notes/dev-loop-build.md.
 [profile.ci]
 inherits = "release"
 lto = "off"
 codegen-units = 16
+debug-assertions = true
+overflow-checks = true
 
 # Release binaries (.github/workflows/release.yml) build with this profile twice, for PGO: -Cprofile-generate,
 # training run, -Cprofile-use (notes/perf-pgo.md), then BOLT on Linux. Instrumented builds override rustc's LTO to
