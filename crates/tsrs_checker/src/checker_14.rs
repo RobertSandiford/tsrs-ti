@@ -429,10 +429,21 @@ impl Checker {
             return None;
         }
         let key = CachedTypeKey { kind: CachedTypeKind::EquivalentBaseType, type_id: t.id };
-        if t.object_flags_lazy().intersects(ObjectFlags::IdenticalBaseTypeCalculated) {
+        let object_flags = t.object_flags_lazy();
+        if object_flags.intersects(ObjectFlags::IdenticalBaseTypeCalculated) {
+            // tsrs-only: `IdenticalBaseTypeExists` is set together with the cache entry below, so a reference
+            // without it has no entry and the map is not probed (nearly every reference the relater normalizes
+            // has no single base, and this is asked of both sides of every relation between references).
+            if !object_flags.intersects(ObjectFlags::IdenticalBaseTypeExists) {
+                debug_assert!(
+                    !self.cached_types.contains_key(&key),
+                    "a cached equivalent base type without IdenticalBaseTypeExists"
+                );
+                return None;
+            }
             return self.cached_types.get(&key).copied();
         }
-        t.object_flags.set(t.object_flags_lazy() | ObjectFlags::IdenticalBaseTypeCalculated);
+        t.object_flags.set(object_flags | ObjectFlags::IdenticalBaseTypeCalculated);
         let target = t.target().unwrap();
         if target.object_flags().intersects(ObjectFlags::Class) {
             let base_type_node = get_base_type_node_of_class(target);
@@ -474,6 +485,7 @@ impl Checker {
             );
         }
         self.cached_types.insert(key, instantiated_base);
+        t.object_flags.set(t.object_flags_lazy() | ObjectFlags::IdenticalBaseTypeExists);
         Some(instantiated_base)
     }
 

@@ -1100,7 +1100,7 @@ bitflags! {
         const IsClassInstanceClone = 1 << 26; // Type is a clone of a class instance type
         // Flags that require TypeFlags.Object and ObjectFlags.Reference
         const IdenticalBaseTypeCalculated = 1 << 27; // has had `getSingleBaseForNonAugmentingSubtype` invoked on it already
-        const IdenticalBaseTypeExists = 1 << 28; // has a defined cachedEquivalentBaseType member
+        const IdenticalBaseTypeExists = 1 << 28; // has a defined cachedEquivalentBaseType member (tsrs: the `EquivalentBaseType` entry in `cached_types`; read before the map is probed)
         const FromTypeNode = 1 << 29; // Originates in resolution of AST type node
         // Flags that require TypeFlags.UnionOrIntersection or TypeFlags.Substitution
         const IsGenericTypeComputed = 1 << 22; // IsGenericObjectType flag has been computed
