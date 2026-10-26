@@ -5,16 +5,19 @@ change are identified separately from measurements of the packaged release. For 
 see the [compatibility table](COMPATIBILITY.md); detailed investigations are indexed in the
 [engineering notes](../notes/README.md). The early development log follows the release entries.
 
-## 0.19.0 beta
+## 0.20.0 beta
 
-The beta package version is `0.19.0-ts7.1.0-beta`, targeting TypeScript `7.1.0-beta` at `3e9236361fa9`.
-The [release notes](releases/0.19.0.md) cover installation, TypeScript-compatible defaults, the opt-in fast preset,
+The beta package version is `0.20.0-ts7.1.0-beta`, targeting TypeScript `7.1.0-beta` at `3e9236361fa9`.
+The [release notes](releases/0.20.0.md) cover installation, TypeScript-compatible defaults, the opt-in fast preset,
 API changes, platform support and known gaps. The release workflow publishes nine npm packages with the `latest`
 tag, creates a GitHub prerelease and then deploys the playground; npm's `beta` tag is assigned manually.
 
-Since the October 25 refresh, flow-memo keys preserve full-width pointers on Windows and other plain-pointer
-builds (#786), and Rust dependencies have been updated (#784). The dated entries below preserve validation
-results and release-preparation state at their recorded revisions.
+The October 26 preparation advances the Cargo workspace and npm package versions to 0.20.0. Since the
+October 25 refresh, changes include full-width flow-memo keys on Windows, checker and front-end allocation
+improvements, Vite+ tooling, debug assertions in the CI profile, and Windows packaging and Fourslash PGO fixes
+(#774, #775, #776, #778, #785, #786, #790, #791, #794, #796, #798). The [release notes](releases/0.20.0.md) link the
+individual measurements. The dated entries below preserve validation results and release-preparation state
+at their recorded revisions.
 
 ## 2026-10-25: 0.19.0 beta refresh
 

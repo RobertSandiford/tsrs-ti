@@ -15,8 +15,8 @@ editors' documented mechanisms.
 **VS Code** — the TypeScript 7 extension (`TypeScriptTeam.native-preview`, source in
 `ts-ref/packages/vscode-typescript`) starts `<tsdk>/tsgo --lsp --stdio` when `js/ts.tsdk.path` points at a directory
 that contains an executable named `tsgo` or `tsc` (`src/util.ts`: `tsdkConfigSources`, `packagedExeBaseNames`).
-The 0.19.0 beta includes `tsdk/tsgo` for macOS and Linux. Install it with
-`pnpm add -D tsrs@0.19.0-ts7.1.0-beta` and commit this `.vscode/settings.json` so each teammate's editor uses the
+The 0.20.0 beta includes `tsdk/tsgo` for macOS and Linux. Install it with
+`pnpm add -D tsrs@0.20.0-ts7.1.0-beta` and commit this `.vscode/settings.json` so each teammate's editor uses the
 version in the project's lockfile:
 
 ```jsonc

@@ -2,7 +2,7 @@
 
 ## JavaScript API
 
-Install the beta with `pnpm add -D tsrs@0.19.0-ts7.1.0-beta`. `require("tsrs")` exports `version`, `typescriptVersion` and
+Install the beta with `pnpm add -D tsrs@0.20.0-ts7.1.0-beta`. `require("tsrs")` exports `version`, `typescriptVersion` and
 `typescriptCommit`.
 
 The package also ships TypeScript 7's programmatic API, copied from microsoft/TypeScript
@@ -54,7 +54,7 @@ selected package manifest. Passing a `tsrs` installation's `package.json` loads 
 installation. This is a package-side helper; tsrs does not supply the upstream VS Code extension's SDK event,
 API-pipe lifecycle, or in-place-upgrade restart handling.
 
-The 0.19.0 beta uses the upstream beta entry-point names. It removes deprecated `openProject`,
+The 0.20.0 beta uses the upstream beta entry-point names. It removes deprecated `openProject`,
 `Project.rootFiles` / `.compilerOptions`, and the `Snapshot.internal` formatting alias; use `openProjects`,
 `project.parsedCommandLine`, and `project.languageService.formatNodeForInsertion`. The server's project response
 no longer sends the removed duplicate fields. The API is served by the `tsrs` binary (`tsrs --api`), whose
