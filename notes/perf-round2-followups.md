@@ -516,6 +516,14 @@ with the switch off, which is why it is not in the default build.
   `getNamedMembers` into a pooled buffer, and object-literal all-properties tables presized: -0.012%, inside the
   spread. A pool's push and pop cost about what mimalloc's fast path does. Pooling paid for hash tables and for
   growth chains (realloc and copy), not for one short-lived Vec.
+- JSDoc lists on the parser's scratch buffers and one lazy JSDoc parser per thread (notes/perf-jsdoc-parser.md,
+  landed): the per-node comment ranges, tags, comment parts and `{@link}` text go through `*_space` buffers, the
+  per-node comment list and the nested lists of a tag build on `node_stack`, and `parse_jsdoc_for_node` reuses a
+  per-thread parser (`Parser::recycle`) instead of building one per node. Heap allocations webpack -4.5% full check
+  / -11.8% front end, typeorm -0.9%, mui-docs -0.1%; instructions webpack -0.33% (6 of 7 pairs), typeorm and
+  mui-docs flat; AST hashes identical on 202,810 files. Do not redo those sites. Left, with the reason, in the note:
+  the `Vec` the `ParseJSDocForNodeFn` signature returns per lazily parsed node (tsrs_ast, #772's territory) and
+  `parse_isolated_entity_name`'s parser per call (language service only).
   Relater round (notes/perf-icount-relater.md; another large private monorepo, DynamoRIO counts): an exact early exit
   from the deeply-nested walk (+0.04% single-threaded), `Relation::set` through hashbrown's `entry` (-0.005%, noise),
   a Bloom filter of names in `some_property_reduces_to_never`'s counts (+0.03%).
