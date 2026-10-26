@@ -7,8 +7,9 @@ use std::process::{Command, Output};
 use tsrs_vfs::osvfs;
 
 fn scratch(name: &str) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("tsrs-npm-lib-path-{}-{}", name, std::process::id()));
+    // Stay on the executable's filesystem so installation can hard-link instead of copying.
+    let root = Path::new(env!("CARGO_BIN_EXE_tsrs")).parent().unwrap();
+    let dir = root.join(format!("tsrs-npm-lib-path-{}-{}", name, std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("project")).unwrap();
     std::fs::write(
@@ -22,18 +23,16 @@ fn scratch(name: &str) -> PathBuf {
     )
     .unwrap();
     // Compiler paths use ordinary drive paths on Windows, not canonicalize's
-    // verbatim paths. Resolve macOS's temporary-directory symlink as well.
+    // verbatim paths. Resolve symlinks in the Cargo output path as well.
     PathBuf::from(osvfs::fs().realpath(&dir.to_string_lossy()))
 }
 
-// The test binary under `bin`, linked rather than copied where the file system allows it (it is large).
+// Hard-linking avoids opening an executable for writing: a concurrent fork could inherit that descriptor.
 fn install_binary(dir: &Path) -> PathBuf {
     let bin = dir.join("bin");
     std::fs::create_dir_all(&bin).unwrap();
     let exe = bin.join(if cfg!(windows) { "tsrs.exe" } else { "tsrs" });
-    if std::fs::hard_link(env!("CARGO_BIN_EXE_tsrs"), &exe).is_err() {
-        std::fs::copy(env!("CARGO_BIN_EXE_tsrs"), &exe).unwrap();
-    }
+    std::fs::hard_link(env!("CARGO_BIN_EXE_tsrs"), &exe).unwrap();
     exe
 }
 
