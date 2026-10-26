@@ -1120,10 +1120,15 @@ bitflags! {
         // tsrs-only, intersections: shouldNormalizeIntersection memoized (its answer depends only on the constituents).
         const ShouldNormalizeComputed = 1 << 30;
         const ShouldNormalize = 1 << 31;
+        // tsrs-only, unions: every constituent is a string, number, bigint, boolean, enum, symbol, object or
+        // non-primitive kind (no nullable, void, intersection or instantiable constituent), so the union has no
+        // nullability type fact and `get_type_facts_worker` answers those without the walk. Set by
+        // `get_union_type_from_sorted_list` from the constituents (`new_type` drops the bit, see `WeakTypeMemo`).
+        const NonNullableUnion = 1 << 30;
         // tsrs-only, object types: isWeakType memoized; cleared with MembersResolved (`WeakTypeMemo`).
         const IsWeakTypeComputed = 1 << 30;
         const IsWeakType = 1 << 31;
-        const WeakTypeMemo = Self::IsWeakTypeComputed.bits() | Self::IsWeakType.bits(); // also the intersection memo bits: new_type drops them
+        const WeakTypeMemo = Self::IsWeakTypeComputed.bits() | Self::IsWeakType.bits(); // also the intersection memo and union summary bits: new_type drops them
     }
 }
 

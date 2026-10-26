@@ -1646,14 +1646,7 @@ impl Checker {
             }
             return TypeFacts::TrueFacts;
         } else if flags.intersects(TypeFlags::Object) {
-            let possible_facts = if self.strict_null_checks {
-                TypeFacts::EmptyObjectStrictFacts
-                    | TypeFacts::FunctionStrictFacts
-                    | TypeFacts::ObjectStrictFacts
-            } else {
-                TypeFacts::EmptyObjectFacts | TypeFacts::FunctionFacts | TypeFacts::ObjectFacts
-            };
-            if (caller_only_needs & possible_facts) == TypeFacts::None {
+            if (caller_only_needs & self.possible_object_type_facts()) == TypeFacts::None {
                 // If the caller doesn't care about any of the facts that we could possibly produce,
                 // return zero so we can skip resolving members.
                 return TypeFacts::None;
@@ -1691,17 +1684,46 @@ impl Checker {
         } else if flags.intersects(TypeFlags::Never) {
             return TypeFacts::None;
         } else if flags.intersects(TypeFlags::Union) {
-            let mut facts = TypeFacts::None;
-            facts = t.types().iter().fold(facts, |mut facts, &t| {
-                facts |= self.get_type_facts_worker(t, caller_only_needs);
-
-                facts
-            });
-            return facts;
+            // tsrs-only: a union of non-nullable kinds (`ObjectFlags::NonNullableUnion`, set by the union builder)
+            // has none of the nullability facts, and when the caller needs no object fact every constituent would
+            // return a constant without the facts asked for and resolve nothing, so the walk is skipped. The
+            // caller masks the result with `caller_only_needs`, as it does the object case's early return.
+            if t.object_flags().intersects(ObjectFlags::NonNullableUnion)
+                && (caller_only_needs & self.possible_object_type_facts()) == TypeFacts::None
+            {
+                if cfg!(debug_assertions) {
+                    let walked = self.get_union_type_facts(t, caller_only_needs);
+                    assert!(
+                        (walked & caller_only_needs) == TypeFacts::None,
+                        "a union of non-nullable kinds has a fact its summary rules out"
+                    );
+                }
+                return TypeFacts::None;
+            }
+            return self.get_union_type_facts(t, caller_only_needs);
         } else if flags.intersects(TypeFlags::Intersection) {
             return self.get_intersection_type_facts(t, caller_only_needs);
         }
         TypeFacts::UnknownFacts
+    }
+
+    /// The facts `get_type_facts_worker` can return for an object type (Go's `possibleFacts`).
+    #[inline]
+    fn possible_object_type_facts(&self) -> TypeFacts {
+        if self.strict_null_checks {
+            TypeFacts::EmptyObjectStrictFacts
+                | TypeFacts::FunctionStrictFacts
+                | TypeFacts::ObjectStrictFacts
+        } else {
+            TypeFacts::EmptyObjectFacts | TypeFacts::FunctionFacts | TypeFacts::ObjectFacts
+        }
+    }
+
+    /// The union case of `getTypeFactsWorker`: the facts of the constituents, or-ed.
+    fn get_union_type_facts(&mut self, t: P<Type>, caller_only_needs: TypeFacts) -> TypeFacts {
+        t.types().iter().fold(TypeFacts::None, |facts, &t| {
+            facts | self.get_type_facts_worker(t, caller_only_needs)
+        })
     }
 
     // checker.go:31607

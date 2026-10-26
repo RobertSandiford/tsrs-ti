@@ -503,6 +503,12 @@ with the switch off, which is why it is not in the default build.
   (55% of typeorm's `--noCheck` allocations are the transformer), never in the catalog's `--noEmit` full check
   (no `tsrs_declarations` frame in 713,672 sampled allocations of typeorm). Nothing to take for the catalog;
   revisit only for a `--noCheck` workload.
+- Around the union type-facts summary (notes/perf-union-type-facts.md, landed: `ObjectFlags::NonNullableUnion`,
+  Compiler-Unions -1.0% single-threaded instructions): a 32-bit OR of constituent flags per union (a word per
+  union, `UnionType` has no padding) and answering the `NE` masks from the summary (the walk resolves object
+  constituents' members for those, so the shortcut would skip resolution) were not built; the strict application
+  projects (typeorm, mui-docs) ask mostly for `NE` facts or of unions that really are nullable, so there is
+  nothing more to take there.
 - From notes/perf-icount-alloc.md (exact VM counts, locality mode, a large private monorepo at 8 checkers): the
   arguments of a pending type alias held as a `Cow` (the alias's own list when unchanged, a pooled buffer when
   changed), together with pooled lists for template-literal instantiation: +0.20%, and +0.26% with the helpers out

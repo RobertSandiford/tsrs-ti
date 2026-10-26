@@ -2662,9 +2662,13 @@ impl Checker {
         index_infos: &[P<IndexInfo>],
     ) {
         // A class or interface sets its own members, then again with the inherited ones: drop what isWeakType
-        // memoized in between.
-        t.object_flags
-            .set(t.object_flags_lazy() & !ObjectFlags::WeakTypeMemo | ObjectFlags::MembersResolved);
+        // memoized in between. The memo lives on object types only; a union keeps `NonNullableUnion` and an
+        // intersection its `ShouldNormalize` memo in the same bits.
+        let mut object_flags = t.object_flags_lazy() | ObjectFlags::MembersResolved;
+        if t.flags().intersects(TypeFlags::Object) {
+            object_flags &= !ObjectFlags::WeakTypeMemo;
+        }
+        t.object_flags.set(object_flags);
         let data = t.as_structured_type();
         data.set_members(members);
         let properties = self.get_named_members(members, t.symbol());

@@ -9,6 +9,14 @@ use tsrs_diagnostics as diagnostics;
 //   const (checker.go:26506): IntersectionFlagsNone, IntersectionFlagsNoSupertypeReduction,
 //     IntersectionFlagsNoConstraintReduction
 
+/// The constituent kinds of an `ObjectFlags::NonNullableUnion`: for each, `get_type_facts_worker` returns a constant
+/// without `IsUndefined`, `IsNull` or, under `strictNullChecks`, `EQUndefined`, `EQNull` and `EQUndefinedOrNull`,
+/// and resolves nothing when the caller needs no object fact. Nullable and void types carry those facts; an
+/// intersection or an instantiable type (a template literal or string mapping included) goes through its base
+/// constraint first; `any` and `unknown` have the EQ facts.
+const NON_NULLABLE_KINDS: TypeFlags =
+    TypeFlags::DefinitelyNonNullable.difference(TypeFlags::Instantiable);
+
 // Go formats an `any` diagnostic argument with `%v`.
 fn literal_value_to_string(value: Option<LiteralValue>) -> String {
     match value {
@@ -214,6 +222,12 @@ impl Checker {
         let flags = precomputed_object_flags
             | Self::get_propagating_flags_of_types(types, TypeFlags::Nullable);
         let t = self.new_union_type(flags, types);
+        // tsrs-only: the summary `get_type_facts_worker` reads for the nullability facts, from the final constituent
+        // list (callers pass only part of a source union's flags) and after `new_type` (which drops the bit).
+        let kinds = types.iter().fold(TypeFlags::empty(), |kinds, &t| kinds | t.flags());
+        if NON_NULLABLE_KINDS.contains(kinds) {
+            t.object_flags.set(t.object_flags() | ObjectFlags::NonNullableUnion);
+        }
         t.as_union_type().set_origin(origin);
         t.set_alias(alias.alias());
         if types.len() == 2
