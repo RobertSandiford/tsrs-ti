@@ -3,7 +3,7 @@
 // MessagePack + SyncConn by default, JSON-RPC + AsyncConn with `--async`.
 
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use crate::conn_async::AsyncConn;
@@ -95,18 +95,6 @@ impl PipeListener {
 
     pub fn accept(&self) -> std::io::Result<Stream> {
         self.inner.accept()
-    }
-}
-
-/// ipc.GeneratePipePath: `<tmpdir>/<name>` on Unix, `\\.\pipe\<name>` on Windows.
-pub fn generate_pipe_path(name: &str) -> PathBuf {
-    #[cfg(windows)]
-    {
-        PathBuf::from(format!(r"\\.\pipe\{name}"))
-    }
-    #[cfg(not(windows))]
-    {
-        std::env::temp_dir().join(name)
     }
 }
 
@@ -213,13 +201,6 @@ impl Connection {
         match self {
             Connection::Sync(c) => c.caller(),
             Connection::Async(c) => c.caller(),
-        }
-    }
-
-    pub fn cancellation(&self) -> CancellationToken {
-        match self {
-            Connection::Sync(c) => c.cancellation(),
-            Connection::Async(c) => c.cancellation(),
         }
     }
 
