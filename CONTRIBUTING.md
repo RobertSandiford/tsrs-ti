@@ -151,7 +151,8 @@ does.
   and determinism use those same binaries. The Linux checks have separate Rust caches: `lint` runs Clippy and source checks;
   `workspace-tests` runs all workspace tests with warnings denied; `conformance` runs beside it with compiler
   conformance in both checker modes with the focused upstream scheduling sweep, and regressions; `test` (the
-  required Test Linux check) passes only when both succeed;
+  required Test Linux check) passes only when both succeed. `check-windows` checks all workspace targets on Windows
+  with warnings denied;
   `determinism` compares every benchmark project against committed snapshots
   from the root pnpm TypeScript release matching Cargo metadata, using Go defaults and fast-mode locality/unnamed
   scheduling at four and all available CPU checkers, three runs each, plus three fixed random assignments per count.
@@ -161,7 +162,7 @@ does.
   then runs type checking, emit, incremental builds, watch edits and LSP edits through `tasks/thread_sanitizer`.
   Reports and failures are retained in its artifact; any sanitizer report or failed workload fails the job.
   See [the determinism task](tasks/determinism/README.md) for snapshot updates. Regression output must still match
-  the checked-in reference output; `fourslash` runs the server framing checks, gate checks, and
+  the checked-in reference output; `fourslash` runs the gate checks and
   [Go fourslash subprocess gate](tools/go-fourslash/README.md#ci-gate); `node-api-clients` runs the pinned upstream
   sync and async client suites against both compilers.
   Source checks overlap Rust setup and Clippy in `lint`. Setup and checkout actions in `test` and `fourslash`
